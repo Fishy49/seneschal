@@ -55,4 +55,27 @@ module ApplicationHelper
     return "\u2014" unless time
     time_ago_in_words(time) + " ago"
   end
+
+  def format_cost(usd)
+    return nil unless usd
+    usd < 0.01 ? "$#{format('%.4f', usd)}" : "$#{format('%.2f', usd)}"
+  end
+
+  def format_tokens(count)
+    return nil unless count && count > 0
+    count >= 1_000_000 ? "#{(count / 1_000_000.0).round(1)}M" : "#{(count / 1_000.0).round(1)}k"
+  end
+
+  def usage_stats_bar(stats)
+    return nil unless stats
+    parts = []
+    parts << format_cost(stats[:cost_usd]) if stats[:cost_usd] > 0
+    total_tokens = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens]
+    parts << "#{format_tokens(total_tokens)} tokens" if total_tokens > 0
+    parts << "#{stats[:num_turns]} turns" if stats[:num_turns] > 0
+    if stats[:duration_ms] > 0
+      parts << format_duration(stats[:duration_ms] / 1000.0)
+    end
+    parts.join(" / ")
+  end
 end

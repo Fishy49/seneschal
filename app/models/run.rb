@@ -19,4 +19,24 @@ class Run < ApplicationRecord
     return nil unless started_at
     (finished_at || Time.current) - started_at
   end
+
+  def usage_stats
+    all = run_steps.filter_map(&:usage_stats)
+    return nil if all.empty?
+    aggregate_usage(all)
+  end
+
+  private
+
+  def aggregate_usage(stats)
+    {
+      cost_usd: stats.sum { |s| s[:cost_usd] },
+      input_tokens: stats.sum { |s| s[:input_tokens] },
+      output_tokens: stats.sum { |s| s[:output_tokens] },
+      cache_read_tokens: stats.sum { |s| s[:cache_read_tokens] },
+      cache_creation_tokens: stats.sum { |s| s[:cache_creation_tokens] },
+      duration_ms: stats.sum { |s| s[:duration_ms] },
+      num_turns: stats.sum { |s| s[:num_turns] }
+    }
+  end
 end

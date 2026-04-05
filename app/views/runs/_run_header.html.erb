@@ -1,17 +1,33 @@
-<div id="run_header" class="flex items-center justify-between mb-4">
-  <div>
-    <h1 class="text-2xl font-semibold">Run #<%= run.id %> <%= status_badge(run.status) %></h1>
+<div id="run_header">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-2xl font-semibold">Run #<%= run.id %> <%= status_badge(run.status) %></h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <% if run.active? %>
+        <%= button_to "Stop", stop_run_path(run),
+              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
+              data: { turbo_confirm: "Stop this run?" } %>
+      <% end %>
+      <% if run.status.in?(%w[failed stopped]) && run.run_steps.exists?(status: "failed") %>
+        <%= button_to "Resume", resume_run_path(run),
+              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
+              data: { turbo_confirm: "Resume this run from the failed step?" } %>
+      <% end %>
+    </div>
   </div>
-  <div class="flex items-center gap-2">
-    <% if run.active? %>
-      <%= button_to "Stop", stop_run_path(run),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
-            data: { turbo_confirm: "Stop this run?" } %>
-    <% end %>
-    <% if run.status.in?(%w[failed stopped]) && run.run_steps.exists?(status: "failed") %>
-      <%= button_to "Resume", resume_run_path(run),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
-            data: { turbo_confirm: "Resume this run from the failed step?" } %>
-    <% end %>
-  </div>
+  <% if (stats = run.usage_stats) && stats[:cost_usd] > 0 %>
+    <div class="text-sm text-content-muted mb-4 flex flex-wrap gap-x-4 gap-y-1">
+      <span>Cost: <span class="text-content font-medium"><%= format_cost(stats[:cost_usd]) %></span></span>
+      <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>
+      <% if total > 0 %>
+        <span>Tokens: <span class="text-content font-medium"><%= format_tokens(total) %></span>
+          <span class="text-xs">(in: <%= format_tokens(stats[:input_tokens]) %>, out: <%= format_tokens(stats[:output_tokens]) %>, cache read: <%= format_tokens(stats[:cache_read_tokens]) %>, cache write: <%= format_tokens(stats[:cache_creation_tokens]) %>)</span>
+        </span>
+      <% end %>
+      <% if stats[:num_turns] > 0 %>
+        <span>Turns: <span class="text-content font-medium"><%= stats[:num_turns] %></span></span>
+      <% end %>
+    </div>
+  <% end %>
 </div>

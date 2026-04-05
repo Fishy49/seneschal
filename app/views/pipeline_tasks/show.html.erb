@@ -40,6 +40,12 @@
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th><td class="px-3 py-2 border-b border-edge"><%= type_badge(@task.kind) %></td></tr>
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(@task.status) %></td></tr>
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></td></tr>
+        <% if (stats = @task.usage_stats) && stats[:cost_usd] > 0 %>
+          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Cost</th><td class="px-3 py-2 border-b border-edge text-sm font-medium"><%= format_cost(stats[:cost_usd]) %></td></tr>
+          <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>
+          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Tokens</th><td class="px-3 py-2 border-b border-edge text-sm"><%= format_tokens(total) %> <span class="text-xs text-content-muted">(in: <%= format_tokens(stats[:input_tokens]) %>, out: <%= format_tokens(stats[:output_tokens]) %>, cache read: <%= format_tokens(stats[:cache_read_tokens]) %>, cache write: <%= format_tokens(stats[:cache_creation_tokens]) %>)</span></td></tr>
+          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Turns</th><td class="px-3 py-2 border-b border-edge text-sm"><%= stats[:num_turns] %></td></tr>
+        <% end %>
       </table>
     </div>
 
@@ -51,6 +57,7 @@
             <tr>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Run</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Cost</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
             </tr>
@@ -60,6 +67,7 @@
               <tr>
                 <td class="px-3 py-2 border-b border-edge"><%= link_to "##{run.id}", run_path(run) %></td>
                 <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_cost(run.usage_stats&.dig(:cost_usd)) || "\u2014" %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>
               </tr>

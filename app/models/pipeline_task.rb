@@ -22,4 +22,19 @@ class PipelineTask < ApplicationRecord
   def latest_run
     runs.order(created_at: :desc).first
   end
+
+  def usage_stats
+    all = runs.includes(:run_steps).flat_map { |r| r.run_steps.filter_map(&:usage_stats) }
+    return nil if all.empty?
+
+    {
+      cost_usd: all.sum { |s| s[:cost_usd] },
+      input_tokens: all.sum { |s| s[:input_tokens] },
+      output_tokens: all.sum { |s| s[:output_tokens] },
+      cache_read_tokens: all.sum { |s| s[:cache_read_tokens] },
+      cache_creation_tokens: all.sum { |s| s[:cache_creation_tokens] },
+      duration_ms: all.sum { |s| s[:duration_ms] },
+      num_turns: all.sum { |s| s[:num_turns] }
+    }
+  end
 end
