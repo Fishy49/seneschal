@@ -73,6 +73,7 @@ class StepsController < ApplicationController
       if raw["skill_outputs"].present?
         config["outputs"] = begin; JSON.parse(raw["skill_outputs"]); rescue; {}; end
       end
+      config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
       permitted[:config] = config
     else
       permitted[:config] = {}

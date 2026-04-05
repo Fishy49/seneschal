@@ -6,7 +6,13 @@ class SetupController < ApplicationController
   def index
     @claude = integration_status("claude_cli")
     @gh = integration_status("gh_cli")
+    @allowed_tools = Setting["default_allowed_tools"].presence || StepExecutor::DEFAULT_ALLOWED_TOOLS
     @all_ok = @claude[:ok] && @gh[:ok]
+  end
+
+  def update_allowed_tools
+    Setting["default_allowed_tools"] = params[:default_allowed_tools].strip
+    redirect_to setup_path, notice: "Allowed tools updated."
   end
 
   def check_claude

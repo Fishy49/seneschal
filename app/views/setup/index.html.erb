@@ -66,6 +66,29 @@
     </div>
   </div>
 
+    <%# ── Claude Permissions ── %>
+    <div class="bg-surface-card border border-edge rounded-lg p-5">
+      <h2 class="text-lg font-semibold mb-1">Claude Permissions</h2>
+      <p class="text-sm text-content-muted mb-4">Skills run with <code class="text-xs bg-surface-input px-1 py-0.5 rounded">--permission-mode dontAsk</code>, which auto-denies any tool not in the allowed list. This replaces the <code class="text-xs bg-surface-input px-1 py-0.5 rounded">--dangerously-skip-permissions</code> flag with scoped, auditable permissions.</p>
+
+      <%= form_with url: update_allowed_tools_setup_path, method: :patch, class: "space-y-3" do %>
+        <div>
+          <label for="default_allowed_tools" class="block text-sm font-medium text-content-muted mb-1.5">Default Allowed Tools</label>
+          <input type="text" name="default_allowed_tools" id="default_allowed_tools"
+                 value="<%= @allowed_tools %>"
+                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+          <p class="text-sm text-content-muted mt-2">Comma-separated. Applies to all skill steps unless overridden. Supports patterns like <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>.</p>
+        </div>
+        <div>
+          <button type="submit"
+                  class="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge">
+            Save
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
   <% if @all_ok %>
     <div class="mt-6 text-center">
       <%= link_to "Continue to Dashboard", root_path,

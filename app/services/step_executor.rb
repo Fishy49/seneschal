@@ -10,6 +10,7 @@ class StepExecutor
   end
 
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
+  DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep"
 
   def initialize(step, context, repo_path, resolved_input_context: nil)
     @step = step
@@ -172,12 +173,12 @@ class StepExecutor
     max_turns = @step.config["max_turns"]
     cmd += ["--max-turns", max_turns.to_s] if max_turns.present?
 
-    allowed = @step.config["allowed_tools"]
-    if allowed.present?
-      cmd += ["--allowedTools", allowed]
-    else
-      cmd += ["--dangerously-skip-permissions"]
-    end
+    cmd += ["--permission-mode", "dontAsk"]
+
+    allowed = @step.config["allowed_tools"].presence ||
+              Setting["default_allowed_tools"].presence ||
+              DEFAULT_ALLOWED_TOOLS
+    cmd += ["--allowedTools", allowed]
 
     cmd
   end
