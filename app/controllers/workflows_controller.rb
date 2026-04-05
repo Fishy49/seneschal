@@ -56,6 +56,6 @@ class WorkflowsController < ApplicationController
   end
 
   def trigger_input_params
-    params.permit(input: {}).fetch(:input, {}).to_h
+    params.permit(input: {}).to_h.fetch("input", {})
   end
 end

@@ -1,0 +1,30 @@
+ready_task:
+  title: Add user authentication
+  body: Implement login and registration
+  kind: feature
+  status: ready
+  project: seneschal
+  workflow: deploy
+
+draft_task:
+  title: Refactor database layer
+  body: Clean up legacy queries
+  kind: chore
+  status: draft
+  project: seneschal
+
+running_task:
+  title: Fix login bug
+  body: Users can't log in with special chars
+  kind: bugfix
+  status: running
+  project: seneschal
+  workflow: deploy
+
+completed_task:
+  title: Add search
+  body: Full-text search for projects
+  kind: feature
+  status: completed
+  project: seneschal
+  workflow: deploy

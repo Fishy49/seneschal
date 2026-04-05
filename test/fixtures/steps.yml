@@ -1,0 +1,29 @@
+skill_step:
+  name: Plan Feature
+  workflow: deploy
+  skill: shared_skill
+  position: 1
+  step_type: skill
+  max_retries: 1
+  timeout: 300
+  config: {}
+
+command_step:
+  name: Run Build
+  workflow: deploy
+  position: 2
+  step_type: command
+  body: "echo 'building...'"
+  max_retries: 0
+  timeout: 120
+  config: {}
+
+script_step:
+  name: Deploy Script
+  workflow: deploy
+  position: 3
+  step_type: script
+  body: "echo 'deploying ${branch}'"
+  max_retries: 2
+  timeout: 600
+  config: {}

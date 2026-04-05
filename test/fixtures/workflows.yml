@@ -1,0 +1,10 @@
+deploy:
+  name: Deploy Pipeline
+  project: seneschal
+  trigger_type: manual
+  description: Standard deployment workflow
+
+cron_workflow:
+  name: Nightly Build
+  project: seneschal
+  trigger_type: cron

@@ -1,0 +1,15 @@
+claude_cli:
+  key: claude_cli
+  value: "claude 1.0.0"
+
+claude_cli_checked:
+  key: claude_cli_checked_at
+  value: "<%= Time.current.iso8601 %>"
+
+gh_cli:
+  key: gh_cli
+  value: "gh version 2.0.0"
+
+gh_cli_checked:
+  key: gh_cli_checked_at
+  value: "<%= Time.current.iso8601 %>"

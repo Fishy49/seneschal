@@ -1,0 +1,12 @@
+seneschal:
+  name: Seneschal
+  repo_url: https://github.com/test/seneschal.git
+  local_path: <%= Rails.root.join("tmp", "test_repos", "seneschal") %>
+  repo_status: ready
+  description: Test project
+
+other_project:
+  name: OtherProject
+  repo_url: https://github.com/test/other.git
+  local_path: <%= Rails.root.join("tmp", "test_repos", "other") %>
+  repo_status: not_cloned

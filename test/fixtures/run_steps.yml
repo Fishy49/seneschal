@@ -1,0 +1,56 @@
+running_step:
+  run: active_run
+  step: skill_step
+  status: running
+  attempt: 1
+  position: 1
+  started_at: <%= 5.minutes.ago %>
+
+passed_step:
+  run: completed_run
+  step: skill_step
+  status: passed
+  attempt: 1
+  position: 1
+  exit_code: 0
+  output: "PR #42 created on branch feature/auth"
+  started_at: <%= 1.hour.ago %>
+  finished_at: <%= 45.minutes.ago %>
+  duration: 900.0
+  stream_log:
+    - type: system
+      model: claude-sonnet-4-20250514
+    - type: result
+      total_cost_usd: 0.0523
+      usage:
+        input_tokens: 15000
+        output_tokens: 3000
+        cache_read_input_tokens: 5000
+        cache_creation_input_tokens: 1000
+      duration_ms: 45000
+      num_turns: 5
+
+passed_command_step:
+  run: completed_run
+  step: command_step
+  status: passed
+  attempt: 1
+  position: 2
+  exit_code: 0
+  output: "building..."
+  started_at: <%= 45.minutes.ago %>
+  finished_at: <%= 40.minutes.ago %>
+  duration: 300.0
+
+failed_step:
+  run: failed_run
+  step: command_step
+  status: failed
+  attempt: 1
+  position: 2
+  exit_code: 1
+  error_output: "Build failed: missing dependency"
+  started_at: <%= 2.hours.ago %>
+  finished_at: <%= 1.hour.ago %>
+  duration: 60.0
+  claude_session_id: "sess_abc123"

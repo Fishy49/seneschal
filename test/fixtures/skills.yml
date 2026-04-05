@@ -1,0 +1,11 @@
+shared_skill:
+  name: ingest_feature
+  body: "Create feature branch for: ${task_title}"
+  description: Shared skill for ingesting features
+  project:
+
+project_skill:
+  name: deploy_check
+  body: "Run deployment checks for ${repo_name}"
+  description: Project-specific deployment skill
+  project: seneschal

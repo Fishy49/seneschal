@@ -1,0 +1,15 @@
+admin:
+  email: admin@test.com
+  password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  otp_required_for_login: false
+
+other:
+  email: other@test.com
+  password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  otp_required_for_login: false
+
+twofa_user:
+  email: twofa@test.com
+  password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  otp_required_for_login: true
+  otp_secret: <%= ROTP::Base32.random %>
