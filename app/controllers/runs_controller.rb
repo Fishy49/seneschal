@@ -18,6 +18,7 @@ class RunsController < ApplicationController
   def stop
     if @run.active?
       @run.update!(status: "stopped", finished_at: Time.current, error_message: "Stopped by user")
+      @run.pipeline_task&.update!(status: "failed")
     end
     redirect_to run_path(@run), notice: "Run stopped."
   end

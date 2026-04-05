@@ -10,6 +10,7 @@ export default class extends Controller {
 
   connect() {
     this.previewVisible = false
+    this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
   }
