@@ -1,0 +1,71 @@
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Tasks</h1>
+  <%= link_to "New Task", new_pipeline_task_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+</div>
+
+<div class="bg-surface-card border border-edge rounded-lg p-4 mb-4">
+  <%= form_with url: pipeline_tasks_path, method: :get, class: "flex items-center gap-3 flex-wrap", data: { turbo_frame: "_top" } do |f| %>
+    <input type="text" name="q" value="<%= params[:q] %>" placeholder="Search tasks..."
+           class="flex-1 min-w-[200px] px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    <select name="project_id" onchange="this.form.requestSubmit()"
+            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      <option value="">All Projects</option>
+      <% @projects.each do |p| %>
+        <option value="<%= p.id %>" <%= "selected" if params[:project_id].to_s == p.id.to_s %>><%= p.name %></option>
+      <% end %>
+    </select>
+    <select name="status" onchange="this.form.requestSubmit()"
+            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      <option value="">All Statuses</option>
+      <% PipelineTask::STATUSES.each do |s| %>
+        <option value="<%= s %>" <%= "selected" if params[:status] == s %>><%= s.capitalize %></option>
+      <% end %>
+    </select>
+    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">Search</button>
+    <% if params[:q].present? || params[:project_id].present? || params[:status].present? || params[:kind].present? %>
+      <%= link_to "Clear", pipeline_tasks_path, class: "text-sm text-content-muted hover:text-content transition-colors" %>
+    <% end %>
+  <% end %>
+</div>
+
+<% if @tasks.any? %>
+  <% %w[draft ready running completed failed].each do |status| %>
+    <% tasks_in_status = @tasks.select { |t| t.status == status } %>
+    <% next if tasks_in_status.empty? %>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3"><%= status.capitalize %></h2>
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Title</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tasks_in_status.each do |task| %>
+            <tr>
+              <td class="px-3 py-2 border-b border-edge"><%= link_to task.title, pipeline_task_path(task) %></td>
+              <td class="px-3 py-2 border-b border-edge"><%= type_badge(task.kind) %></td>
+              <td class="px-3 py-2 border-b border-edge text-content-muted"><%= task.project.name %></td>
+              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= task.workflow&.name || "\u2014" %></td>
+              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(task.updated_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% else %>
+  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+    <% if params[:q].present? || params[:project_id].present? || params[:status].present? %>
+      <p>No tasks match your filters.</p>
+      <p class="mt-2"><%= link_to "Clear filters", pipeline_tasks_path %></p>
+    <% else %>
+      <p>No tasks yet.</p>
+      <p class="mt-2"><%= link_to "Create your first task", new_pipeline_task_path %></p>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,18 @@
+<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" id="run_info">
+  <h2 class="text-lg font-semibold mb-3">Run Info</h2>
+  <table class="w-full border-collapse">
+    <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td></tr>
+    <% if run.input["resumed_from_run"].present? %>
+      <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Resumed from</th><td class="px-3 py-2 border-b border-edge"><%= link_to "Run ##{run.input['resumed_from_run']}", run_path(run.input["resumed_from_run"]) %></td></tr>
+    <% end %>
+    <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Started</th><td class="px-3 py-2 border-b border-edge text-sm"><%= run.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "\u2014" %></td></tr>
+    <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Finished</th><td class="px-3 py-2 border-b border-edge text-sm"><%= run.finished_at&.strftime("%Y-%m-%d %H:%M:%S") || "\u2014" %></td></tr>
+    <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th><td class="px-3 py-2 border-b border-edge text-sm"><%= format_duration(run.duration) %></td></tr>
+  </table>
+  <% if run.error_message.present? %>
+    <div class="mt-4">
+      <h3 class="text-base font-semibold mb-2">Error</h3>
+      <div class="output-block" style="border-color:var(--danger)"><%= run.error_message %></div>
+    </div>
+  <% end %>
+</div>

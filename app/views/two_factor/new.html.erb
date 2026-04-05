@@ -1,0 +1,20 @@
+<h2 class="text-xl font-semibold text-center mb-2">Two-Factor Authentication</h2>
+<p class="text-sm text-content-muted text-center mb-6">Enter the code from your authenticator app</p>
+
+<%= form_with url: two_factor_path, class: "space-y-4" do |f| %>
+  <div>
+    <label for="code" class="block text-sm font-medium text-content-muted mb-1.5">Verification Code</label>
+    <input type="text" name="code" id="code" autofocus required
+           inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
+           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm text-center tracking-[0.3em] font-mono text-lg focus:outline-none focus:border-accent" />
+  </div>
+
+  <button type="submit"
+          class="w-full px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors">
+    Verify
+  </button>
+<% end %>
+
+<p class="text-center text-sm text-content-muted mt-6">
+  <%= link_to "Back to sign in", login_path, class: "text-accent hover:text-accent-hover font-medium" %>
+</p>

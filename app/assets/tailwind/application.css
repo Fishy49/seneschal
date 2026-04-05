@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/* Theme tokens — swap via data-theme attribute */
+@layer base {
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-input: #252836;
+    --border: #2d3140;
+    --text: #e4e6ed;
+    --text-muted: #8b8fa3;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+  }
+
+  [data-theme="light"] {
+    --bg: #f4f5f7;
+    --bg-card: #ffffff;
+    --bg-input: #eef0f4;
+    --border: #d1d5de;
+    --text: #1a1d27;
+    --text-muted: #5f6578;
+    --accent: #4f46e5;
+    --accent-hover: #6366f1;
+    --success: #16a34a;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --info: #2563eb;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  a {
+    color: var(--accent);
+  }
+
+  a:hover {
+    color: var(--accent-hover);
+  }
+}
+
+@theme inline {
+  --color-surface: var(--bg);
+  --color-surface-card: var(--bg-card);
+  --color-surface-input: var(--bg-input);
+  --color-edge: var(--border);
+  --color-content: var(--text);
+  --color-content-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+}
+
+/* CodeJar editor */
+@layer components {
+  .codejar-wrap {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .codejar-editor {
+    display: block;
+    min-height: 400px;
+    padding: 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    tab-size: 2;
+    outline: none;
+    border-radius: 0.5rem;
+  }
+
+  .code-preview {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .code-preview pre {
+    margin: 0;
+    border-radius: 0.5rem;
+  }
+
+  .code-preview code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+  }
+
+  /* Background watermark — set via inline style in layout for propshaft asset paths */
+  .main-watermark {
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    bottom: 0;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center center;
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  [data-theme="light"] .main-watermark {
+    opacity: 0.06;
+  }
+
+  /* Theme switch */
+  .theme-switch-track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 56px;
+    height: 28px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: 0 6px;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .theme-switch:hover .theme-switch-track {
+    border-color: var(--text-muted);
+  }
+
+  .theme-switch-icon {
+    font-size: 14px;
+    line-height: 1;
+    z-index: 1;
+    transition: opacity 0.3s;
+  }
+
+  .theme-switch-sun {
+    color: var(--warning);
+    opacity: 0.4;
+  }
+
+  .theme-switch-moon {
+    color: var(--info);
+    opacity: 1;
+  }
+
+  [data-theme="light"] .theme-switch-sun { opacity: 1; }
+  [data-theme="light"] .theme-switch-moon { opacity: 0.4; }
+
+  .theme-switch-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: transform 0.3s ease, background 0.3s;
+  }
+
+  .theme-switch-thumb.is-light {
+    transform: translateX(28px);
+    background: var(--accent);
+  }
+
+  /* Output block */
+  .output-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    color: var(--text-muted);
+  }
+
+  /* Auth splash — circuit conduit animation */
+  .circuit-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.25;
+  }
+
+  [data-theme="light"] .circuit-bg {
+    opacity: 0.20;
+  }
+
+  .circuit-bg .conduit {
+    stroke: var(--accent);
+    stroke-width: 1;
+    fill: none;
+    opacity: 0.4;
+  }
+
+  .circuit-bg .node {
+    fill: var(--accent);
+    opacity: 0.6;
+  }
+
+  .circuit-bg .pulse {
+    fill: var(--accent);
+    opacity: 0;
+    filter: drop-shadow(0 0 6px var(--accent));
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+
+  .circuit-bg .pulse-delayed {
+    animation-delay: -2s;
+  }
+
+  .circuit-bg .pulse-slow {
+    animation-duration: 7s;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 0.9; }
+    50% { opacity: 1; }
+  }
+}

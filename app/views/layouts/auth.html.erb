@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || "Seneschal" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <script>
+      (function() {
+        var t = localStorage.getItem("theme") || "dark";
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="min-h-screen flex items-center justify-center overflow-hidden relative">
+    <%# Circuit animation background %>
+    <div class="circuit-bg" aria-hidden="true">
+      <svg class="w-full h-full" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <%# Horizontal conduits %>
+        <line x1="0" y1="120" x2="1200" y2="120" class="conduit" />
+        <line x1="0" y1="320" x2="1200" y2="320" class="conduit" />
+        <line x1="0" y1="480" x2="1200" y2="480" class="conduit" />
+        <line x1="0" y1="680" x2="1200" y2="680" class="conduit" />
+
+        <%# Vertical conduits %>
+        <line x1="200" y1="0" x2="200" y2="800" class="conduit" />
+        <line x1="500" y1="0" x2="500" y2="800" class="conduit" />
+        <line x1="700" y1="0" x2="700" y2="800" class="conduit" />
+        <line x1="1000" y1="0" x2="1000" y2="800" class="conduit" />
+
+        <%# Diagonal conduits %>
+        <line x1="0" y1="0" x2="500" y2="480" class="conduit" />
+        <line x1="1200" y1="0" x2="700" y2="480" class="conduit" />
+        <line x1="200" y1="800" x2="700" y2="320" class="conduit" />
+        <line x1="1000" y1="800" x2="500" y2="320" class="conduit" />
+
+        <%# Junction nodes %>
+        <circle cx="200" cy="120" r="3" class="node" />
+        <circle cx="500" cy="120" r="3" class="node" />
+        <circle cx="700" cy="120" r="3" class="node" />
+        <circle cx="1000" cy="120" r="3" class="node" />
+        <circle cx="200" cy="320" r="3" class="node" />
+        <circle cx="500" cy="320" r="3" class="node" />
+        <circle cx="700" cy="320" r="3" class="node" />
+        <circle cx="1000" cy="320" r="3" class="node" />
+        <circle cx="200" cy="480" r="3" class="node" />
+        <circle cx="500" cy="480" r="3" class="node" />
+        <circle cx="700" cy="480" r="3" class="node" />
+        <circle cx="1000" cy="480" r="3" class="node" />
+        <circle cx="200" cy="680" r="3" class="node" />
+        <circle cx="500" cy="680" r="3" class="node" />
+        <circle cx="700" cy="680" r="3" class="node" />
+        <circle cx="1000" cy="680" r="3" class="node" />
+
+        <%# Animated pulses racing along horizontal conduits %>
+        <circle r="4" class="pulse">
+          <animateMotion dur="4s" repeatCount="indefinite" path="M0,120 L1200,120" />
+        </circle>
+        <circle r="3" class="pulse pulse-delayed">
+          <animateMotion dur="5s" repeatCount="indefinite" path="M1200,320 L0,320" />
+        </circle>
+        <circle r="4" class="pulse">
+          <animateMotion dur="3.5s" repeatCount="indefinite" path="M0,480 L1200,480" />
+        </circle>
+        <circle r="3" class="pulse pulse-delayed">
+          <animateMotion dur="6s" repeatCount="indefinite" path="M1200,680 L0,680" />
+        </circle>
+
+        <%# Animated pulses racing along vertical conduits %>
+        <circle r="3" class="pulse">
+          <animateMotion dur="5s" repeatCount="indefinite" path="M200,0 L200,800" />
+        </circle>
+        <circle r="4" class="pulse pulse-delayed">
+          <animateMotion dur="4s" repeatCount="indefinite" path="M700,800 L700,0" />
+        </circle>
+        <circle r="3" class="pulse">
+          <animateMotion dur="6s" repeatCount="indefinite" path="M1000,0 L1000,800" />
+        </circle>
+
+        <%# Animated pulses racing along diagonal conduits %>
+        <circle r="3" class="pulse pulse-slow">
+          <animateMotion dur="7s" repeatCount="indefinite" path="M0,0 L500,480" />
+        </circle>
+        <circle r="3" class="pulse pulse-slow">
+          <animateMotion dur="8s" repeatCount="indefinite" path="M1200,0 L700,480" />
+        </circle>
+        <circle r="3" class="pulse pulse-slow pulse-delayed">
+          <animateMotion dur="6s" repeatCount="indefinite" path="M200,800 L700,320" />
+        </circle>
+      </svg>
+    </div>
+
+    <%# Center card %>
+    <div class="relative z-10 w-full max-w-sm mx-4">
+      <div class="flex items-center justify-center gap-3 mb-8">
+        <%= image_tag "logo.png", size: 48, class: "rounded-lg" %>
+        <span class="text-3xl font-bold text-content tracking-tight">Seneschal</span>
+      </div>
+
+      <div class="bg-surface-card/90 backdrop-blur-sm border border-edge rounded-xl p-8 shadow-2xl">
+        <% flash.each do |type, message| %>
+          <div class="<%= type == 'notice' ? 'bg-success/15 text-success border border-success/25' : 'bg-danger/15 text-danger border border-danger/25' %> px-4 py-3 rounded-lg mb-4 text-sm">
+            <%= message %>
+          </div>
+        <% end %>
+        <%= yield %>
+      </div>
+    </div>
+  </body>
+</html>

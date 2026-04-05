@@ -1,0 +1,48 @@
+<%= form_with model: project do |f| %>
+  <% if project.errors.any? %>
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+      <% project.errors.full_messages.each do |msg| %>
+        <p><%= msg %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="mb-4">
+    <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_field :name, placeholder: "supertextadventure",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+  </div>
+
+  <div class="mb-4">
+    <%= f.label :repo_url, "Repository URL", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_field :repo_url, placeholder: "git@github.com:user/repo.git",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+  </div>
+
+  <div class="mb-4" data-controller="default-path" data-default-path-base-value="<%= Rails.root.join('repos') %>">
+    <%= f.label :local_path, "Local Path", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <div class="flex gap-2">
+      <%= f.text_field :local_path, placeholder: "#{Rails.root.join('repos', 'myproject')}",
+            data: { default_path_target: "input" },
+            class: "flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+      <button type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors"
+              data-default-path-target="btn"
+              data-action="default-path#populate">
+        Default
+      </button>
+    </div>
+    <p class="text-sm text-content-muted mt-2">Leave free-form or click Default to use repos/ in the app root.</p>
+  </div>
+
+  <div class="mb-4">
+    <%= f.label :description, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_area :description, placeholder: "Optional description",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y min-h-20" %>
+  </div>
+
+  <div class="flex gap-2">
+    <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+    <%= link_to "Cancel", projects_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+<% end %>

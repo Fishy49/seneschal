@@ -1,0 +1,72 @@
+<%= render "shared/project_bar", project: @task.project, task: @task %>
+
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold"><%= @task.title %> <%= status_badge(@task.status) %> <%= type_badge(@task.kind) %></h1>
+  </div>
+  <div class="flex items-center gap-2">
+    <%= link_to "Edit", edit_pipeline_task_path(@task), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    <% if @task.status.in?(%w[draft completed failed]) && @task.workflow.present? %>
+      <%= button_to "Mark Ready", mark_ready_pipeline_task_path(@task), method: :patch,
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
+            data: { turbo_confirm: @task.status != "draft" ? "Reset '#{@task.title}' to ready for re-execution?" : nil } %>
+    <% end %>
+    <% if @task.executable? %>
+      <%= button_to "Execute", execute_pipeline_task_path(@task),
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
+            data: { turbo_confirm: "Execute '#{@task.title}' with #{@task.workflow.name}?" } %>
+    <% end %>
+    <%= button_to "Delete", pipeline_task_path(@task), method: :delete,
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
+          data: { turbo_confirm: "Delete task '#{@task.title}'?" } %>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 gap-4">
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="markdown">
+      <h2 class="text-lg font-semibold mb-3">Spec</h2>
+      <div class="code-preview" data-markdown-target="output"></div>
+      <template data-markdown-target="source"><%= @task.body %></template>
+    </div>
+  </div>
+
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Details</h2>
+      <table class="w-full border-collapse">
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th><td class="px-3 py-2 border-b border-edge"><%= link_to @task.project.name, project_path(@task.project) %></td></tr>
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th><td class="px-3 py-2 border-b border-edge"><%= @task.workflow ? link_to(@task.workflow.name, project_workflow_path(@task.project, @task.workflow)) : "Not assigned" %></td></tr>
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th><td class="px-3 py-2 border-b border-edge"><%= type_badge(@task.kind) %></td></tr>
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(@task.status) %></td></tr>
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></td></tr>
+      </table>
+    </div>
+
+    <% if @runs.any? %>
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <h2 class="text-lg font-semibold mb-3">Runs</h2>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Run</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @runs.each do |run| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to "##{run.id}", run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </div>
+</div>

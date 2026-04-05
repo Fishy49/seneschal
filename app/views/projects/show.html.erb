@@ -1,0 +1,96 @@
+<%= turbo_stream_from @project %>
+<%= render "shared/project_bar", project: @project %>
+
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold"><%= @project.name %></h1>
+    <p class="text-sm text-content-muted"><%= @project.repo_url %></p>
+  </div>
+  <div class="flex items-center gap-2">
+    <%= render "repo_status", project: @project %>
+    <%= link_to "Edit", edit_project_path(@project), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    <%= link_to "New Workflow", new_project_workflow_path(@project), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    <%= link_to "New Task", new_pipeline_task_path(project_id: @project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+  </div>
+</div>
+
+<% if @project.description.present? %>
+  <p class="text-content-muted mb-4"><%= @project.description %></p>
+<% end %>
+
+<div class="grid grid-cols-2 gap-4">
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Workflows</h2>
+      <% if @workflows.any? %>
+        <% @workflows.each do |workflow| %>
+          <div class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0">
+            <div class="flex-1">
+              <div class="font-medium"><%= link_to workflow.name, project_workflow_path(@project, workflow) %></div>
+              <div class="text-[0.8125rem] text-content-muted"><%= pluralize(workflow.steps.count, "step") %> &middot; <%= workflow.trigger_type %></div>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-center py-8 text-content-muted"><%= link_to "Add a workflow", new_project_workflow_path(@project) %></p>
+      <% end %>
+    </div>
+
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold mb-0">Tasks</h2>
+        <%= link_to "New", new_pipeline_task_path(project_id: @project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      </div>
+      <% if @tasks.any? %>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Title</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @tasks.each do |task| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to task.title, pipeline_task_path(task) %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= type_badge(task.kind) %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= status_badge(task.status) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="text-center py-8 text-content-muted">No tasks yet</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Recent Runs</h2>
+      <% if @recent_runs.any? %>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recent_runs.each do |run| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to run.workflow.name, run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="text-center py-8 text-content-muted">No runs yet</p>
+      <% end %>
+    </div>
+  </div>
+</div>

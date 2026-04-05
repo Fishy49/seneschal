@@ -1,0 +1,216 @@
+<% skills = Skill.for_project(@project).order(:name) %>
+<% skill_cfg = step.step_type == "skill" ? (step.config || {}) : {} %>
+<% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
+<%= form_with model: [@project, @workflow, step],
+      data: { controller: "step-form",
+              step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json } do |f| %>
+  <% if step.errors.any? %>
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+      <% step.errors.full_messages.each do |msg| %>
+        <p><%= msg %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="mb-4">
+    <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_field :name, placeholder: "ingest",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+  </div>
+
+  <div class="grid grid-cols-[1fr_auto] gap-4 items-end">
+    <div class="mb-4">
+      <%= f.label :position, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.number_field :position, min: 1,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+    <div class="mb-4">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted px-3 py-2">
+        <%= f.check_box :injectable_only, class: "accent-accent" %>
+        Inject only
+      </label>
+      <p class="text-xs text-content-muted mt-0.5 px-3">Skipped in normal runs, only runs when injected by a failing step</p>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <%= f.label :step_type, "Type", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.select :step_type,
+          [["Skill", "skill"], ["Script", "script"], ["Command", "command"], ["CI Check", "ci_check"]],
+          {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+          data: { step_form_target: "typeSelect", action: "step-form#toggle" } %>
+  </div>
+
+  <%# === Skill fields === %>
+  <div data-step-form-target="skillFields" style="<%= 'display:none' unless step.step_type == 'skill' %>">
+    <div class="mb-4">
+      <%= f.label :skill_id, "Skill", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.select :skill_id,
+            skills.map { |s| [s.display_name, s.id] },
+            { include_blank: "Select a skill..." },
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+            data: { step_form_target: "skillSelect", action: "step-form#skillChanged" } %>
+    </div>
+
+    <div data-step-form-target="skillPreview" style="display:none" class="mb-4">
+      <div class="flex items-center justify-between">
+        <label class="text-sm text-content-muted">Prompt Preview</label>
+        <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" data-action="step-form#togglePreview">
+          <span data-step-form-target="previewToggleText">Show</span>
+        </button>
+      </div>
+      <div data-step-form-target="previewBody" style="display:none" class="mt-2">
+        <div class="code-preview" data-step-form-target="previewContent"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="mb-4">
+        <label for="skill_model" class="block text-sm font-medium text-content-muted mb-1.5">Model</label>
+        <select name="skill_model" id="skill_model" class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="">Default</option>
+          <option value="claude-opus-4-6" <%= "selected" if skill_cfg["model"] == "claude-opus-4-6" %>>Opus 4.6</option>
+          <option value="claude-sonnet-4-6" <%= "selected" if skill_cfg["model"] == "claude-sonnet-4-6" %>>Sonnet 4.6</option>
+          <option value="claude-haiku-4-5-20251001" <%= "selected" if skill_cfg["model"] == "claude-haiku-4-5-20251001" %>>Haiku 4.5</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label for="skill_max_turns" class="block text-sm font-medium text-content-muted mb-1.5">Max Turns</label>
+        <input type="number" name="skill_max_turns" id="skill_max_turns"
+               value="<%= skill_cfg["max_turns"] %>" min="1" placeholder="Default"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label for="skill_capture_output" class="block text-sm font-medium text-content-muted mb-1.5">Capture Output As</label>
+      <input type="text" name="skill_capture_output" id="skill_capture_output"
+             value="<%= skill_cfg["capture_output"] %>"
+             placeholder="e.g. implementation_plan"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      <p class="text-sm text-content-muted mt-2">Store the full step output in run context under this key</p>
+    </div>
+
+    <div class="mb-4">
+      <label for="skill_outputs" class="block text-sm font-medium text-content-muted mb-1.5">Output Patterns (JSON)</label>
+      <textarea name="skill_outputs" id="skill_outputs" rows="3"
+                placeholder='{"pr_number": "PR #(\\d+)"}'
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= skill_cfg["outputs"]&.to_json %></textarea>
+    </div>
+  </div>
+
+  <%# === Script / Command fields === %>
+  <div data-step-form-target="bodyFields" style="<%= 'display:none' unless step.step_type.in?(%w[script command]) %>">
+    <div class="mb-4">
+      <%= f.label :body, step.step_type == "script" ? "Script" : "Command", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_area :body, rows: 8,
+            placeholder: "git checkout main && git pull",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
+    </div>
+  </div>
+
+  <%# === CI Check fields === %>
+  <div data-step-form-target="ciCheckFields" style="<%= 'display:none' unless step.step_type == 'ci_check' %>">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="mb-4">
+        <label for="ci_mode" class="block text-sm font-medium text-content-muted mb-1.5">Mode</label>
+        <select name="ci_mode" id="ci_mode" data-step-form-target="ciMode" data-action="step-form#ciModeChanged"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="pr" <%= "selected" unless ci["mode"] == "workflow" %>>PR Checks</option>
+          <option value="workflow" <%= "selected" if ci["mode"] == "workflow" %>>Workflow Run</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label for="ci_poll_interval" class="block text-sm font-medium text-content-muted mb-1.5">Poll Interval (seconds)</label>
+        <input type="number" name="ci_poll_interval" id="ci_poll_interval"
+               value="<%= ci["poll_interval"] || 30 %>" min="10"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+    </div>
+
+    <div data-step-form-target="ciPrFields" style="<%= 'display:none' if ci["mode"] == "workflow" %>">
+      <div class="mb-4">
+        <label for="ci_pr" class="block text-sm font-medium text-content-muted mb-1.5">PR Number (variable)</label>
+        <input type="text" name="ci_pr" id="ci_pr"
+               value="<%= ci["pr"] || "${pr_number}" %>"
+               placeholder="${pr_number}"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+    </div>
+
+    <div data-step-form-target="ciWorkflowFields" style="<%= 'display:none' unless ci["mode"] == "workflow" %>">
+      <div class="mb-4">
+        <label for="ci_workflow" class="block text-sm font-medium text-content-muted mb-1.5">Workflow File</label>
+        <input type="text" name="ci_workflow" id="ci_workflow"
+               value="<%= ci["workflow"] %>"
+               placeholder="ci.yml"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+      <div class="mb-4">
+        <label for="ci_ref" class="block text-sm font-medium text-content-muted mb-1.5">Branch/Ref (variable)</label>
+        <input type="text" name="ci_ref" id="ci_ref"
+               value="<%= ci["ref"] || "${branch}" %>"
+               placeholder="${branch}"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+      <div class="mb-4">
+        <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
+          <input type="checkbox" name="ci_trigger" value="1" <%= "checked" if ci["trigger"] %>>
+          Trigger workflow run (otherwise just watch for results)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <%# === Input Context (all types) === %>
+  <div class="mb-4">
+    <%= f.label :input_context, "Additional Context", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_area :input_context, rows: 4,
+          placeholder: "Optional instructions injected into this step. Supports ${variable} interpolation.\nFor retries, use ${previous_failure} to reference the prior failure output.",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
+    <p class="text-sm text-content-muted mt-2">Appended to skill prompts or available as $INPUT_CONTEXT for scripts</p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div class="mb-4">
+      <%= f.label :max_retries, "Max Retries", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.number_field :max_retries, min: 0,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+
+    <div class="mb-4">
+      <%= f.label :timeout, "Timeout (seconds)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.number_field :timeout, min: 1,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+  </div>
+
+  <%# === On Failure Inject (all types) === %>
+  <% injectable_steps = @workflow.steps.order(:position) %>
+  <% if injectable_steps.any? %>
+    <% current_inject = step.config&.dig("on_failure_inject") || [] %>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="mb-4">
+        <label for="on_failure_inject" class="block text-sm font-medium text-content-muted mb-1.5">On Failure, Inject Steps</label>
+        <select name="on_failure_inject[]" id="on_failure_inject" multiple size="<%= [injectable_steps.count, 5].min %>"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <% injectable_steps.each do |s| %>
+            <option value="<%= s.name %>" <%= "selected" if current_inject.include?(s.name) %>><%= s.position %>. <%= s.name %></option>
+          <% end %>
+        </select>
+        <p class="text-sm text-content-muted mt-2">Steps to inject after this one on failure (hold Cmd/Ctrl to multi-select)</p>
+      </div>
+      <div class="mb-4">
+        <label for="max_injections" class="block text-sm font-medium text-content-muted mb-1.5">Max Injection Rounds</label>
+        <input type="number" name="max_injections" id="max_injections"
+               value="<%= step.config&.dig("max_injections") || 3 %>" min="1"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      </div>
+    </div>
+  <% end %>
+
+  <div class="flex gap-2">
+    <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+    <%= link_to "Cancel", project_workflow_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+<% end %>

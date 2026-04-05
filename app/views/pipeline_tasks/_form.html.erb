@@ -1,0 +1,53 @@
+<%= form_with model: task do |f| %>
+  <% if task.errors.any? %>
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+      <% task.errors.full_messages.each do |msg| %>
+        <p><%= msg %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div class="mb-4">
+      <%= f.label :title, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_field :title, placeholder: "NPC dialogue trees",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+
+    <div class="mb-4">
+      <%= f.label :kind, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.select :kind, PipelineTask::KINDS.map { |k| [k.capitalize, k] },
+            {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div class="mb-4">
+      <%= f.label :project_id, "Project", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.select :project_id, Project.order(:name).pluck(:name, :id),
+            {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+            data: { action: "change->task-form#projectChanged" } %>
+    </div>
+
+    <div class="mb-4">
+      <%= f.label :workflow_id, "Workflow", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.select :workflow_id,
+            (task.project ? task.project.workflows.order(:name).pluck(:name, :id) : Workflow.order(:name).pluck(:name, :id)),
+            { include_blank: "Select later..." },
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+  </div>
+
+  <div class="mb-4" data-controller="code-editor">
+    <%= f.label :body, "Spec", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <div class="codejar-wrap">
+      <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
+    </div>
+    <%= f.hidden_field :body, data: { code_editor_target: "input" } %>
+  </div>
+
+  <div class="flex gap-2">
+    <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+    <%= link_to "Cancel", (task.persisted? ? pipeline_task_path(task) : pipeline_tasks_path), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+<% end %>

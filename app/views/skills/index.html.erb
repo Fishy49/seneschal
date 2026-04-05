@@ -1,0 +1,63 @@
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Skills</h1>
+  <%= link_to "New Skill", new_skill_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+</div>
+
+<% shared, project_specific = @skills.partition(&:shared?) %>
+
+<% if shared.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <h2 class="text-lg font-semibold mb-3">Shared</h2>
+    <table class="w-full border-collapse">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% shared.each do |skill| %>
+          <tr>
+            <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= pluralize(skill.steps.count, "step") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% if project_specific.any? %>
+  <% project_specific.group_by(&:project).each do |project, skills| %>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3"><%= project.name %></h2>
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% skills.each do |skill| %>
+            <tr>
+              <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
+              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>
+              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= pluralize(skill.steps.count, "step") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @skills.empty? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+    <p>No skills yet.</p>
+    <p class="mt-2"><%= link_to "Create your first skill", new_skill_path %></p>
+  </div>
+<% end %>

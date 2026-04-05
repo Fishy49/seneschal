@@ -1,0 +1,88 @@
+<%= render "shared/project_bar", project: @project, workflow: @workflow %>
+
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold"><%= @workflow.name %></h1>
+  <div class="flex items-center gap-2">
+    <%= link_to "Edit", edit_project_workflow_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+</div>
+
+<% if @workflow.description.present? %>
+  <p class="text-content-muted mb-4"><%= @workflow.description %></p>
+<% end %>
+
+<div class="grid grid-cols-2 gap-4">
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold mb-0">Steps</h2>
+        <%= link_to "Add Step", new_project_workflow_step_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      </div>
+      <% if @steps.any? %>
+        <ul class="list-none">
+          <% @steps.each do |step| %>
+            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0 <%= 'opacity-60' if step.injectable_only? %>">
+              <% if step.injectable_only? %>
+                <span class="w-7 h-7 rounded-full bg-accent/15 text-accent text-[0.75rem] font-semibold flex items-center justify-center shrink-0" title="Inject only">&orarr;</span>
+              <% else %>
+                <span class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
+              <% end %>
+              <div class="flex-1">
+                <div class="font-medium">
+                  <%= step.name %>
+                  <% if step.injectable_only? %>
+                    <span class="text-xs font-normal text-accent">inject only</span>
+                  <% end %>
+                </div>
+                <div class="text-[0.8125rem] text-content-muted">
+                  <%= type_badge(step.step_type) %>
+                  <% if step.max_retries > 0 %>
+                    &middot; <%= step.max_retries %> retries
+                  <% end %>
+                  &middot; <%= step.timeout %>s timeout
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <%= link_to "Edit", edit_project_workflow_step_path(@project, @workflow, step), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+                <%= button_to "Remove", project_workflow_step_path(@project, @workflow, step),
+                      method: :delete,
+                      class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
+                      data: { turbo_confirm: "Remove step '#{step.name}'?" } %>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-center py-8 text-content-muted"><%= link_to "Add the first step", new_project_workflow_step_path(@project, @workflow) %></p>
+      <% end %>
+    </div>
+  </div>
+
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Recent Runs</h2>
+      <% if @recent_runs.any? %>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recent_runs.each do |run| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to status_badge(run.status), run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
+                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="text-center py-8 text-content-muted">No runs yet</p>
+      <% end %>
+    </div>
+  </div>
+</div>

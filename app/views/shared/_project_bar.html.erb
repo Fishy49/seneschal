@@ -1,0 +1,15 @@
+<div class="flex items-center gap-1.5 px-3 py-2 mb-4 bg-surface-card border border-edge rounded-lg text-[0.8125rem]">
+  <%= link_to project.name, project_path(project), class: "text-content-muted font-medium hover:text-accent" %>
+  <% if defined?(workflow) && workflow %>
+    <span class="text-edge">/</span>
+    <%= link_to workflow.name, project_workflow_path(project, workflow), class: "text-content-muted font-medium hover:text-accent" %>
+  <% end %>
+  <% if defined?(task) && task %>
+    <span class="text-edge">/</span>
+    <%= link_to task.title, pipeline_task_path(task), class: "text-content-muted font-medium hover:text-accent" %>
+  <% end %>
+  <% if defined?(run) && run %>
+    <span class="text-edge">/</span>
+    <span class="text-content font-medium">Run #<%= run.id %></span>
+  <% end %>
+</div>

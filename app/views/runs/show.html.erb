@@ -1,0 +1,36 @@
+<%= turbo_stream_from @run %>
+<%= render "shared/project_bar",
+     project: @run.workflow.project,
+     workflow: @run.workflow,
+     task: @run.pipeline_task,
+     run: @run %>
+
+<%= render "run_header", run: @run %>
+
+<div class="grid grid-cols-[2fr_1fr] gap-4">
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Steps</h2>
+      <%= render "run_steps_list", run: @run %>
+    </div>
+  </div>
+
+  <div>
+    <%= render "run_info", run: @run %>
+    <%= render "run_context", run: @run %>
+
+    <% if @run.input.present? && @run.input.any? %>
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <h2 class="text-lg font-semibold mb-3">Input</h2>
+        <table class="w-full border-collapse">
+          <% @run.input.each do |key, value| %>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted"><%= key %></th>
+              <td class="px-3 py-2 border-b border-edge text-sm"><code class="font-mono text-[0.8125rem]"><%= value %></code></td>
+            </tr>
+          <% end %>
+        </table>
+      </div>
+    <% end %>
+  </div>
+</div>

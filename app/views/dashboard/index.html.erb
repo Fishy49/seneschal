@@ -1,0 +1,99 @@
+<h1 class="text-2xl font-semibold mb-4">Dashboard</h1>
+
+<div class="grid grid-cols-2 gap-4">
+  <div>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold mb-0">Active Runs</h2>
+      </div>
+      <% if @active_runs.any? %>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Started</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @active_runs.each do |run| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to run.workflow.name, run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge text-content-muted"><%= run.workflow.project.name %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+                <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= time_ago_short(run.started_at || run.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="text-center py-8 text-content-muted">No active runs</p>
+      <% end %>
+    </div>
+
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold mb-0">Recent Runs</h2>
+        <%= link_to "View all", runs_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      </div>
+      <% if @recent_runs.any? %>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Finished</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recent_runs.each do |run| %>
+              <tr>
+                <td class="px-3 py-2 border-b border-edge"><%= link_to run.workflow.name, run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+                <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= format_duration(run.duration) %></td>
+                <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= time_ago_short(run.finished_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="text-center py-8 text-content-muted">No completed runs yet</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold mb-0">Projects</h2>
+      <%= link_to "New Project", new_project_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    </div>
+    <% if @projects.any? %>
+      <% @projects.each do |project| %>
+        <div class="bg-surface-card border border-edge rounded-lg p-4 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold"><%= link_to project.name, project_path(project), class: "hover:text-accent transition-colors" %></h3>
+            <span class="text-xs text-content-muted"><%= project.repo_status == "ready" ? "Repo cloned" : project.repo_status.titleize %></span>
+          </div>
+          <% if project.description.present? %>
+            <p class="text-sm text-content-muted mb-2"><%= project.description.truncate(100) %></p>
+          <% end %>
+          <div class="text-xs text-content-muted mb-3">
+            <%= pluralize(project.workflows.count, "workflow") %> &middot; <%= pluralize(project.pipeline_tasks.count, "task") %>
+          </div>
+          <div class="flex items-center gap-2">
+            <%= link_to "New Task", new_pipeline_task_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+            <%= link_to "Tasks", pipeline_tasks_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= link_to "Runs", runs_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+        <p>No projects yet.</p>
+        <p class="mt-2"><%= link_to "Create your first project", new_project_path %></p>
+      </div>
+    <% end %>
+  </div>
+</div>

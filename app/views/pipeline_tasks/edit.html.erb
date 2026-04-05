@@ -1,0 +1,5 @@
+<%= render "shared/project_bar", project: @task.project, task: @task %>
+<h1 class="text-2xl font-semibold mb-4">Edit Task: <%= @task.title %></h1>
+<div class="bg-surface-card border border-edge rounded-lg p-5">
+  <%= render "form", task: @task %>
+</div>

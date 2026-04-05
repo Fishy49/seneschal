@@ -1,0 +1,37 @@
+<div class="max-w-md">
+  <h1 class="text-2xl font-bold mb-6">Account</h1>
+
+  <%= form_with model: current_user, url: account_path, method: :patch, class: "space-y-4" do |f| %>
+    <% if current_user.errors.any? %>
+      <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg text-sm">
+        <% current_user.errors.full_messages.each do |msg| %>
+          <p><%= msg %></p>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :email, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.email_field :email, required: true,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+
+    <div>
+      <%= f.label :password, "New Password", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.password_field :password,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+      <p class="text-xs text-content-muted mt-1">Leave blank to keep current password.</p>
+    </div>
+
+    <div>
+      <%= f.label :password_confirmation, "Confirm Password", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.password_field :password_confirmation,
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+
+    <button type="submit"
+            class="px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors">
+      Save Changes
+    </button>
+  <% end %>
+</div>
