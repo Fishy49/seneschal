@@ -6,11 +6,11 @@ class StepExecutor
       super
     end
 
-    def passed? = exit_code == 0
+    def passed? = exit_code.zero?
   end
 
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
-  DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep"
+  DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
   def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil)
     @step = step
@@ -20,11 +20,11 @@ class StepExecutor
     @resume_session_id = resume_session_id
   end
 
-  def execute(&on_progress)
+  def execute(&)
     case @step.step_type
-    when "skill"    then execute_skill(&on_progress)
-    when "script"   then execute_script(&on_progress)
-    when "command"  then execute_command(&on_progress)
+    when "skill"    then execute_skill(&)
+    when "script"   then execute_script(&)
+    when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
@@ -33,58 +33,56 @@ class StepExecutor
 
   private
 
-  def execute_skill(&on_progress)
+  def execute_skill(&)
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No skill assigned") unless prompt
 
-    if @resolved_input_context.present?
-      prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}"
-    end
+    prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
 
     if block_given?
-      execute_skill_streaming(cmd, &on_progress)
+      execute_skill_streaming(cmd, &)
     else
       run_command(cmd)
     end
   end
 
-  def execute_script(&on_progress)
+  def execute_script(&)
     body = interpolate_string(@step.body)
     if block_given?
-      run_command_streaming(["bash", "-c", body], chdir: @repo_path, &on_progress)
+      run_command_streaming(["bash", "-c", body], chdir: @repo_path, &)
     else
       run_command(["bash", "-c", body], chdir: @repo_path)
     end
   end
 
-  def execute_command(&on_progress)
+  def execute_command(&)
     body = interpolate_string(@step.body)
     if block_given?
-      run_command_streaming(["bash", "-c", body], chdir: @repo_path, &on_progress)
+      run_command_streaming(["bash", "-c", body], chdir: @repo_path, &)
     else
       run_command(["bash", "-c", body], chdir: @repo_path)
     end
   end
 
-  def execute_ci_check(&on_progress)
+  def execute_ci_check(&)
     cfg = @step.config
     mode = cfg.fetch("mode", "pr")
 
     case mode
-    when "pr"       then poll_pr_checks(cfg, &on_progress)
-    when "workflow"  then poll_workflow_run(cfg, &on_progress)
+    when "pr" then poll_pr_checks(cfg, &)
+    when "workflow" then poll_workflow_run(cfg, &)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown ci_check mode: #{mode}")
     end
-  rescue => e
+  rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end
 
   # --- Streaming execution ---
 
-  def execute_skill_streaming(cmd, &on_progress)
+  def execute_skill_streaming(cmd)
     events = []
     result_text = +""
     stderr_acc = +""
@@ -100,7 +98,7 @@ class StepExecutor
         line = line.strip
         next if line.empty?
 
-        event = begin; JSON.parse(line); rescue; next; end
+        event = begin; JSON.parse(line); rescue StandardError; next; end
         events << event
 
         # Capture session_id from the earliest event that has one
@@ -131,11 +129,11 @@ class StepExecutor
 
       Result.new(exit_code: exit_code, stdout: result_text, stderr: stderr_acc, stream_events: events)
     end
-  rescue => e
+  rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end
 
-  def run_command_streaming(cmd, chdir: nil, &on_progress)
+  def run_command_streaming(cmd, chdir: nil)
     stdout_acc = +""
     stderr_acc = +""
 
@@ -161,7 +159,7 @@ class StepExecutor
 
       Result.new(exit_code: exit_code, stdout: stdout_acc, stderr: stderr_acc)
     end
-  rescue => e
+  rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end
 
@@ -208,13 +206,13 @@ class StepExecutor
     )
 
     Result.new(exit_code: status.exitstatus || 1, stdout: stdout, stderr: stderr)
-  rescue => e
+  rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end
 
   # --- CI polling (unchanged) ---
 
-  def poll_pr_checks(cfg, &on_progress)
+  def poll_pr_checks(cfg)
     pr = interpolate_string(cfg.fetch("pr", "${pr_number}"))
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
@@ -223,38 +221,35 @@ class StepExecutor
 
     loop do
       yield({ output: "Polling CI checks for PR ##{pr}..." }) if block_given?
-      stdout, stderr, status = Open3.capture3(
+      stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "pr", "checks", pr.to_s, "--json", "name,bucket,link",
         chdir: @repo_path
       )
 
       if status.success?
-        checks = begin; JSON.parse(stdout); rescue; []; end
+        checks = begin; JSON.parse(stdout); rescue StandardError; []; end
 
         if checks.any?
           pending = checks.select { |c| c["bucket"] == "pending" }
 
           if pending.empty?
             failed = checks.select { |c| c["bucket"] == "fail" }
-            summary = checks.map { |c|
-              "#{c['bucket'] == 'fail' ? 'FAIL' : 'PASS'} #{c['name']}"
-            }.join("\n")
+            summary = checks.map do |c|
+              "#{c["bucket"] == "fail" ? "FAIL" : "PASS"} #{c["name"]}"
+            end.join("\n")
 
-            if failed.empty?
-              return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "")
-            else
-              failure_logs = fetch_failure_logs(failed)
-              output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
-              return Result.new(exit_code: 1, stdout: output, stderr: "")
-            end
+            return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
+
+            failure_logs = fetch_failure_logs(failed)
+            output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
+            return Result.new(exit_code: 1, stdout: output, stderr: "")
+
           end
         end
       end
 
-      if Time.current > deadline
-        return Result.new(exit_code: 1, stdout: stdout.to_s, stderr: "CI checks timed out after #{@step.timeout}s")
-      end
+      return Result.new(exit_code: 1, stdout: stdout.to_s, stderr: "CI checks timed out after #{@step.timeout}s") if Time.current > deadline
 
       sleep poll_interval
     end
@@ -274,22 +269,22 @@ class StepExecutor
       next unless status.success? && stdout.present?
 
       # Clean up GitHub Actions log formatting
-      clean = stdout.lines.map { |l|
+      clean = stdout.lines.map do |l|
         l.gsub(/\e\[[0-9;]*m/, "")                        # strip ANSI codes
          .sub(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/, "")        # strip timestamps
-         .sub(/^[^\t]+\t[^\t]+\t/, "")                     # strip "job\tstep\t" prefix
-         .sub(/^\W*##\[(group|endgroup|error)\].*\n?/, "")     # strip GH workflow marker lines (incl BOM)
-      }.reject { |l| l.strip.blank? }.join
+         .sub(/^[^\t]+\t[^\t]+\t/, "") # strip "job\tstep\t" prefix
+         .sub(/^\W*##\[(group|endgroup|error)\].*\n?/, "") # strip GH workflow marker lines (incl BOM)
+      end.reject { |l| l.strip.blank? }.join
 
       clean.truncate(10_000)
     end
 
     logs.join("\n\n---\n\n")
-  rescue => e
+  rescue StandardError => e
     "(Could not fetch failure logs: #{e.message})"
   end
 
-  def poll_workflow_run(cfg, &on_progress)
+  def poll_workflow_run(cfg)
     workflow_file = interpolate_string(cfg.fetch("workflow", "ci.yml"))
     ref = interpolate_string(cfg.fetch("ref", "main"))
     should_trigger = cfg.fetch("trigger", false)
@@ -302,9 +297,8 @@ class StepExecutor
         "gh", "workflow", "run", workflow_file, "--ref", ref,
         chdir: @repo_path
       )
-      unless status.success?
-        return Result.new(exit_code: 1, stdout: "", stderr: "Failed to trigger workflow: #{stderr}")
-      end
+      return Result.new(exit_code: 1, stdout: "", stderr: "Failed to trigger workflow: #{stderr}") unless status.success?
+
       sleep 5
     end
 
@@ -322,23 +316,23 @@ class StepExecutor
       )
 
       if status.success?
-        runs = begin; JSON.parse(stdout); rescue; []; end
+        runs = begin; JSON.parse(stdout); rescue StandardError; []; end
 
         if runs.any?
           run_data = runs.first
           if run_data["status"] == "completed"
             if run_data["conclusion"] == "success"
-              return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data['databaseId']})", stderr: "")
-            else
-              return Result.new(exit_code: 1, stdout: "Workflow '#{workflow_file}' #{run_data['conclusion']} (run ##{run_data['databaseId']})", stderr: "")
+              return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data["databaseId"]})", stderr: "")
             end
+
+            return Result.new(exit_code: 1,
+                              stdout: "Workflow '#{workflow_file}' #{run_data["conclusion"]} (run ##{run_data["databaseId"]})", stderr: "")
+
           end
         end
       end
 
-      if Time.current > deadline
-        return Result.new(exit_code: 1, stdout: "", stderr: "Workflow timed out after #{@step.timeout}s")
-      end
+      return Result.new(exit_code: 1, stdout: "", stderr: "Workflow timed out after #{@step.timeout}s") if Time.current > deadline
 
       sleep poll_interval
     end
@@ -356,7 +350,7 @@ class StepExecutor
 
   def interpolate_string(str)
     str.to_s.gsub(/\$\{(\w+)\}/) do
-      @context[$1] || @context[$1.to_sym] || "${#{$1}}"
+      @context[::Regexp.last_match(1)] || @context[::Regexp.last_match(1).to_sym] || "${#{::Regexp.last_match(1)}}"
     end
   end
 

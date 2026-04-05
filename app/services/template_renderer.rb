@@ -6,8 +6,8 @@ class TemplateRenderer
 
   def render
     @body.gsub(/\$\{(\w+)\}/) do
-      key = $1.to_sym
-      @context.fetch(key) { "${#{$1}}" }
+      key = ::Regexp.last_match(1).to_sym
+      @context.fetch(key) { "${#{::Regexp.last_match(1)}}" }
     end
   end
 end

@@ -4,25 +4,27 @@ class Run < ApplicationRecord
   has_many :run_steps, dependent: :destroy
   has_one :project, through: :workflow
 
-  STATUSES = %w[pending running completed failed stopped].freeze
+  STATUSES = ["pending", "running", "completed", "failed", "stopped"].freeze
 
   validates :status, presence: true, inclusion: { in: STATUSES }
 
-  scope :active, -> { where(status: %w[pending running]) }
+  scope :active, -> { where(status: ["pending", "running"]) }
   scope :recent, -> { order(created_at: :desc) }
 
   def active?
-    status.in?(%w[pending running])
+    status.in?(["pending", "running"])
   end
 
   def duration
     return nil unless started_at
+
     (finished_at || Time.current) - started_at
   end
 
   def usage_stats
     all = run_steps.filter_map(&:usage_stats)
     return nil if all.empty?
+
     aggregate_usage(all)
   end
 

@@ -31,20 +31,16 @@ class ExecuteRunJob < ApplicationJob
       position = run.run_steps.maximum(:position) || 0
 
       # Drop everything before the resume step from the queue
-      while queue.any? && queue.first[0].id != resume_from_step_id
-        queue.shift
-      end
+      queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
 
       # Link the existing failed RunStep so we can reuse its session_id
       crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: "failed").last
-      if crashed_run_step
-        queue[0] = [queue[0][0], crashed_run_step.id] if queue.any?
-      end
+      queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       # New run with skip: create skipped RunSteps for steps before the resume point
       position = 0
       while queue.any? && queue.first[0].id != resume_from_step_id
-        step, _ = queue.shift
+        step, = queue.shift
         position += 1
         rs = run.run_steps.create!(step: step, status: "skipped", attempt: 1, position: position,
                                    started_at: Time.current, finished_at: Time.current, duration: 0)
@@ -131,11 +127,11 @@ class ExecuteRunJob < ApplicationJob
   private
 
   def resolve_input_context(step, context)
-    return nil unless step.input_context.present?
+    return nil if step.input_context.blank?
 
     any_resolved = false
     resolved = step.input_context.gsub(/\$\{(\w+)\}/) do
-      value = context[$1] || context[$1.to_sym]
+      value = context[::Regexp.last_match(1)] || context[::Regexp.last_match(1).to_sym]
       if value.present?
         any_resolved = true
         value
@@ -147,7 +143,7 @@ class ExecuteRunJob < ApplicationJob
     return nil unless any_resolved
 
     resolved = resolved.strip
-    resolved.present? ? resolved : nil
+    resolved.presence
   end
 
   def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil)
@@ -158,7 +154,7 @@ class ExecuteRunJob < ApplicationJob
                                 resolved_input_context: resolved_context,
                                 resume_session_id: resume_sid)
 
-    on_progress = ->(update) {
+    on_progress = lambda { |update|
       attrs = {}
       attrs[:output] = update[:output] if update.key?(:output)
       attrs[:error_output] = update[:error_output] if update.key?(:error_output)
@@ -171,9 +167,9 @@ class ExecuteRunJob < ApplicationJob
 
     result = executor.execute(&on_progress)
 
-    return result if result.passed? || step.max_retries == 0
+    return result if result.passed? || step.max_retries.zero?
 
-    (2..step.max_retries + 1).each do |attempt|
+    (2..(step.max_retries + 1)).each do |attempt|
       run_step.update!(status: "retrying", attempt: attempt)
       broadcast_step(run, run_step)
       result = executor.execute(&on_progress)
@@ -232,7 +228,7 @@ class ExecuteRunJob < ApplicationJob
 
   def capture_full_output(run, step, stdout)
     key = step.config["capture_output"]
-    return unless key.present?
+    return if key.blank?
 
     run.update!(context: run.context.merge(key => stdout))
   end

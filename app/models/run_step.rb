@@ -2,13 +2,14 @@ class RunStep < ApplicationRecord
   belongs_to :run
   belongs_to :step
 
-  STATUSES = %w[pending queued running passed failed retrying skipped].freeze
+  STATUSES = ["pending", "queued", "running", "passed", "failed", "retrying", "skipped"].freeze
 
   validates :status, presence: true, inclusion: { in: STATUSES }
   validates :attempt, numericality: { only_integer: true, greater_than: 0 }
 
   def usage_stats
     return nil unless stream_log.is_a?(Array)
+
     result = stream_log.find { |e| e["type"] == "result" }
     return nil unless result
 

@@ -43,7 +43,7 @@ module StreamLogHelper
     when "Glob"
       input["pattern"].to_s
     when "Grep"
-      "#{input['pattern']}#{" in #{short_path(input['path'])}" if input['path'].present?}"
+      "#{input["pattern"]}#{" in #{short_path(input["path"])}" if input["path"].present?}"
     when "WebSearch", "WebFetch"
       input["query"].to_s.truncate(80)
     else
@@ -68,15 +68,15 @@ module StreamLogHelper
     return nil unless result
 
     parts = []
-    parts << "#{result['num_turns']} turns" if result["num_turns"]
-    parts << "$#{format('%.4f', result['total_cost_usd'])}" if result["total_cost_usd"]
+    parts << "#{result["num_turns"]} turns" if result["num_turns"]
+    parts << "$#{format("%.4f", result["total_cost_usd"])}" if result["total_cost_usd"]
     if result["duration_ms"]
       secs = result["duration_ms"] / 1000.0
       parts << if secs < 60
-        "#{secs.round(1)}s"
-      else
-        "#{(secs / 60).floor}m #{(secs % 60).round}s"
-      end
+                 "#{secs.round(1)}s"
+               else
+                 "#{(secs / 60).floor}m #{(secs % 60).round}s"
+               end
     end
     parts.join(", ")
   end
@@ -84,7 +84,8 @@ module StreamLogHelper
   private
 
   def short_path(path)
-    return "" unless path.present?
+    return "" if path.blank?
+
     parts = path.to_s.split("/")
     parts.length > 2 ? parts.last(2).join("/") : path
   end

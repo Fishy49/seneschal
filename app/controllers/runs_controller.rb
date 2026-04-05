@@ -1,5 +1,5 @@
 class RunsController < ApplicationController
-  before_action :set_run, only: %i[show stop resume retry_from]
+  before_action :set_run, only: [:show, :stop, :resume, :retry_from]
 
   def index
     @runs = Run.includes(workflow: :project).recent
@@ -12,8 +12,7 @@ class RunsController < ApplicationController
     @projects = Project.order(:name)
   end
 
-  def show
-  end
+  def show; end
 
   def stop
     if @run.active?
@@ -24,7 +23,7 @@ class RunsController < ApplicationController
   end
 
   def resume
-    unless @run.status.in?(%w[failed stopped])
+    unless @run.status.in?(["failed", "stopped"])
       redirect_to run_path(@run), alert: "Can only resume failed or stopped runs."
       return
     end

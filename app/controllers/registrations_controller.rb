@@ -15,13 +15,13 @@ class RegistrationsController < ApplicationController
       session[:user_id] = @user.id
       redirect_to root_path, notice: "Account created. Welcome to Seneschal."
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 
   private
 
   def registration_params
-    params.expect(user: %i[email password password_confirmation])
+    params.expect(user: [:email, :password, :password_confirmation])
   end
 end

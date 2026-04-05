@@ -5,7 +5,7 @@ class RunRecoveryJob < ApplicationJob
 
   def perform
     stale_run_steps = RunStep.where(status: "running")
-                             .where("updated_at < ?", STALE_THRESHOLD.ago)
+                             .where(updated_at: ...STALE_THRESHOLD.ago)
 
     stale_run_steps.find_each do |run_step|
       run = run_step.run

@@ -1,13 +1,13 @@
 class TwoFactorController < ApplicationController
-  skip_before_action :require_authentication, only: %i[new create]
+  skip_before_action :require_authentication, only: [:new, :create]
   skip_before_action :require_setup
 
-  layout "auth", only: %i[new create]
+  layout "auth", only: [:new, :create]
 
   def new
-    unless session[:pending_2fa_user_id]
-      redirect_to login_path
-    end
+    return if session[:pending_2fa_user_id]
+
+    redirect_to login_path
   end
 
   def create
@@ -25,13 +25,13 @@ class TwoFactorController < ApplicationController
       redirect_to root_path, notice: "Welcome back."
     else
       flash.now[:alert] = "Invalid code. Please try again."
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 
   # 2FA setup (authenticated user)
   def setup
-    current_user.generate_otp_secret! unless current_user.otp_secret.present?
+    current_user.generate_otp_secret! if current_user.otp_secret.blank?
     @qr_svg = generate_qr_svg(current_user.otp_provisioning_uri)
   end
 
@@ -42,7 +42,7 @@ class TwoFactorController < ApplicationController
     else
       @qr_svg = generate_qr_svg(current_user.otp_provisioning_uri)
       flash.now[:alert] = "Invalid code. Please scan the QR code and try again."
-      render :setup, status: :unprocessable_entity
+      render :setup, status: :unprocessable_content
     end
   end
 

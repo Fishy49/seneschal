@@ -9,7 +9,8 @@ class User < ApplicationRecord
   end
 
   def verify_otp(code)
-    return false unless otp_secret.present?
+    return false if otp_secret.blank?
+
     ROTP::TOTP.new(otp_secret).verify(code.to_s, drift_behind: 30, drift_ahead: 30)
   end
 

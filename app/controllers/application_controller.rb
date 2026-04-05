@@ -8,13 +8,14 @@ class ApplicationController < ActionController::Base
   private
 
   def require_authentication
-    unless current_user
-      redirect_to login_path, alert: "Please sign in."
-    end
+    return if current_user
+
+    redirect_to login_path, alert: "Please sign in."
   end
 
   def require_setup
     return if Setting["claude_cli"].present? && Setting["gh_cli"].present?
+
     redirect_to setup_path
   end
 

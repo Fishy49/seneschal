@@ -1,29 +1,28 @@
 class StepsController < ApplicationController
   before_action :set_project_and_workflow
-  before_action :set_step, only: %i[edit update destroy move]
+  before_action :set_step, only: [:edit, :update, :destroy, :move]
 
   def new
     next_position = (@workflow.steps.maximum(:position) || 0) + 1
     @step = @workflow.steps.build(position: next_position)
   end
 
+  def edit; end
+
   def create
     @step = @workflow.steps.build(step_params)
     if @step.save
       redirect_to project_workflow_path(@project, @workflow), notice: "Step added."
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
-  end
-
-  def edit
   end
 
   def update
     if @step.update(step_params)
       redirect_to project_workflow_path(@project, @workflow), notice: "Step updated."
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
@@ -50,7 +49,8 @@ class StepsController < ApplicationController
   end
 
   def step_params
-    permitted = params.expect(step: %i[name position step_type max_retries timeout config skill_id body input_context injectable_only]).to_h
+    permitted = params.expect(step: [:name, :position, :step_type, :max_retries, :timeout, :config, :skill_id, :body, :input_context,
+                                     :injectable_only]).to_h
 
     # Use raw request params for config fields that live outside the step namespace
     raw = request.params
@@ -70,9 +70,7 @@ class StepsController < ApplicationController
       config["model"] = raw["skill_model"] if raw["skill_model"].present?
       config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
       config["capture_output"] = raw["skill_capture_output"] if raw["skill_capture_output"].present?
-      if raw["skill_outputs"].present?
-        config["outputs"] = begin; JSON.parse(raw["skill_outputs"]); rescue; {}; end
-      end
+      config["outputs"] = begin; JSON.parse(raw["skill_outputs"]); rescue StandardError; {}; end if raw["skill_outputs"].present?
       config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
       permitted[:config] = config
     else
@@ -80,7 +78,7 @@ class StepsController < ApplicationController
     end
 
     # Merge on_failure_inject config (available for all step types)
-    inject_steps = Array(raw["on_failure_inject"]).reject(&:blank?)
+    inject_steps = Array(raw["on_failure_inject"]).compact_blank
     if inject_steps.any?
       permitted[:config] = permitted[:config].merge(
         "on_failure_inject" => inject_steps,

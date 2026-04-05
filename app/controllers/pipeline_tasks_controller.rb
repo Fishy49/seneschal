@@ -1,5 +1,5 @@
 class PipelineTasksController < ApplicationController
-  before_action :set_task, only: %i[show edit update destroy execute mark_ready]
+  before_action :set_task, only: [:show, :edit, :update, :destroy, :execute, :mark_ready]
 
   def index
     @tasks = PipelineTask.includes(:project, :workflow).recent
@@ -24,23 +24,22 @@ class PipelineTasksController < ApplicationController
     )
   end
 
+  def edit; end
+
   def create
     @task = PipelineTask.new(task_params)
     if @task.save
       redirect_to @task, notice: "Task created."
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
-  end
-
-  def edit
   end
 
   def update
     if @task.update(task_params)
       redirect_to @task, notice: "Task updated."
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
@@ -96,6 +95,6 @@ class PipelineTasksController < ApplicationController
   end
 
   def task_params
-    params.expect(pipeline_task: %i[title body kind status project_id workflow_id])
+    params.expect(pipeline_task: [:title, :body, :kind, :status, :project_id, :workflow_id])
   end
 end

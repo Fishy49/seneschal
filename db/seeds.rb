@@ -6,7 +6,7 @@ end
 
 # ── Shared skills ────────────────────────────────────────────
 
-ingest_skill = Skill.find_or_create_by!(name: "ingest_feature", project: nil) do |s|
+Skill.find_or_create_by!(name: "ingest_feature", project: nil) do |s|
   s.description = "Create feature branch and draft PR from task"
   s.body = <<~'PROMPT'
     # Ingest Feature
@@ -45,9 +45,9 @@ ingest_skill = Skill.find_or_create_by!(name: "ingest_feature", project: nil) do
   PROMPT
 end
 
-plan_skill = Skill.find_or_create_by!(name: "plan_feature", project: nil) do |s|
+Skill.find_or_create_by!(name: "plan_feature", project: nil) do |s|
   s.description = "Explore codebase and write a detailed implementation plan"
-  s.body = <<~'PROMPT'
+  s.body = <<~PROMPT
     # Plan Feature Implementation
 
     You are working in a project repository.
@@ -96,7 +96,7 @@ plan_skill = Skill.find_or_create_by!(name: "plan_feature", project: nil) do |s|
   PROMPT
 end
 
-implement_skill = Skill.find_or_create_by!(name: "implement_feature", project: nil) do |s|
+Skill.find_or_create_by!(name: "implement_feature", project: nil) do |s|
   s.description = "Write tests and code following the plan, then push"
   s.body = <<~'PROMPT'
     # Implement Feature
@@ -136,7 +136,7 @@ implement_skill = Skill.find_or_create_by!(name: "implement_feature", project: n
   PROMPT
 end
 
-fix_skill = Skill.find_or_create_by!(name: "fix_failing_tests", project: nil) do |s|
+Skill.find_or_create_by!(name: "fix_failing_tests", project: nil) do |s|
   s.description = "Fix CI failures based on error output"
   s.body = <<~'PROMPT'
     # Fix Failing Tests
@@ -172,4 +172,4 @@ fix_skill = Skill.find_or_create_by!(name: "fix_failing_tests", project: nil) do
   PROMPT
 end
 
-puts "Seeded #{User.count} user(s), #{Skill.where(project: nil).count} shared skill(s)"
+Rails.logger.debug { "Seeded #{User.count} user(s), #{Skill.where(project: nil).count} shared skill(s)" }

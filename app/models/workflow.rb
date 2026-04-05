@@ -4,5 +4,5 @@ class Workflow < ApplicationRecord
   has_many :runs, dependent: :destroy
 
   validates :name, presence: true, uniqueness: { scope: :project_id }
-  validates :trigger_type, presence: true, inclusion: { in: %w[manual cron file_watch] }
+  validates :trigger_type, presence: true, inclusion: { in: ["manual", "cron", "file_watch"] }
 end

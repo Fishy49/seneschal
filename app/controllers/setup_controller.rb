@@ -62,7 +62,7 @@ class SetupController < ApplicationController
     { success: false, output: "Command not found: #{cmd.split.first}" }
   rescue Timeout::Error
     { success: false, output: "Timed out after 15s" }
-  rescue => e
+  rescue StandardError => e
     { success: false, output: e.message }
   end
 

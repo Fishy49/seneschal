@@ -1,0 +1,108 @@
+plugins:
+  - rubocop-rails
+  - rubocop-performance
+
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  Exclude:
+    - "bin/**/*"
+    - "db/schema.rb"
+    - "db/queue_schema.rb"
+    - "db/cache_schema.rb"
+    - "vendor/**/*"
+    - "node_modules/**/*"
+    - "tmp/**/*"
+    - "repos/**/*"
+
+# ── Style ──
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/SymbolArray:
+  EnforcedStyle: brackets
+
+Style/WordArray:
+  EnforcedStyle: brackets
+
+# ── Layout ──
+
+Layout/LineLength:
+  Max: 140
+
+# ── Metrics ──
+
+Metrics/MethodLength:
+  Max: 45
+  Exclude:
+    - "app/jobs/execute_run_job.rb"
+
+Metrics/AbcSize:
+  Max: 50
+  Exclude:
+    - "app/jobs/execute_run_job.rb"
+    - "app/controllers/steps_controller.rb"
+
+Metrics/ClassLength:
+  Max: 300
+
+Metrics/BlockLength:
+  Exclude:
+    - "config/routes.rb"
+    - "db/migrate/*.rb"
+    - "db/seeds.rb"
+    - "app/services/**/*"
+    - "app/jobs/**/*"
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+  Exclude:
+    - "app/jobs/execute_run_job.rb"
+
+Metrics/PerceivedComplexity:
+  Max: 15
+  Exclude:
+    - "app/jobs/execute_run_job.rb"
+
+Metrics/BlockNesting:
+  Max: 4
+
+# ── Lint ──
+
+Lint/DuplicateBranch:
+  Enabled: false
+
+# ── Style ──
+
+Style/MultilineBlockChain:
+  Exclude:
+    - "app/services/**/*"
+
+# ── Rails ──
+
+Rails/I18nLocaleTexts:
+  Enabled: false
+
+Rails/SkipsModelValidations:
+  Exclude:
+    - "app/jobs/**/*"
+
+Rails/OutputSafety:
+  Exclude:
+    - "app/views/**/*"
+
+Rails/UniqueValidationWithoutIndex:
+  Enabled: false
+
+Rails/InverseOf:
+  Enabled: false

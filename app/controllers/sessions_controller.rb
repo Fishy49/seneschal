@@ -3,8 +3,7 @@ class SessionsController < ApplicationController
 
   layout "auth"
 
-  def new
-  end
+  def new; end
 
   def create
     user = User.find_by(email: params[:email])
@@ -19,7 +18,7 @@ class SessionsController < ApplicationController
       end
     else
       flash.now[:alert] = "Invalid email or password."
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 

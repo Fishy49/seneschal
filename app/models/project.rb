@@ -4,7 +4,7 @@ class Project < ApplicationRecord
   has_many :skills, dependent: :destroy
   has_many :pipeline_tasks, dependent: :destroy
 
-  REPO_STATUSES = %w[not_cloned cloning ready error].freeze
+  REPO_STATUSES = ["not_cloned", "cloning", "ready", "error"].freeze
 
   validates :name, presence: true, uniqueness: true
   validates :repo_url, presence: true
@@ -34,9 +34,9 @@ class Project < ApplicationRecord
   private
 
   def detect_repo_status
-    if local_path.present? && File.exist?(File.join(local_path, ".git"))
-      self.repo_status = "ready"
-    end
+    return unless local_path.present? && File.exist?(File.join(local_path, ".git"))
+
+    self.repo_status = "ready"
   end
 
   def ensure_local_path_exists

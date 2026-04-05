@@ -23,7 +23,7 @@ class CloneRepoJob < ApplicationJob
       update_status(project, "error")
       Rails.logger.error("Clone failed for #{project.name}: #{stderr}")
     end
-  rescue => e
+  rescue StandardError => e
     update_status(project, "error")
     Rails.logger.error("Clone failed for #{project.name}: #{e.message}")
   end

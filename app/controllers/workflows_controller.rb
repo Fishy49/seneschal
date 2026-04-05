@@ -1,6 +1,6 @@
 class WorkflowsController < ApplicationController
   before_action :set_project
-  before_action :set_workflow, only: %i[show edit update destroy trigger]
+  before_action :set_workflow, only: [:show, :edit, :update, :destroy, :trigger]
 
   def show
     @steps = @workflow.steps
@@ -11,23 +11,22 @@ class WorkflowsController < ApplicationController
     @workflow = @project.workflows.build
   end
 
+  def edit; end
+
   def create
     @workflow = @project.workflows.build(workflow_params)
     if @workflow.save
       redirect_to project_workflow_path(@project, @workflow), notice: "Workflow created."
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
-  end
-
-  def edit
   end
 
   def update
     if @workflow.update(workflow_params)
       redirect_to project_workflow_path(@project, @workflow), notice: "Workflow updated."
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
@@ -53,7 +52,7 @@ class WorkflowsController < ApplicationController
   end
 
   def workflow_params
-    params.expect(workflow: %i[name description trigger_type trigger_config])
+    params.expect(workflow: [:name, :description, :trigger_type, :trigger_config])
   end
 
   def trigger_input_params

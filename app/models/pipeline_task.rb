@@ -3,8 +3,8 @@ class PipelineTask < ApplicationRecord
   belongs_to :workflow, optional: true
   has_many :runs, dependent: :nullify
 
-  KINDS = %w[feature bugfix chore].freeze
-  STATUSES = %w[draft ready running completed failed].freeze
+  KINDS = ["feature", "bugfix", "chore"].freeze
+  STATUSES = ["draft", "ready", "running", "completed", "failed"].freeze
 
   validates :title, presence: true
   validates :body, presence: true
@@ -13,10 +13,10 @@ class PipelineTask < ApplicationRecord
   validates :workflow, presence: true, if: -> { status != "draft" }
 
   scope :recent, -> { order(updated_at: :desc) }
-  scope :actionable, -> { where(status: %w[draft ready]) }
+  scope :actionable, -> { where(status: ["draft", "ready"]) }
 
   def executable?
-    workflow.present? && status.in?(%w[ready failed])
+    workflow.present? && status.in?(["ready", "failed"])
   end
 
   def latest_run

@@ -33,7 +33,7 @@ Rails.application.routes.draw do
       member do
         post :trigger
       end
-      resources :steps, only: %i[new create edit update destroy] do
+      resources :steps, only: [:new, :create, :edit, :update, :destroy] do
         member do
           patch :move
         end
@@ -50,7 +50,7 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :runs, only: %i[index show] do
+  resources :runs, only: [:index, :show] do
     member do
       post :stop
       post :resume
