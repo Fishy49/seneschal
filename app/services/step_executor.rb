@@ -12,11 +12,12 @@ class StepExecutor
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep"
 
-  def initialize(step, context, repo_path, resolved_input_context: nil)
+  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil)
     @step = step
     @context = context
     @repo_path = repo_path
     @resolved_input_context = resolved_input_context
+    @resume_session_id = resume_session_id
   end
 
   def execute(&on_progress)
@@ -67,13 +68,13 @@ class StepExecutor
     end
   end
 
-  def execute_ci_check
+  def execute_ci_check(&on_progress)
     cfg = @step.config
     mode = cfg.fetch("mode", "pr")
 
     case mode
-    when "pr"       then poll_pr_checks(cfg)
-    when "workflow"  then poll_workflow_run(cfg)
+    when "pr"       then poll_pr_checks(cfg, &on_progress)
+    when "workflow"  then poll_workflow_run(cfg, &on_progress)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown ci_check mode: #{mode}")
     end
@@ -87,6 +88,7 @@ class StepExecutor
     events = []
     result_text = +""
     stderr_acc = +""
+    session_id = nil
 
     Open3.popen3(env_vars, *cmd, chdir: @repo_path) do |stdin, stdout, stderr, wait_thr|
       stdin.close
@@ -101,10 +103,14 @@ class StepExecutor
         event = begin; JSON.parse(line); rescue; next; end
         events << event
 
+        # Capture session_id from the earliest event that has one
+        session_id ||= event["session_id"]
+
         # Extract text from result or assistant text blocks
         case event["type"]
         when "result"
           result_text = event["result"].to_s
+          session_id ||= event["session_id"]
         when "assistant"
           (event.dig("message", "content") || []).each do |block|
             result_text = block["text"] if block["type"] == "text"
@@ -112,7 +118,7 @@ class StepExecutor
         end
 
         if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-          yield({ stream_log: events.dup, output: result_text.dup })
+          yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
           last_broadcast = monotonic_now
         end
       end
@@ -121,7 +127,7 @@ class StepExecutor
       exit_code = wait_thr.value.exitstatus || 1
 
       # Final broadcast
-      yield({ stream_log: events.dup, output: result_text.dup })
+      yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
 
       Result.new(exit_code: exit_code, stdout: result_text, stderr: stderr_acc, stream_events: events)
     end
@@ -162,10 +168,19 @@ class StepExecutor
   # --- Skill command builder ---
 
   def build_skill_cmd(prompt, stream: false)
-    cmd = ["claude", "-p"]
-    cmd += ["--output-format", "stream-json"] if stream
-    cmd += ["--verbose"]
-    cmd << prompt
+    cmd = ["claude"]
+
+    if @resume_session_id
+      cmd += ["--resume", @resume_session_id, "-p"]
+      cmd += ["--output-format", "stream-json"] if stream
+      cmd += ["--verbose"]
+      cmd << "Your previous session was interrupted. Continue and complete the task."
+    else
+      cmd += ["-p"]
+      cmd += ["--output-format", "stream-json"] if stream
+      cmd += ["--verbose"]
+      cmd << prompt
+    end
 
     model = @step.config["model"]
     cmd += ["--model", model] if model.present?
@@ -199,7 +214,7 @@ class StepExecutor
 
   # --- CI polling (unchanged) ---
 
-  def poll_pr_checks(cfg)
+  def poll_pr_checks(cfg, &on_progress)
     pr = interpolate_string(cfg.fetch("pr", "${pr_number}"))
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
@@ -207,6 +222,7 @@ class StepExecutor
     sleep 5
 
     loop do
+      yield({ output: "Polling CI checks for PR ##{pr}..." }) if block_given?
       stdout, stderr, status = Open3.capture3(
         env_vars,
         "gh", "pr", "checks", pr.to_s, "--json", "name,bucket,link",
@@ -273,7 +289,7 @@ class StepExecutor
     "(Could not fetch failure logs: #{e.message})"
   end
 
-  def poll_workflow_run(cfg)
+  def poll_workflow_run(cfg, &on_progress)
     workflow_file = interpolate_string(cfg.fetch("workflow", "ci.yml"))
     ref = interpolate_string(cfg.fetch("ref", "main"))
     should_trigger = cfg.fetch("trigger", false)
@@ -293,6 +309,8 @@ class StepExecutor
     end
 
     loop do
+      yield({ output: "Polling workflow '#{workflow_file}'..." }) if block_given?
+
       stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "run", "list",

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_05_005838) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_05_044555) do
   create_table "pipeline_tasks", force: :cascade do |t|
     t.text "body", null: false
     t.datetime "created_at", null: false
@@ -36,6 +36,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_05_005838) do
 
   create_table "run_steps", force: :cascade do |t|
     t.integer "attempt", default: 1, null: false
+    t.string "claude_session_id"
     t.datetime "created_at", null: false
     t.float "duration"
     t.text "error_output"

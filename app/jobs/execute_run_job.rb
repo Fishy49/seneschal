@@ -34,6 +34,12 @@ class ExecuteRunJob < ApplicationJob
       while queue.any? && queue.first[0].id != resume_from_step_id
         queue.shift
       end
+
+      # Link the existing failed RunStep so we can reuse its session_id
+      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: "failed").last
+      if crashed_run_step
+        queue[0] = [queue[0][0], crashed_run_step.id] if queue.any?
+      end
     elsif resume_from_step_id.present?
       # New run with skip: create skipped RunSteps for steps before the resume point
       position = 0
@@ -145,13 +151,19 @@ class ExecuteRunJob < ApplicationJob
   end
 
   def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil)
-    executor = StepExecutor.new(step, run.context, repo_path, resolved_input_context: resolved_context)
+    # If resuming a crashed skill step, pass the session_id so Claude can continue
+    resume_sid = run_step.claude_session_id if step.step_type == "skill"
+
+    executor = StepExecutor.new(step, run.context, repo_path,
+                                resolved_input_context: resolved_context,
+                                resume_session_id: resume_sid)
 
     on_progress = ->(update) {
       attrs = {}
       attrs[:output] = update[:output] if update.key?(:output)
       attrs[:error_output] = update[:error_output] if update.key?(:error_output)
       attrs[:stream_log] = update[:stream_log] if update.key?(:stream_log)
+      attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
       RunStep.where(id: run_step.id).update_all(attrs) if attrs.any?
       run_step.reload
       broadcast_step(run, run_step)
