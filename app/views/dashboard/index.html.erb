@@ -10,7 +10,7 @@
         <table class="w-full border-collapse">
           <thead>
             <tr>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Task</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Started</th>
@@ -19,7 +19,10 @@
           <tbody>
             <% @active_runs.each do |run| %>
               <tr>
-                <td class="px-3 py-2 border-b border-edge"><%= link_to run.workflow.name, run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge">
+                  <div><%= link_to run.pipeline_task&.title || run.workflow.name, run_path(run) %></div>
+                  <div class="text-xs text-content-muted"><%= run.workflow.name %></div>
+                </td>
                 <td class="px-3 py-2 border-b border-edge text-content-muted"><%= run.workflow.project.name %></td>
                 <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
                 <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= time_ago_short(run.started_at || run.created_at) %></td>
@@ -41,7 +44,7 @@
         <table class="w-full border-collapse">
           <thead>
             <tr>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Task</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Finished</th>
@@ -50,7 +53,10 @@
           <tbody>
             <% @recent_runs.each do |run| %>
               <tr>
-                <td class="px-3 py-2 border-b border-edge"><%= link_to run.workflow.name, run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge">
+                  <div><%= link_to run.pipeline_task&.title || run.workflow.name, run_path(run) %></div>
+                  <div class="text-xs text-content-muted"><%= run.workflow.name %></div>
+                </td>
                 <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
                 <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= format_duration(run.duration) %></td>
                 <td class="px-3 py-2 border-b border-edge text-content-muted text-sm"><%= time_ago_short(run.finished_at) %></td>
