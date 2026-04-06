@@ -60,6 +60,10 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [:id]
 
+  # Action Cable — allow connections from any origin.
+  # Safe for a self-hosted, single-user deployment behind a reverse proxy.
+  config.action_cable.disable_request_forgery_protection = true
+
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [
   #   "example.com",     # Allow requests from example.com
