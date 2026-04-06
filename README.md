@@ -6,6 +6,27 @@
 
 <p align="center">An AI pipeline orchestrator for software projects. Define workflows that use Claude to plan, implement, and validate features, then watch them run.</p>
 
+## Table of contents
+
+- [What it does](#what-it-does)
+- [Requirements](#requirements)
+- [Development setup](#development-setup)
+- [Production setup (Raspberry Pi)](#production-setup-raspberry-pi)
+  - [1. System dependencies](#1-system-dependencies)
+  - [2. Install Claude CLI and GitHub CLI](#2-install-claude-cli-and-github-cli)
+  - [3. Clone and install](#3-clone-and-install)
+  - [4. Configure environment](#4-configure-environment)
+  - [5. Database and assets](#5-database-and-assets)
+  - [6. Caddy reverse proxy](#6-caddy-reverse-proxy)
+  - [7. Systemd service](#7-systemd-service)
+  - [8. First run](#8-first-run)
+  - [Updating](#updating)
+  - [Backups](#backups)
+- [Concepts](#concepts)
+  - [Step types](#step-types)
+  - [Failure injection](#failure-injection)
+- [Stack](#stack)
+
 ## What it does
 
 Seneschal connects your Git repositories to multi-step AI workflows. A typical pipeline might:
