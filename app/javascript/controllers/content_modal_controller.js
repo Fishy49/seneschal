@@ -5,7 +5,7 @@ export default class extends Controller {
   static values = { title: String }
 
   open() {
-    const text = this.sourceTarget.content.textContent
+    const text = this.sourceTarget.textContent
 
     this.overlay = document.createElement("div")
     this.overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-150"

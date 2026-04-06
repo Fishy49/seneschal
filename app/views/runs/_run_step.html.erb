@@ -15,7 +15,7 @@
       <div class="mt-1 inline-block" data-controller="content-modal" data-content-modal-title-value="Input Context — <%= run_step.step.name %>">
         <button type="button" data-action="content-modal#open"
                 class="text-[0.8125rem] text-accent cursor-pointer bg-transparent border-none p-0 hover:text-accent-hover">input context</button>
-        <template data-content-modal-target="source"><%= run_step.resolved_input_context %></template>
+        <script type="text/plain" data-content-modal-target="source"><%= run_step.resolved_input_context %></script>
       </div>
     <% end %>
     <% if run_step.stream_log.present? %>
@@ -65,7 +65,7 @@
           <div data-controller="content-modal" data-content-modal-title-value="Output — <%= run_step.step.name %>">
             <button type="button" data-action="content-modal#open"
                     class="text-[0.8125rem] text-content-muted cursor-pointer bg-transparent border-none p-0 hover:text-content">output</button>
-            <template data-content-modal-target="source"><%= run_step.output %></template>
+            <script type="text/plain" data-content-modal-target="source"><%= run_step.output %></script>
           </div>
         <% end %>
         <% if run_step.error_output.present? %>
@@ -73,7 +73,7 @@
           <div data-controller="content-modal" data-content-modal-title-value="<%= stderr_is_error ? 'Error' : 'Stderr' %> — <%= run_step.step.name %>">
             <button type="button" data-action="content-modal#open"
                     class="text-[0.8125rem] cursor-pointer bg-transparent border-none p-0 <%= stderr_is_error ? 'text-danger hover:text-danger/80' : 'text-content-muted hover:text-content' %>"><%= stderr_is_error ? "error" : "stderr" %></button>
-            <template data-content-modal-target="source"><%= run_step.error_output %></template>
+            <script type="text/plain" data-content-modal-target="source"><%= run_step.error_output %></script>
           </div>
         <% end %>
       </div>
