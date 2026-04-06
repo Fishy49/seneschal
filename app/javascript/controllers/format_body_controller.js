@@ -5,7 +5,9 @@ export default class extends Controller {
   static values = { url: String }
 
   async format() {
-    const text = this.inputTarget.value.trim()
+    // Read from the editor element directly — dictation may bypass CodeJar's onUpdate
+    const editor = this.element.querySelector("[data-code-editor-target='editor']")
+    const text = (editor?.textContent || this.inputTarget.value).trim()
     if (!text) return
 
     const original = this.btnTarget.textContent
