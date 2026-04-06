@@ -14,6 +14,7 @@ class StepTemplate < ApplicationRecord
       body: body,
       config: config,
       skill_id: skill_id,
+      skill_name: skill&.display_name,
       max_retries: max_retries,
       timeout: timeout,
       input_context: input_context,

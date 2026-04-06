@@ -15,28 +15,14 @@
   <% end %>
 
   <% if step.new_record? && templates.any? %>
-    <div class="mb-6 pb-4 border-b border-edge">
-      <div class="flex items-center justify-between mb-1.5">
-        <label class="block text-sm font-medium text-content-muted">Load from Template</label>
-        <%= link_to "Manage", step_templates_path,
-              class: "text-xs text-content-muted hover:text-accent transition-colors" %>
-      </div>
-      <div class="relative" data-controller="template-search" data-template-search-step-form-outlet=".step-form-wrapper">
-        <input type="text" placeholder="Search templates..." autocomplete="off"
-               data-template-search-target="input" data-action="input->template-search#filter"
-               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
-        <div data-template-search-target="list" class="mt-1 bg-surface-card border border-edge rounded-lg overflow-hidden max-h-48 overflow-y-auto" style="display:none">
-          <% templates.each do |t| %>
-            <button type="button" data-action="template-search#select"
-                    data-template-id="<%= t.id %>"
-                    data-searchable="<%= t.name.downcase %>"
-                    class="w-full text-left px-3 py-2 text-sm hover:bg-surface-input transition-colors cursor-pointer bg-transparent border-none text-content">
-              <span class="font-medium"><%= t.name %></span>
-              <span class="text-content-muted text-xs ml-1">(<%= t.step_type %>)</span>
-            </button>
-          <% end %>
-        </div>
-      </div>
+    <div class="mb-6 pb-4 border-b border-edge flex items-center justify-between">
+      <button type="button" data-action="template-panel#open"
+              class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm text-content-muted hover:text-content hover:bg-edge transition-colors cursor-pointer">
+        Choose Template
+        <span class="text-xs opacity-60">(<%= templates.size %>)</span>
+      </button>
+      <%= link_to "Manage Templates", step_templates_path,
+            class: "text-xs text-content-muted hover:text-accent transition-colors" %>
     </div>
   <% end %>
 

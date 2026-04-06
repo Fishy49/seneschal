@@ -1,37 +1,64 @@
 <h1 class="text-2xl font-bold mb-6">Step Templates</h1>
 
 <% if @templates.any? %>
-  <div class="bg-surface-card border border-edge rounded-xl overflow-hidden">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b border-edge text-left text-content-muted">
-          <th class="px-4 py-3 font-medium">Name</th>
-          <th class="px-4 py-3 font-medium">Type</th>
-          <th class="px-4 py-3 font-medium">Skill</th>
-          <th class="px-4 py-3 font-medium">Timeout</th>
-          <th class="px-4 py-3 font-medium">Retries</th>
-          <th class="px-4 py-3 font-medium"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @templates.each do |template| %>
-          <tr class="border-b border-edge last:border-0">
-            <td class="px-4 py-3 text-content font-medium"><%= template.name %></td>
-            <td class="px-4 py-3">
-              <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-accent/15 text-accent"><%= template.step_type %></span>
-            </td>
-            <td class="px-4 py-3 text-content-muted"><%= template.skill&.display_name || "&mdash;".html_safe %></td>
-            <td class="px-4 py-3 text-content-muted"><%= template.timeout %>s</td>
-            <td class="px-4 py-3 text-content-muted"><%= template.max_retries %></td>
-            <td class="px-4 py-3 text-right">
-              <%= button_to "Delete", step_template_path(template), method: :delete,
-                    data: { turbo_confirm: "Delete template \"#{template.name}\"?" },
-                    class: "px-2 py-1 text-xs text-danger hover:text-danger/80 transition-colors cursor-pointer bg-transparent border-none" %>
-            </td>
+  <div data-controller="list-filter">
+    <div class="flex items-center gap-3 mb-4">
+      <input type="text" placeholder="Search templates..." autocomplete="off"
+             data-list-filter-target="search" data-action="input->list-filter#filter"
+             class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+      <select data-list-filter-target="type" data-action="change->list-filter#filter"
+              class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+        <option value="">All Types</option>
+        <option value="skill">Skill</option>
+        <option value="script">Script</option>
+        <option value="command">Command</option>
+        <option value="ci_check">CI Check</option>
+      </select>
+    </div>
+
+    <div class="bg-surface-card border border-edge rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-edge text-left text-content-muted">
+            <th class="px-4 py-3 font-medium">Name</th>
+            <th class="px-4 py-3 font-medium">Type</th>
+            <th class="px-4 py-3 font-medium">Skill</th>
+            <th class="px-4 py-3 font-medium">Timeout</th>
+            <th class="px-4 py-3 font-medium">Retries</th>
+            <th class="px-4 py-3 font-medium"></th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody data-list-filter-target="list">
+          <% @templates.each do |template| %>
+            <% searchable = [template.name, template.step_type, template.skill&.display_name, template.body].compact.join(" ").downcase %>
+            <tr class="border-b border-edge last:border-0" data-type="<%= template.step_type %>" data-searchable="<%= searchable %>">
+              <td class="px-4 py-3 text-content font-medium"><%= template.name %></td>
+              <td class="px-4 py-3">
+                <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full
+                  <%= case template.step_type
+                      when 'skill' then 'bg-accent/15 text-accent'
+                      when 'command' then 'bg-success/15 text-success'
+                      when 'script' then 'bg-warning/15 text-warning'
+                      when 'ci_check' then 'bg-info/15 text-info'
+                      end %>"><%= template.step_type %></span>
+              </td>
+              <td class="px-4 py-3 text-content-muted"><%= template.skill&.display_name || "&mdash;".html_safe %></td>
+              <td class="px-4 py-3 text-content-muted"><%= template.timeout %>s</td>
+              <td class="px-4 py-3 text-content-muted"><%= template.max_retries %></td>
+              <td class="px-4 py-3 text-right">
+                <%= button_to "Delete", step_template_path(template), method: :delete,
+                      data: { turbo_confirm: "Delete template \"#{template.name}\"?" },
+                      class: "px-2 py-1 text-xs text-danger hover:text-danger/80 transition-colors cursor-pointer bg-transparent border-none" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <p data-list-filter-target="empty" class="bg-surface-card border border-edge rounded-xl p-8 text-center text-content-muted text-sm mt-4" style="display:none">
+      No templates match your filters.
+    </p>
   </div>
 <% else %>
   <div class="bg-surface-card border border-edge rounded-xl p-8 text-center text-content-muted text-sm">

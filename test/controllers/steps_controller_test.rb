@@ -118,6 +118,6 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
   test "GET new shows template selector when templates exist" do
     get new_project_workflow_step_path(@project, @workflow)
     assert_response :success
-    assert_select "[data-controller='template-search']"
+    assert_select "[data-controller='template-panel']"
   end
 end

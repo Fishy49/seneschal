@@ -73,7 +73,7 @@ export default class extends Controller {
     const cfg = template.config || {}
 
     // Basic fields
-    this.field("step[name]").value = ""
+    this.field("step[name]").value = template.name || ""
     this.typeSelectTarget.value = template.step_type
     this.field("step[body]").value = template.body || ""
     this.field("step[max_retries]").value = template.max_retries

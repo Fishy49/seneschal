@@ -54,6 +54,8 @@
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'skills' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Runs", runs_path,
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'runs' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+        <%= link_to "Templates", step_templates_path,
+              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'step_templates' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <% if current_user&.admin? %>
           <%= link_to "Users", users_path,
                 class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'users' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
