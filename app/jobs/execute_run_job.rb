@@ -194,7 +194,6 @@ class ExecuteRunJob < ApplicationJob
     extract_context(run, step, result.stdout)
     capture_full_output(run, step, result.stdout)
     broadcast_step(run, run_step)
-    broadcast_run(run)
   end
 
   def fail_step(run, run_step, result)
