@@ -241,7 +241,8 @@ class StepExecutor
 
             return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
 
-            failure_logs = fetch_failure_logs(failed)
+            max_chars = cfg.fetch("max_log_chars", 50_000)
+            failure_logs = fetch_failure_logs(failed, max_chars: max_chars)
             output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
             return Result.new(exit_code: 1, stdout: output, stderr: "")
 
@@ -255,10 +256,11 @@ class StepExecutor
     end
   end
 
-  def fetch_failure_logs(failed_checks)
+  def fetch_failure_logs(failed_checks, max_chars: 50_000)
     # Extract unique run IDs from check links
     # Link format: https://github.com/OWNER/REPO/actions/runs/RUN_ID/job/JOB_ID
     run_ids = failed_checks.filter_map { |c| c["link"]&.match(%r{/runs/(\d+)})&.[](1) }.uniq
+    per_run_limit = run_ids.size > 1 ? max_chars / run_ids.size : max_chars
 
     logs = run_ids.filter_map do |run_id|
       stdout, _, status = Open3.capture3(
@@ -276,7 +278,11 @@ class StepExecutor
          .sub(/^\W*##\[(group|endgroup|error)\].*\n?/, "") # strip GH workflow marker lines (incl BOM)
       end.reject { |l| l.strip.blank? }.join
 
-      clean.truncate(10_000)
+      # Keep the tail — error summaries are at the end
+      if clean.length > per_run_limit
+        clean = "... (truncated #{clean.length - per_run_limit} chars from start) ...\n\n#{clean.last(per_run_limit)}"
+      end
+      clean
     end
 
     logs.join("\n\n---\n\n")
