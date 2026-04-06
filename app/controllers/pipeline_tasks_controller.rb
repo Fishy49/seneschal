@@ -1,3 +1,5 @@
+require "open3"
+
 class PipelineTasksController < ApplicationController
   before_action :set_task, only: [:show, :edit, :update, :destroy, :execute, :mark_ready]
 
@@ -46,6 +48,35 @@ class PipelineTasksController < ApplicationController
   def destroy
     @task.destroy
     redirect_to pipeline_tasks_path, notice: "Task deleted."
+  end
+
+  def format_body
+    raw_text = params[:body].to_s.strip
+    if raw_text.blank?
+      render json: { error: "No text to format." }, status: :unprocessable_content
+      return
+    end
+
+    prompt = <<~PROMPT
+      Format the following rough notes into a concise markdown feature specification. Include:
+
+      1. A brief description of what the feature does and why (2-3 sentences max)
+      2. An "## Acceptance criteria" section with concrete, testable bullet points
+
+      Keep it tight — no filler, no implementation details. Just what and why.
+
+      Here are the notes:
+
+      #{raw_text}
+    PROMPT
+
+    stdout, stderr, status = Open3.capture3("claude", "-p", prompt, "--model", "claude-haiku-4-5-20251001")
+
+    if status.success? && stdout.present?
+      render json: { formatted: stdout.strip }
+    else
+      render json: { error: stderr.presence || "Claude CLI failed." }, status: :unprocessable_content
+    end
   end
 
   def mark_ready

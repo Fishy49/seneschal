@@ -38,12 +38,18 @@
     </div>
   </div>
 
-  <div class="mb-4" data-controller="code-editor">
-    <%= f.label :body, "Spec", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+  <div class="mb-4" data-controller="code-editor format-body" data-format-body-url-value="<%= format_task_body_path %>">
+    <div class="flex items-center justify-between mb-1.5">
+      <%= f.label :body, "Spec", class: "block text-sm font-medium text-content-muted" %>
+      <button type="button" data-action="format-body#format" data-format-body-target="btn"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+        Format with Claude
+      </button>
+    </div>
     <div class="codejar-wrap">
       <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
     </div>
-    <%= f.hidden_field :body, data: { code_editor_target: "input" } %>
+    <%= f.hidden_field :body, data: { code_editor_target: "input", format_body_target: "input" } %>
   </div>
 
   <div class="flex gap-2">
