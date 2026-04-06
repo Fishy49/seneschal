@@ -72,7 +72,7 @@ class DataImporterTest < ActiveSupport::TestCase
     bad_data = @export_data.deep_dup
     bad_data[:seneschal_export][:projects] << { name: nil, repo_url: nil, local_path: nil }
 
-    assert_raises ActiveRecord::RecordInvalid do
+    assert_raises ActiveRecord::StatementInvalid do
       DataImporter.new(bad_data).call
     end
 

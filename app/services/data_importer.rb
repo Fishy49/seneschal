@@ -53,12 +53,14 @@ class DataImporter
 
   def import_projects
     (@data[:projects] || []).each do |proj_attrs|
-      project = Project.create!(
+      project = Project.new(
         name: proj_attrs[:name],
         repo_url: proj_attrs[:repo_url],
         local_path: proj_attrs[:local_path],
-        description: proj_attrs[:description]
+        description: proj_attrs[:description],
+        repo_status: "not_cloned"
       )
+      project.save!(validate: false)
       @stats[:projects] += 1
 
       import_project_skills(project)
