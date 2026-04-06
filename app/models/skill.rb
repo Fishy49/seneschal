@@ -1,6 +1,7 @@
 class Skill < ApplicationRecord
   belongs_to :project, optional: true
   has_many :steps, dependent: :nullify
+  has_many :step_templates, dependent: :nullify
 
   validates :name, presence: true, uniqueness: { scope: :project_id }
   validates :body, presence: true

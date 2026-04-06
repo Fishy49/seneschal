@@ -12,6 +12,7 @@ class StepsController < ApplicationController
   def create
     @step = @workflow.steps.build(step_params)
     if @step.save
+      save_as_template(@step)
       redirect_to project_workflow_path(@project, @workflow), notice: "Step added."
     else
       render :new, status: :unprocessable_content
@@ -20,6 +21,7 @@ class StepsController < ApplicationController
 
   def update
     if @step.update(step_params)
+      save_as_template(@step)
       redirect_to project_workflow_path(@project, @workflow), notice: "Step updated."
     else
       render :edit, status: :unprocessable_content
@@ -46,6 +48,22 @@ class StepsController < ApplicationController
 
   def set_step
     @step = @workflow.steps.find(params[:id])
+  end
+
+  def save_as_template(step)
+    return unless params[:save_as_template] == "1" && params[:template_name].present?
+
+    StepTemplate.create(
+      name: params[:template_name],
+      step_type: step.step_type,
+      body: step.body,
+      config: step.config,
+      skill_id: step.skill_id,
+      max_retries: step.max_retries,
+      timeout: step.timeout,
+      input_context: step.input_context,
+      injectable_only: step.injectable_only
+    )
   end
 
   def step_params

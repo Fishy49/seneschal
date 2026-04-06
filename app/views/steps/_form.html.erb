@@ -1,14 +1,42 @@
 <% skills = Skill.for_project(@project).order(:name) %>
 <% skill_cfg = step.step_type == "skill" ? (step.config || {}) : {} %>
 <% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
+<% templates = StepTemplate.ordered %>
 <%= form_with model: [@project, @workflow, step],
       data: { controller: "step-form",
-              step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json } do |f| %>
+              step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json,
+              step_form_templates_value: templates.map { |t| [t.id, t.template_data] }.to_h.to_json } do |f| %>
   <% if step.errors.any? %>
     <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
       <% step.errors.full_messages.each do |msg| %>
         <p><%= msg %></p>
       <% end %>
+    </div>
+  <% end %>
+
+  <% if step.new_record? && templates.any? %>
+    <div class="mb-6 pb-4 border-b border-edge">
+      <div class="flex items-center justify-between mb-1.5">
+        <label class="block text-sm font-medium text-content-muted">Load from Template</label>
+        <%= link_to "Manage", step_templates_path,
+              class: "text-xs text-content-muted hover:text-accent transition-colors" %>
+      </div>
+      <div class="relative" data-controller="template-search" data-template-search-step-form-outlet=".step-form-wrapper">
+        <input type="text" placeholder="Search templates..." autocomplete="off"
+               data-template-search-target="input" data-action="input->template-search#filter"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+        <div data-template-search-target="list" class="mt-1 bg-surface-card border border-edge rounded-lg overflow-hidden max-h-48 overflow-y-auto" style="display:none">
+          <% templates.each do |t| %>
+            <button type="button" data-action="template-search#select"
+                    data-template-id="<%= t.id %>"
+                    data-searchable="<%= t.name.downcase %>"
+                    class="w-full text-left px-3 py-2 text-sm hover:bg-surface-input transition-colors cursor-pointer bg-transparent border-none text-content">
+              <span class="font-medium"><%= t.name %></span>
+              <span class="text-content-muted text-xs ml-1">(<%= t.step_type %>)</span>
+            </button>
+          <% end %>
+        </div>
+      </div>
     </div>
   <% end %>
 
@@ -217,6 +245,18 @@
       </div>
     </div>
   <% end %>
+
+  <div class="mb-4 pt-4 border-t border-edge">
+    <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
+      <input type="checkbox" name="save_as_template" value="1" class="accent-accent"
+             data-step-form-target="saveTemplateCheck" data-action="step-form#toggleSaveTemplate">
+      Save as Template
+    </label>
+    <div data-step-form-target="saveTemplateFields" style="display:none" class="mt-2">
+      <input type="text" name="template_name" placeholder="Template name"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    </div>
+  </div>
 
   <div class="flex gap-2">
     <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>

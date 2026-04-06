@@ -1,0 +1,28 @@
+skill_template:
+  name: "Standard Plan Step"
+  step_type: skill
+  skill: shared_skill
+  config: {}
+  max_retries: 1
+  timeout: 300
+  injectable_only: false
+
+command_template:
+  name: "Git Checkout Main"
+  step_type: command
+  body: "git checkout main && git pull"
+  config: {}
+  max_retries: 0
+  timeout: 120
+  injectable_only: false
+
+ci_check_template:
+  name: "Wait for PR Checks"
+  step_type: ci_check
+  config:
+    mode: pr
+    pr: "${pr_number}"
+    poll_interval: 30
+  max_retries: 0
+  timeout: 600
+  injectable_only: false

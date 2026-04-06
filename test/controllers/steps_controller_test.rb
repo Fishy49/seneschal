@@ -79,4 +79,45 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_workflow_path(@project, @workflow)
     assert_equal 5, steps(:skill_step).reload.position
   end
+
+  test "POST create with save_as_template creates both step and template" do
+    assert_difference ["Step.count", "StepTemplate.count"], 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Reusable Command",
+          step_type: "command",
+          body: "make build",
+          position: 10,
+          timeout: 120,
+          max_retries: 1
+        },
+        save_as_template: "1",
+        template_name: "Build Step"
+      }
+    end
+    template = StepTemplate.find_by(name: "Build Step")
+    assert_not_nil template
+    assert_equal "command", template.step_type
+    assert_equal "make build", template.body
+    assert_equal 120, template.timeout
+  end
+
+  test "POST create without save_as_template does not create template" do
+    assert_no_difference "StepTemplate.count" do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "No Template",
+          step_type: "command",
+          body: "echo hi",
+          position: 10
+        }
+      }
+    end
+  end
+
+  test "GET new shows template selector when templates exist" do
+    get new_project_workflow_step_path(@project, @workflow)
+    assert_response :success
+    assert_select "[data-controller='template-search']"
+  end
 end

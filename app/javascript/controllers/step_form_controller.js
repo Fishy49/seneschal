@@ -4,9 +4,10 @@ export default class extends Controller {
   static targets = [
     "typeSelect", "skillFields", "bodyFields", "ciCheckFields",
     "skillSelect", "skillPreview", "previewBody", "previewContent", "previewToggleText",
-    "ciMode", "ciPrFields", "ciWorkflowFields"
+    "ciMode", "ciPrFields", "ciWorkflowFields",
+    "saveTemplateCheck", "saveTemplateFields"
   ]
-  static values = { skills: Object }
+  static values = { skills: Object, templates: Object }
 
   connect() {
     this.previewVisible = false
@@ -58,5 +59,57 @@ export default class extends Controller {
     this.previewVisible = !this.previewVisible
     this.previewBodyTarget.style.display = this.previewVisible ? "" : "none"
     this.previewToggleTextTarget.textContent = this.previewVisible ? "Hide" : "Show"
+  }
+
+  toggleSaveTemplate() {
+    if (!this.hasSaveTemplateFieldsTarget) return
+    this.saveTemplateFieldsTarget.style.display = this.saveTemplateCheckTarget.checked ? "" : "none"
+  }
+
+  loadTemplate(templateId) {
+    const template = this.templatesValue[templateId]
+    if (!template) return
+
+    const cfg = template.config || {}
+
+    // Basic fields
+    this.field("step[name]").value = ""
+    this.typeSelectTarget.value = template.step_type
+    this.field("step[body]").value = template.body || ""
+    this.field("step[max_retries]").value = template.max_retries
+    this.field("step[timeout]").value = template.timeout
+    this.field("step[input_context]").value = template.input_context || ""
+    this.field("step[injectable_only]").checked = template.injectable_only
+
+    // Skill config
+    if (template.step_type === "skill") {
+      if (this.hasSkillSelectTarget && template.skill_id) {
+        this.skillSelectTarget.value = template.skill_id
+        this.skillChanged()
+      }
+      this.field("skill_model").value = cfg.model || ""
+      this.field("skill_max_turns").value = cfg.max_turns || ""
+      this.field("skill_capture_output").value = cfg.capture_output || ""
+      this.field("skill_outputs").value = cfg.outputs ? JSON.stringify(cfg.outputs) : ""
+      this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
+    }
+
+    // CI Check config
+    if (template.step_type === "ci_check") {
+      this.field("ci_mode").value = cfg.mode || "pr"
+      this.field("ci_poll_interval").value = cfg.poll_interval || 30
+      this.field("ci_pr").value = cfg.pr || "${pr_number}"
+      this.field("ci_workflow").value = cfg.workflow || ""
+      this.field("ci_ref").value = cfg.ref || "${branch}"
+      const trigger = this.element.querySelector('[name="ci_trigger"]')
+      if (trigger) trigger.checked = !!cfg.trigger
+      if (this.hasCiModeTarget) this.ciModeChanged()
+    }
+
+    this.toggle()
+  }
+
+  field(name) {
+    return this.element.querySelector(`[name="${name}"]`) || { value: "", checked: false }
   }
 }
