@@ -73,7 +73,8 @@ class PipelineTasksController < ApplicationController
     stdout, stderr, status = Open3.capture3("claude", "-p", prompt, "--model", "claude-haiku-4-5-20251001")
 
     if status.success? && stdout.present?
-      render json: { formatted: stdout.strip }
+      formatted = stdout.strip.gsub(/\A```\w*\n?/, "").gsub(/\n?```\z/, "").strip
+      render json: { formatted: formatted }
     else
       render json: { error: stderr.presence || "Claude CLI failed." }, status: :unprocessable_content
     end
