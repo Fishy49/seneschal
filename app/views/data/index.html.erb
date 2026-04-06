@@ -1,0 +1,46 @@
+<h1 class="text-2xl font-bold mb-6">Data Management</h1>
+
+<div class="grid grid-cols-2 gap-6">
+  <%# Export section %>
+  <div class="bg-surface-card border border-edge rounded-xl p-6">
+    <h2 class="text-lg font-semibold mb-3">Export</h2>
+    <p class="text-sm text-content-muted mb-4">
+      Download all projects, workflows, steps, skills, tasks, and step templates as a JSON file.
+      Runs and user accounts are not included.
+    </p>
+
+    <div class="text-sm text-content-muted mb-4 space-y-1">
+      <p><%= @project_count %> projects, <%= @workflow_count %> workflows</p>
+      <p><%= @skill_count %> skills, <%= @template_count %> step templates</p>
+      <p><%= @task_count %> tasks</p>
+    </div>
+
+    <%= link_to "Download Export", data_export_path,
+          class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors" %>
+  </div>
+
+  <%# Import section %>
+  <div class="bg-surface-card border border-edge rounded-xl p-6">
+    <h2 class="text-lg font-semibold mb-3">Import</h2>
+
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg text-sm mb-4">
+      <p class="font-semibold mb-1">Destructive operation</p>
+      <p>Importing will <strong>permanently delete</strong> all existing projects, workflows, steps, runs, tasks, skills, and step templates before loading the imported data.</p>
+      <p class="mt-1">User accounts and settings are not affected.</p>
+    </div>
+
+    <%= form_with url: data_import_path, multipart: true, class: "space-y-4" do |f| %>
+      <div>
+        <label class="block text-sm font-medium text-content-muted mb-1.5">Export file (.json)</label>
+        <input type="file" name="file" accept=".json"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-accent/15 file:text-accent file:text-xs file:px-3 file:py-1 file:cursor-pointer" />
+      </div>
+
+      <button type="submit"
+              data-turbo-confirm="This will DELETE all existing projects, workflows, steps, runs, tasks, skills, and step templates. This cannot be undone. Continue?"
+              class="inline-flex items-center gap-1.5 px-4 py-2 bg-danger text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-danger/80 transition-colors">
+        Import &amp; Replace All Data
+      </button>
+    <% end %>
+  </div>
+</div>
