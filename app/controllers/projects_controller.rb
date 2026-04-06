@@ -49,6 +49,18 @@ class ProjectsController < ApplicationController
     render partial: "repo_status", locals: { project: @project }
   end
 
+  def import_skills
+    result = SkillImporter.new(@project).call
+
+    if result.nil?
+      redirect_to @project, alert: "No .claude/skills directory found in this repository."
+    elsif result[:imported].any?
+      redirect_to @project, notice: "Imported #{result[:imported].size} skill(s): #{result[:imported].join(", ")}."
+    else
+      redirect_to @project, notice: "No new skills to import (#{result[:skipped].size} already exist)."
+    end
+  end
+
   private
 
   def set_project

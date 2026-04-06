@@ -42,6 +42,7 @@ Rails.application.routes.draw do
     member do
       post :clone
       get :repo_status
+      post :import_skills
     end
     resources :workflows do
       member do
