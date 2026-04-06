@@ -28,9 +28,12 @@ export default class extends Controller {
 
     const pre = document.createElement("pre")
     pre.className = "whitespace-pre-wrap break-words text-sm font-mono text-content"
-    pre.textContent = text
-
+    const code = document.createElement("code")
+    code.className = "language-markdown"
+    code.textContent = text
+    pre.appendChild(code)
     body.appendChild(pre)
+    window.hljs?.highlightElement(code)
     modal.appendChild(header)
     modal.appendChild(body)
     this.overlay.appendChild(modal)
