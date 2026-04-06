@@ -2,6 +2,7 @@
 User.find_or_create_by!(email: "admin@seneschal.dev") do |u|
   u.password = "password"
   u.password_confirmation = "password"
+  u.admin = true
 end
 
 # ── Shared skills ────────────────────────────────────────────

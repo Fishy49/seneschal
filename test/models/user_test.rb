@@ -77,4 +77,48 @@ class UserTest < ActiveSupport::TestCase
     assert_includes uri, URI.encode_www_form_component(user.email)
     assert_includes uri, "Seneschal"
   end
+
+  test "admin? returns true for admin users" do
+    assert users(:admin).admin?
+    assert_not users(:other).admin?
+  end
+
+  test "generate_invite_token! sets token" do
+    user = users(:other)
+    assert_nil user.invite_token
+    user.generate_invite_token!
+    assert_not_nil user.reload.invite_token
+  end
+
+  test "invite_pending? when token present and not accepted" do
+    assert users(:invited_user).invite_pending?
+    assert_not users(:admin).invite_pending?
+  end
+
+  test "accept_invite sets password and clears token" do
+    user = users(:invited_user)
+    assert user.accept_invite(password: "newpass123", password_confirmation: "newpass123")
+    user.reload
+    assert_nil user.invite_token
+    assert_not_nil user.invite_accepted_at
+    assert user.authenticate("newpass123")
+  end
+
+  test "accept_invite fails on mismatched passwords" do
+    user = users(:invited_user)
+    assert_not user.accept_invite(password: "newpass", password_confirmation: "different")
+    assert_not_nil user.reload.invite_token
+  end
+
+  test "accept_invite fails on blank password" do
+    user = users(:invited_user)
+    assert_not user.accept_invite(password: "", password_confirmation: "")
+    assert_includes user.errors[:password], "can't be blank"
+    assert_not_nil user.reload.invite_token
+  end
+
+  test "ordered scope sorts by email" do
+    emails = User.ordered.pluck(:email)
+    assert_equal emails.sort, emails
+  end
 end

@@ -1,15 +1,25 @@
 admin:
   email: admin@test.com
   password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  admin: true
   otp_required_for_login: false
 
 other:
   email: other@test.com
   password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  admin: false
   otp_required_for_login: false
 
 twofa_user:
   email: twofa@test.com
   password_digest: <%= BCrypt::Password.create("password", cost: 4) %>
+  admin: false
   otp_required_for_login: true
   otp_secret: <%= ROTP::Base32.random %>
+
+invited_user:
+  email: invited@test.com
+  password_digest: <%= BCrypt::Password.create("placeholder", cost: 4) %>
+  admin: false
+  otp_required_for_login: false
+  invite_token: test-invite-token-abc123

@@ -21,27 +21,6 @@ class AuthenticationTest < ApplicationSystemTestCase
     assert_current_path login_path
   end
 
-  test "register new account" do
-    visit register_path
-    fill_in "Email", with: "newuser@test.com"
-    fill_in "Password", with: "securepassword"
-    fill_in "Confirm Password", with: "securepassword"
-    click_on "Create Account"
-
-    assert_text "Dashboard"
-    assert_current_path root_path
-  end
-
-  test "register with mismatched passwords shows errors" do
-    visit register_path
-    fill_in "Email", with: "newuser@test.com"
-    fill_in "Password", with: "password"
-    fill_in "Confirm Password", with: "different"
-    click_on "Create Account"
-
-    assert_text "doesn't match"
-  end
-
   test "sign out" do
     sign_in_as users(:admin)
     click_on "Sign Out"
@@ -50,22 +29,39 @@ class AuthenticationTest < ApplicationSystemTestCase
     assert_current_path login_path
   end
 
-  test "navigate from login to register" do
-    visit login_path
-    click_on "Register"
-
-    assert_text "Create Account"
-  end
-
-  test "navigate from register to login" do
-    visit register_path
-    click_on "Sign in"
-
+  test "unauthenticated user redirected to login" do
+    visit root_path
     assert_text "Sign In"
   end
 
-  test "unauthenticated user redirected to login" do
-    visit root_path
+  test "accept invite and set password" do
+    user = users(:invited_user)
+    visit accept_invite_path(user.invite_token)
+
+    assert_text "Set Up Your Account"
+    assert_text user.email
+
+    fill_in "Password", with: "mynewpassword"
+    fill_in "Confirm Password", with: "mynewpassword"
+    click_on "Set Password & Sign In"
+
+    assert_text "Dashboard"
+    assert_current_path root_path
+  end
+
+  test "invite with mismatched passwords shows error" do
+    user = users(:invited_user)
+    visit accept_invite_path(user.invite_token)
+
+    fill_in "Password", with: "password"
+    fill_in "Confirm Password", with: "different"
+    click_on "Set Password & Sign In"
+
+    assert_text "doesn't match"
+  end
+
+  test "invalid invite token redirected to login" do
+    visit accept_invite_path("bad-token")
     assert_text "Sign In"
   end
 end

@@ -1,0 +1,64 @@
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Users</h1>
+  <%= link_to "New User", new_user_path,
+        class: "px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors" %>
+</div>
+
+<div class="bg-surface-card border border-edge rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-edge text-left text-content-muted">
+        <th class="px-4 py-3 font-medium">Email</th>
+        <th class="px-4 py-3 font-medium">Role</th>
+        <th class="px-4 py-3 font-medium">Status</th>
+        <th class="px-4 py-3 font-medium">Invite Link</th>
+        <th class="px-4 py-3 font-medium"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @users.each do |user| %>
+        <tr class="border-b border-edge last:border-0">
+          <td class="px-4 py-3 text-content"><%= user.email %></td>
+          <td class="px-4 py-3">
+            <% if user.admin? %>
+              <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-accent/15 text-accent">Admin</span>
+            <% else %>
+              <span class="text-content-muted">Member</span>
+            <% end %>
+          </td>
+          <td class="px-4 py-3">
+            <% if user.invite_pending? %>
+              <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-warning/15 text-warning">Invite Pending</span>
+            <% else %>
+              <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-success/15 text-success">Active</span>
+            <% end %>
+          </td>
+          <td class="px-4 py-3">
+            <% if user.invite_pending? %>
+              <div class="flex items-center gap-2" data-controller="clipboard">
+                <input type="text" value="<%= accept_invite_url(user.invite_token) %>" readonly
+                       class="w-64 px-2 py-1 bg-surface-input border border-edge rounded text-xs text-content-muted font-mono truncate"
+                       data-clipboard-target="source" />
+                <button type="button" data-action="clipboard#copy"
+                        class="px-2 py-1 text-xs bg-surface-input border border-edge rounded hover:bg-edge transition-colors cursor-pointer text-content-muted">
+                  Copy
+                </button>
+                <%= button_to "Reset", reset_invite_user_path(user), method: :post,
+                      class: "px-2 py-1 text-xs bg-surface-input border border-edge rounded hover:bg-edge transition-colors cursor-pointer text-content-muted" %>
+              </div>
+            <% else %>
+              <span class="text-content-muted">&mdash;</span>
+            <% end %>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <% unless user == current_user %>
+              <%= button_to "Delete", user_path(user), method: :delete,
+                    data: { turbo_confirm: "Delete #{user.email}?" },
+                    class: "px-2 py-1 text-xs text-danger hover:text-danger/80 transition-colors cursor-pointer bg-transparent border-none" %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

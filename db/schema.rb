@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_05_044555) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_06_000947) do
   create_table "pipeline_tasks", force: :cascade do |t|
     t.text "body", null: false
     t.datetime "created_at", null: false
@@ -88,6 +88,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_05_044555) do
     t.index ["project_id"], name: "index_skills_on_project_id"
   end
 
+  create_table "step_templates", force: :cascade do |t|
+    t.text "body"
+    t.json "config", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.boolean "injectable_only", default: false, null: false
+    t.text "input_context"
+    t.integer "max_retries", default: 0, null: false
+    t.string "name", null: false
+    t.integer "skill_id"
+    t.string "step_type", null: false
+    t.integer "timeout", default: 600, null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_step_templates_on_name", unique: true
+    t.index ["skill_id"], name: "index_step_templates_on_skill_id"
+  end
+
   create_table "steps", force: :cascade do |t|
     t.text "body"
     t.json "config", default: {}, null: false
@@ -107,13 +123,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_05_044555) do
   end
 
   create_table "users", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.string "email", null: false
+    t.datetime "invite_accepted_at"
+    t.string "invite_token"
     t.boolean "otp_required_for_login", default: false, null: false
     t.string "otp_secret"
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["invite_token"], name: "index_users_on_invite_token", unique: true
   end
 
   create_table "workflows", force: :cascade do |t|
@@ -134,6 +154,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_05_044555) do
   add_foreign_key "runs", "pipeline_tasks"
   add_foreign_key "runs", "workflows"
   add_foreign_key "skills", "projects"
+  add_foreign_key "step_templates", "skills"
   add_foreign_key "steps", "skills"
   add_foreign_key "steps", "workflows"
   add_foreign_key "workflows", "projects"
