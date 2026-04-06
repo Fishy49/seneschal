@@ -235,8 +235,9 @@ class ExecuteRunJob < ApplicationJob
   # --- Turbo Streams ---
 
   def broadcast_step(run, run_step)
-    Turbo::StreamsChannel.broadcast_replace_to(
+    Turbo::StreamsChannel.broadcast_action_to(
       run,
+      action: :morph,
       target: "run_step_#{run_step.id}",
       partial: "runs/run_step",
       locals: { run_step: run_step, run: run }
