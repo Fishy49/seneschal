@@ -98,7 +98,8 @@ export default class extends Controller {
     if (template.step_type === "ci_check") {
       this.field("ci_mode").value = cfg.mode || "pr"
       this.field("ci_poll_interval").value = cfg.poll_interval || 30
-      this.field("ci_max_log_chars").value = cfg.max_log_chars || 50000
+      this.field("ci_max_log_chars").value = cfg.max_log_chars || 10000
+      this.field("ci_log_from").value = cfg.log_from || "end"
       this.field("ci_pr").value = cfg.pr || "${pr_number}"
       this.field("ci_workflow").value = cfg.workflow || ""
       this.field("ci_ref").value = cfg.ref || "${branch}"

@@ -82,7 +82,8 @@ class StepsController < ApplicationController
         "ref" => raw["ci_ref"].presence,
         "trigger" => raw["ci_trigger"] == "1",
         "poll_interval" => (raw["ci_poll_interval"].presence || 30).to_i,
-        "max_log_chars" => (raw["ci_max_log_chars"].presence || 50_000).to_i
+        "max_log_chars" => (raw["ci_max_log_chars"].presence || 10_000).to_i,
+        "log_from" => raw["ci_log_from"].presence || "end"
       }.compact
     when "skill"
       config = {}
