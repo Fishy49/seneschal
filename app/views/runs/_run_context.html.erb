@@ -8,10 +8,12 @@
           <td class="px-3 py-2 border-b border-edge text-sm">
             <% text = value.to_s %>
             <% if text.length > 200 %>
-              <details>
-                <summary class="cursor-pointer hover:text-accent"><code class="font-mono text-[0.8125rem]"><%= truncate(text, length: 200) %></code></summary>
-                <div class="mt-2 whitespace-pre-wrap break-words max-h-96 overflow-y-auto"><code class="font-mono text-[0.8125rem]"><%= text %></code></div>
-              </details>
+              <div data-controller="content-modal" data-content-modal-title-value="<%= key %>">
+                <code class="font-mono text-[0.8125rem]"><%= truncate(text, length: 200) %></code>
+                <button type="button" data-action="content-modal#open"
+                        class="ml-1 text-xs text-accent hover:text-accent-hover cursor-pointer bg-transparent border-none">View</button>
+                <template data-content-modal-target="source"><%= text %></template>
+              </div>
             <% else %>
               <code class="font-mono text-[0.8125rem]"><%= text %></code>
             <% end %>

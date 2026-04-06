@@ -12,10 +12,11 @@
       <% end %>
     </div>
     <% if run_step.resolved_input_context.present? %>
-      <details class="mt-1">
-        <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">input context</summary>
-        <div class="output-block mt-2"><%= run_step.resolved_input_context %></div>
-      </details>
+      <div class="mt-1 inline-block" data-controller="content-modal" data-content-modal-title-value="Input Context — <%= run_step.step.name %>">
+        <button type="button" data-action="content-modal#open"
+                class="text-[0.8125rem] text-accent cursor-pointer bg-transparent border-none p-0 hover:text-accent-hover">input context</button>
+        <template data-content-modal-target="source"><%= run_step.resolved_input_context %></template>
+      </div>
     <% end %>
     <% if run_step.stream_log.present? %>
       <% entries = stream_log_entries(run_step.stream_log) %>
@@ -59,19 +60,21 @@
       </details>
     <% end %>
     <% if run_step.output.present? || run_step.error_output.present? %>
-      <div class="mt-1">
+      <div class="mt-1 flex items-center gap-3">
         <% if run_step.output.present? %>
-          <details class="mt-0.5">
-            <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">output</summary>
-            <div class="output-block mt-2"><%= run_step.output %></div>
-          </details>
+          <div data-controller="content-modal" data-content-modal-title-value="Output — <%= run_step.step.name %>">
+            <button type="button" data-action="content-modal#open"
+                    class="text-[0.8125rem] text-content-muted cursor-pointer bg-transparent border-none p-0 hover:text-content">output</button>
+            <template data-content-modal-target="source"><%= run_step.output %></template>
+          </div>
         <% end %>
         <% if run_step.error_output.present? %>
           <% stderr_is_error = run_step.status == "failed" %>
-          <details class="mt-0.5">
-            <summary class="text-[0.8125rem] cursor-pointer select-none <%= stderr_is_error ? 'text-danger' : 'text-content-muted hover:text-content' %>"><%= stderr_is_error ? 'error' : 'stderr' %></summary>
-            <div class="output-block mt-2" style="<%= "border-color:var(--danger)" if stderr_is_error %>"><%= run_step.error_output %></div>
-          </details>
+          <div data-controller="content-modal" data-content-modal-title-value="<%= stderr_is_error ? 'Error' : 'Stderr' %> — <%= run_step.step.name %>">
+            <button type="button" data-action="content-modal#open"
+                    class="text-[0.8125rem] cursor-pointer bg-transparent border-none p-0 <%= stderr_is_error ? 'text-danger hover:text-danger/80' : 'text-content-muted hover:text-content' %>"><%= stderr_is_error ? "error" : "stderr" %></button>
+            <template data-content-modal-target="source"><%= run_step.error_output %></template>
+          </div>
         <% end %>
       </div>
     <% end %>
