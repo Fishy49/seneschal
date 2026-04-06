@@ -27,6 +27,7 @@ gem "rqrcode", "~> 2.2"
 gem "tzinfo-data", platforms: [:windows, :jruby]
 
 # Use the database-backed adapters for Rails.cache and Active Job
+gem "solid_cable"
 gem "solid_cache"
 gem "solid_queue"
 
