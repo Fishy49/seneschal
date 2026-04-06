@@ -45,6 +45,10 @@ class ProjectsController < ApplicationController
     redirect_to @project, notice: "Repository cloning started..."
   end
 
+  def repo_status
+    render partial: "repo_status", locals: { project: @project }
+  end
+
   private
 
   def set_project

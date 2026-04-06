@@ -1,4 +1,8 @@
-<span id="repo_status">
+<span id="repo_status"
+      <% if project.repo_status == "cloning" %>
+        data-controller="poll-status"
+        data-poll-status-url-value="<%= repo_status_project_path(project) %>"
+      <% end %>>
   <% case project.repo_status %>
   <% when "not_cloned" %>
     <%= button_to "Clone Repository", clone_project_path(project),
