@@ -18,44 +18,12 @@
       </details>
     <% end %>
     <% if run_step.stream_log.present? %>
-      <% entries = stream_log_entries(run_step.stream_log) %>
       <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
       <details class="mt-1" <%= "open" if run_step.status == "running" %>>
         <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
           activity log<% if cost_summary.present? %> <span class="text-content-muted">(<%= cost_summary %>)</span><% end %>
         </summary>
-        <div class="mt-2 rounded-lg bg-surface border border-edge p-3 max-h-80 overflow-y-auto space-y-0.5" data-controller="autoscroll">
-          <% entries.each do |entry| %>
-            <% case entry[:type] %>
-            <% when :tool_use %>
-              <div class="flex items-start gap-1.5 text-xs font-mono">
-                <span class="text-accent shrink-0">&#9656;</span>
-                <span class="text-content-muted"><span class="text-content font-semibold"><%= entry[:tool] %></span> <%= tool_use_label(entry[:tool], entry[:input]) %></span>
-              </div>
-            <% when :text %>
-              <div class="flex items-start gap-1.5 text-xs font-mono">
-                <span class="text-content-muted shrink-0">&#9657;</span>
-                <span class="text-content-muted"><%= entry[:text].truncate(300) %></span>
-              </div>
-            <% when :result %>
-              <div class="flex items-start gap-1.5 text-xs font-mono mt-1 pt-1 border-t border-edge">
-                <span class="text-success shrink-0">&#10003;</span>
-                <span class="text-success">
-                  Done
-                  <% if entry[:turns] %>&middot; <%= entry[:turns] %> turns<% end %>
-                  <% if entry[:cost] %>&middot; $<%= format("%.4f", entry[:cost]) %><% end %>
-                  <% if entry[:duration_ms] %>&middot; <%= format_duration(entry[:duration_ms] / 1000.0) %><% end %>
-                </span>
-              </div>
-            <% end %>
-          <% end %>
-          <% if run_step.status == "running" && entries.none? { |e| e[:type] == :result } %>
-            <div class="flex items-center gap-1.5 text-xs font-mono text-content-muted animate-pulse">
-              <span class="shrink-0">&#8943;</span>
-              <span>working</span>
-            </div>
-          <% end %>
-        </div>
+        <%= render "runs/stream_log", run_step: run_step %>
       </details>
     <% end %>
     <% if run_step.output.present? || run_step.error_output.present? %>

@@ -162,7 +162,7 @@ class ExecuteRunJob < ApplicationJob
       attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
       RunStep.where(id: run_step.id).update_all(attrs) if attrs.any?
       run_step.reload
-      broadcast_step(run, run_step)
+      broadcast_stream_log(run, run_step)
     }
 
     result = executor.execute(&on_progress)
@@ -235,12 +235,20 @@ class ExecuteRunJob < ApplicationJob
   # --- Turbo Streams ---
 
   def broadcast_step(run, run_step)
-    Turbo::StreamsChannel.broadcast_action_to(
+    Turbo::StreamsChannel.broadcast_replace_to(
       run,
-      action: :morph,
       target: "run_step_#{run_step.id}",
       partial: "runs/run_step",
       locals: { run_step: run_step, run: run }
+    )
+  end
+
+  def broadcast_stream_log(run, run_step)
+    Turbo::StreamsChannel.broadcast_replace_to(
+      run,
+      target: "stream_log_#{run_step.id}",
+      partial: "runs/stream_log",
+      locals: { run_step: run_step }
     )
   end
 
