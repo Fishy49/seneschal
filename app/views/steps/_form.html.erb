@@ -151,7 +151,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div data-step-form-target="ciLogFields" style="<%= 'display:none' if ci["mode"] == "workflow" %>" class="grid grid-cols-2 gap-4">
       <div class="mb-4">
         <label for="ci_max_log_chars" class="block text-sm font-medium text-content-muted mb-1.5">Max Failure Log Size (characters)</label>
         <input type="number" name="ci_max_log_chars" id="ci_max_log_chars"

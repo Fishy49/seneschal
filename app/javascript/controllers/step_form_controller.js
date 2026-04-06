@@ -4,7 +4,7 @@ export default class extends Controller {
   static targets = [
     "typeSelect", "skillFields", "bodyFields", "ciCheckFields",
     "skillSelect", "skillPreview", "previewBody", "previewContent", "previewToggleText",
-    "ciMode", "ciPrFields", "ciWorkflowFields",
+    "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "saveTemplateCheck", "saveTemplateFields"
   ]
   static values = { skills: Object, templates: Object }
@@ -30,6 +30,7 @@ export default class extends Controller {
     const isWorkflow = this.ciModeTarget.value === "workflow"
     if (this.hasCiPrFieldsTarget) this.ciPrFieldsTarget.style.display = isWorkflow ? "none" : ""
     if (this.hasCiWorkflowFieldsTarget) this.ciWorkflowFieldsTarget.style.display = isWorkflow ? "" : "none"
+    if (this.hasCiLogFieldsTarget) this.ciLogFieldsTarget.style.display = isWorkflow ? "none" : ""
   }
 
   skillChanged() {
