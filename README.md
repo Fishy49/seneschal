@@ -6,6 +6,12 @@
 
 <p align="center">An AI pipeline orchestrator for software projects. Define workflows that use Claude to plan, implement, and validate features, then watch them run.</p>
 
+<p align="center">
+  
+https://github.com/user-attachments/assets/51d96dcf-b06a-48eb-9092-28e8e4cc03d8
+
+</p>
+
 ## Table of contents
 
 - [What it does](#what-it-does)

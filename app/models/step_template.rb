@@ -10,6 +10,7 @@ class StepTemplate < ApplicationRecord
 
   def template_data
     {
+      name: name,
       step_type: step_type,
       body: body,
       config: config,

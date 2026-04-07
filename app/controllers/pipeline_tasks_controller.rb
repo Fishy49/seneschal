@@ -70,7 +70,10 @@ class PipelineTasksController < ApplicationController
       #{raw_text}
     PROMPT
 
-    stdout, stderr, status = Open3.capture3("claude", "-p", prompt, "--model", "claude-haiku-4-5-20251001")
+    stdout, stderr, status = Open3.capture3(
+      "claude", "-p", "--model", "claude-haiku-4-5-20251001",
+      stdin_data: prompt
+    )
 
     if status.success? && stdout.present?
       formatted = stdout.strip.gsub(/\A```\w*\n?/, "").gsub(/\n?```\z/, "").strip

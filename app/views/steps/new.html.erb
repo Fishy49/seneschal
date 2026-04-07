@@ -3,7 +3,7 @@
 
 <% templates = StepTemplate.includes(:skill).ordered %>
 <div data-controller="template-panel"
-     data-template-panel-templates-value="<%= templates.map { |t| [t.id, t.template_data.merge(name: t.name)] }.to_h.to_json %>">
+     data-template-panel-templates-value="<%= templates.map { |t| [t.id, t.template_data] }.to_h.to_json %>">
   <div class="bg-surface-card border border-edge rounded-lg p-5 step-form-wrapper">
     <%= render "form", step: @step %>
   </div>
