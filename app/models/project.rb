@@ -18,6 +18,10 @@ class Project < ApplicationRecord
     repo_status == "ready"
   end
 
+  def local_path_exists?
+    local_path.present? && File.directory?(local_path)
+  end
+
   def refresh_repo_status!
     return if repo_status == "cloning"
 
