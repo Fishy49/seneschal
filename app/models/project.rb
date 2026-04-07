@@ -18,6 +18,17 @@ class Project < ApplicationRecord
     repo_status == "ready"
   end
 
+  def refresh_repo_status!
+    return if repo_status == "cloning"
+
+    on_disk = local_path.present? && File.exist?(File.join(local_path, ".git"))
+    desired = on_disk ? "ready" : "not_cloned"
+    return if repo_status == desired
+
+    # Skip validations — ensure_local_path_exists would try to mkdir_p
+    update_column(:repo_status, desired) # rubocop:disable Rails/SkipsModelValidations
+  end
+
   def repo_nwo
     match = repo_url.match(%r{[:/]([^/]+)/([^/]+?)(?:\.git)?$})
     match ? "#{match[1]}/#{match[2]}" : nil
