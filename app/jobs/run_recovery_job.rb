@@ -11,7 +11,7 @@ class RunRecoveryJob < ApplicationJob
       run = run_step.run
 
       # Skip if already recovered once to prevent infinite loops
-      next if run.context["auto_recovered"]
+      next if run.system_flags["auto_recovered"]
 
       Rails.logger.info "[RunRecovery] Recovering stale RunStep ##{run_step.id} (Run ##{run.id}, step '#{run_step.step.name}')"
 
@@ -23,11 +23,13 @@ class RunRecoveryJob < ApplicationJob
         error_output: [run_step.error_output, "Interrupted unexpectedly. Auto-recovering."].compact.join("\n")
       )
 
-      # Mark the run as failed, flag it as auto-recovered, then re-enqueue
+      # Mark the run as failed, flag it as auto-recovered, then re-enqueue.
+      # The flag lives on system_flags (not context) so it never leaks into
+      # step env vars or prompt interpolation.
       run.update!(
         status: "failed",
         error_message: "Step '#{run_step.step.name}' interrupted, auto-recovering",
-        context: run.context.merge("auto_recovered" => true)
+        system_flags: run.system_flags.merge("auto_recovered" => true)
       )
 
       # Re-enqueue with resume to pick up from the crashed step

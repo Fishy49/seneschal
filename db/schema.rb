@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_06_000947) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_08_124443) do
   create_table "pipeline_tasks", force: :cascade do |t|
     t.text "body", null: false
     t.datetime "created_at", null: false
@@ -64,6 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_06_000947) do
     t.integer "pipeline_task_id"
     t.datetime "started_at"
     t.string "status", default: "pending", null: false
+    t.json "system_flags", default: {}, null: false
     t.datetime "updated_at", null: false
     t.integer "workflow_id", null: false
     t.index ["pipeline_task_id"], name: "index_runs_on_pipeline_task_id"
