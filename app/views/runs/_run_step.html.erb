@@ -17,9 +17,9 @@
         <div class="output-block mt-2"><%= run_step.resolved_input_context %></div>
       </details>
     <% end %>
-    <% if run_step.stream_log.present? %>
+    <% if run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
       <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
-      <details class="mt-1" <%= "open" if run_step.status == "running" %>>
+      <details class="mt-1" <%= "open" if run_step.status.in?(%w[running retrying]) %>>
         <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
           activity log<% if cost_summary.present? %> <span class="text-content-muted">(<%= cost_summary %>)</span><% end %>
         </summary>
