@@ -1,0 +1,21 @@
+<% card_search = [skill.name, skill.description, skill.body, skill.shared? ? "shared" : skill.project&.name].compact.join(" ").downcase %>
+<button type="button" data-action="skill-panel#select"
+        data-skill-id="<%= skill.id %>"
+        data-skill-name="<%= skill.display_name %>"
+        data-searchable="<%= card_search %>"
+        class="w-full text-left bg-surface-input/50 border border-edge rounded-lg p-4 hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer group block">
+  <div class="flex items-start justify-between mb-1">
+    <span class="font-medium text-sm text-content group-hover:text-accent transition-colors"><%= skill.name %></span>
+    <% if skill.shared? %>
+      <span class="inline-block px-2 py-0.5 text-[0.6875rem] font-medium rounded-full shrink-0 ml-2 bg-surface-input text-content-muted">shared</span>
+    <% else %>
+      <span class="inline-block px-2 py-0.5 text-[0.6875rem] font-medium rounded-full shrink-0 ml-2 bg-accent/15 text-accent"><%= skill.project.name %></span>
+    <% end %>
+  </div>
+
+  <% if skill.description.present? %>
+    <p class="text-xs text-content-muted mb-2"><%= skill.description %></p>
+  <% end %>
+
+  <div class="text-xs font-mono text-content-muted/70 bg-surface-card rounded px-2.5 py-2 line-clamp-4 overflow-hidden whitespace-pre-wrap"><%= truncate(skill.body, length: 300) %></div>
+</button>

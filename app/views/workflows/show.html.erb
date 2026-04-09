@@ -19,13 +19,18 @@
         <%= link_to "Add Step", new_project_workflow_step_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
       </div>
       <% if @steps.any? %>
-        <ul class="list-none">
+        <ul class="list-none" data-controller="sortable-steps"
+            data-sortable-steps-url-value="<%= reorder_project_workflow_steps_path(@project, @workflow) %>">
           <% @steps.each do |step| %>
-            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0 <%= 'opacity-60' if step.injectable_only? %>">
+            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0 <%= 'opacity-60' if step.injectable_only? %>"
+                draggable="true" data-step-id="<%= step.id %>"
+                data-sortable-steps-target="item"
+                data-action="dragstart->sortable-steps#dragstart dragend->sortable-steps#dragend dragover->sortable-steps#dragover dragleave->sortable-steps#dragleave drop->sortable-steps#drop"
+                style="cursor: grab;">
               <% if step.injectable_only? %>
                 <span class="w-7 h-7 rounded-full bg-accent/15 text-accent text-[0.75rem] font-semibold flex items-center justify-center shrink-0" title="Inject only">&orarr;</span>
               <% else %>
-                <span class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
+                <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
               <% end %>
               <div class="flex-1">
                 <div class="font-medium">

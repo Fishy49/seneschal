@@ -1,0 +1,9 @@
+<% pill_classes = case step_type
+    when 'skill' then 'bg-accent/15 text-accent'
+    when 'command' then 'bg-success/15 text-success'
+    when 'script' then 'bg-warning/15 text-warning'
+    when 'ci_check' then 'bg-warning/15 text-warning'
+    when 'context_fetch' then 'bg-info/15 text-info'
+    else 'bg-surface-input text-content-muted'
+    end %>
+<span class="inline-block px-2 py-0.5 text-[0.6875rem] font-medium rounded-full shrink-0 ml-2 <%= pill_classes %>"><%= step_type %></span>

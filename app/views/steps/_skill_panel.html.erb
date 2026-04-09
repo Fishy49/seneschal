@@ -1,0 +1,52 @@
+<%# Skill panel backdrop %>
+<div data-skill-panel-target="backdrop" data-action="click->skill-panel#close"
+     class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-200"
+     style="display:none; opacity:0"></div>
+
+<%# Skill slide-out panel %>
+<div data-skill-panel-target="panel"
+     class="fixed top-0 right-0 h-full w-[560px] bg-surface-card border-l border-edge z-50 shadow-2xl flex flex-col transition-transform duration-200"
+     style="transform:translateX(100%)">
+
+  <%# Header %>
+  <div class="flex items-center justify-between px-5 py-4 border-b border-edge">
+    <h2 class="text-lg font-semibold">Select Skill</h2>
+    <button type="button" data-action="skill-panel#close"
+            class="p-1 text-content-muted hover:text-content bg-transparent border-none cursor-pointer text-lg">&times;</button>
+  </div>
+
+  <%# Search %>
+  <div class="px-5 py-3 border-b border-edge">
+    <input type="text" placeholder="Search skills..." autocomplete="off"
+           data-skill-panel-target="search" data-action="input->skill-panel#filter"
+           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+  </div>
+
+  <%# Skill cards %>
+  <div class="flex-1 overflow-y-auto p-5 space-y-3" data-skill-panel-target="list">
+    <% project_skills = skills.reject(&:shared?) %>
+    <% shared_skills = skills.select(&:shared?) %>
+
+    <% if project_skills.any? %>
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Project Skills</p>
+      <% project_skills.each do |s| %>
+        <%= render "steps/skill_card", skill: s %>
+      <% end %>
+    <% end %>
+
+    <% if project_skills.any? && shared_skills.any? %>
+      <div class="border-t border-edge my-3"></div>
+    <% end %>
+
+    <% if shared_skills.any? %>
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Shared Skills</p>
+      <% shared_skills.each do |s| %>
+        <%= render "steps/skill_card", skill: s %>
+      <% end %>
+    <% end %>
+
+    <p data-skill-panel-target="empty" class="text-sm text-content-muted text-center py-4" style="display:none">
+      No skills match your search.
+    </p>
+  </div>
+</div>

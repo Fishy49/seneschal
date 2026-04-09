@@ -2,38 +2,33 @@
 <h1 class="text-2xl font-semibold mb-4">Add Step</h1>
 
 <% templates = StepTemplate.includes(:skill).ordered %>
-<div data-controller="template-panel"
+<% skills = Skill.for_project(@project).includes(:project).order(:name) %>
+<div data-controller="template-panel skill-panel"
      data-template-panel-templates-value="<%= templates.map { |t| [t.id, t.template_data] }.to_h.to_json %>">
   <div class="bg-surface-card border border-edge rounded-lg p-5 step-form-wrapper">
     <%= render "form", step: @step %>
   </div>
 
   <% if templates.any? %>
-    <%# Overlay backdrop %>
+    <%# Template panel backdrop %>
     <div data-template-panel-target="backdrop" data-action="click->template-panel#close"
          class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-200"
          style="display:none; opacity:0"></div>
 
-    <%# Slide-out panel %>
+    <%# Template slide-out panel %>
     <div data-template-panel-target="panel"
          class="fixed top-0 right-0 h-full w-[420px] bg-surface-card border-l border-edge z-50 shadow-2xl flex flex-col transition-transform duration-200"
          style="transform:translateX(100%)">
-
-      <%# Panel header %>
       <div class="flex items-center justify-between px-5 py-4 border-b border-edge">
         <h2 class="text-lg font-semibold">Step Templates</h2>
         <button type="button" data-action="template-panel#close"
                 class="p-1 text-content-muted hover:text-content bg-transparent border-none cursor-pointer text-lg">&times;</button>
       </div>
-
-      <%# Search %>
       <div class="px-5 py-3 border-b border-edge">
         <input type="text" placeholder="Search by name, type, skill..." autocomplete="off"
                data-template-panel-target="search" data-action="input->template-panel#filter"
                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
       </div>
-
-      <%# Template cards %>
       <div class="flex-1 overflow-y-auto p-5 space-y-3" data-template-panel-target="list">
         <% templates.each do |t| %>
           <% card_search = [t.name, t.step_type, t.skill&.display_name, t.body].compact.join(" ").downcase %>
@@ -43,23 +38,14 @@
                   class="w-full text-left bg-surface-input/50 border border-edge rounded-lg p-4 hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer group block">
             <div class="flex items-start justify-between mb-2">
               <span class="font-medium text-sm text-content group-hover:text-accent transition-colors"><%= t.name %></span>
-              <span class="inline-block px-2 py-0.5 text-[0.6875rem] font-medium rounded-full shrink-0 ml-2
-                <%= case t.step_type
-                    when 'skill' then 'bg-accent/15 text-accent'
-                    when 'command' then 'bg-success/15 text-success'
-                    when 'script' then 'bg-warning/15 text-warning'
-                    when 'ci_check' then 'bg-info/15 text-info'
-                    end %>"><%= t.step_type %></span>
+              <%= render "steps/type_pill", step_type: t.step_type %>
             </div>
-
             <% if t.skill %>
               <p class="text-xs text-content-muted mb-1.5">Skill: <%= t.skill.display_name %></p>
             <% end %>
-
             <% if t.body.present? %>
               <div class="text-xs font-mono text-content-muted/70 bg-surface-card rounded px-2 py-1.5 mb-2 line-clamp-2 overflow-hidden"><%= truncate(t.body, length: 120) %></div>
             <% end %>
-
             <div class="flex gap-3 text-[0.6875rem] text-content-muted">
               <span>Timeout: <%= t.timeout %>s</span>
               <span>Retries: <%= t.max_retries %></span>
@@ -72,11 +58,12 @@
             </div>
           </button>
         <% end %>
-
         <p data-template-panel-target="empty" class="text-sm text-content-muted text-center py-4" style="display:none">
           No templates match your search.
         </p>
       </div>
     </div>
   <% end %>
+
+  <%= render "steps/skill_panel", skills: skills %>
 </div>

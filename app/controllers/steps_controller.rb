@@ -33,6 +33,15 @@ class StepsController < ApplicationController
     redirect_to project_workflow_path(@project, @workflow), notice: "Step removed."
   end
 
+  def reorder
+    ids = params[:step_ids] || []
+    ids.each_with_index do |id, index|
+      step = @workflow.steps.find_by(id: id)
+      step&.update!(position: index + 1)
+    end
+    head :ok
+  end
+
   def move
     new_position = params[:position].to_i
     @step.update!(position: new_position)
@@ -70,12 +79,24 @@ class StepsController < ApplicationController
     permitted = params.expect(step: [:name, :position, :step_type, :max_retries, :timeout, :config, :skill_id, :body, :input_context,
                                      :injectable_only]).to_h
 
-    # Use raw request params for config fields that live outside the step namespace
     raw = request.params
+    permitted[:config] = build_step_config(permitted[:step_type], raw)
 
-    case permitted[:step_type]
+    inject_steps = Array(raw["on_failure_inject"]).compact_blank
+    if inject_steps.any?
+      permitted[:config] = permitted[:config].merge(
+        "on_failure_inject" => inject_steps,
+        "max_injections" => (raw["max_injections"].presence || 3).to_i
+      )
+    end
+
+    permitted
+  end
+
+  def build_step_config(step_type, raw)
+    case step_type
     when "ci_check"
-      permitted[:config] = {
+      {
         "mode" => raw["ci_mode"] || "pr",
         "pr" => raw["ci_pr"].presence,
         "workflow" => raw["ci_workflow"].presence,
@@ -92,20 +113,16 @@ class StepsController < ApplicationController
       config["capture_output"] = raw["skill_capture_output"] if raw["skill_capture_output"].present?
       config["outputs"] = begin; JSON.parse(raw["skill_outputs"]); rescue StandardError; {}; end if raw["skill_outputs"].present?
       config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
-      permitted[:config] = config
+      config
+    when "context_fetch"
+      {
+        "method" => raw["fetch_method"].presence || "url",
+        "url" => raw["fetch_url"].presence,
+        "context_key" => raw["fetch_context_key"].presence,
+        "capture_output" => raw["fetch_context_key"].presence
+      }.compact
     else
-      permitted[:config] = {}
+      {}
     end
-
-    # Merge on_failure_inject config (available for all step types)
-    inject_steps = Array(raw["on_failure_inject"]).compact_blank
-    if inject_steps.any?
-      permitted[:config] = permitted[:config].merge(
-        "on_failure_inject" => inject_steps,
-        "max_injections" => (raw["max_injections"].presence || 3).to_i
-      )
-    end
-
-    permitted
   end
 end

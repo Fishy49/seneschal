@@ -1,5 +1,9 @@
 <%= render "shared/project_bar", project: @project, workflow: @workflow %>
 <h1 class="text-2xl font-semibold mb-4">Edit Step: <%= @step.name %></h1>
-<div class="bg-surface-card border border-edge rounded-lg p-5">
-  <%= render "form", step: @step %>
+<% skills = Skill.for_project(@project).includes(:project).order(:name) %>
+<div data-controller="skill-panel">
+  <div class="bg-surface-card border border-edge rounded-lg p-5">
+    <%= render "form", step: @step %>
+  </div>
+  <%= render "steps/skill_panel", skills: skills %>
 </div>

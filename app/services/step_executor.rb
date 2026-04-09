@@ -1,6 +1,8 @@
 require "open3"
 
 class StepExecutor
+  include ContextFetcher
+
   Result = Data.define(:exit_code, :stdout, :stderr, :stream_events) do
     def initialize(exit_code:, stdout:, stderr:, stream_events: nil)
       super
@@ -26,6 +28,7 @@ class StepExecutor
     when "script"   then execute_script(&)
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
+    when "context_fetch" then execute_context_fetch(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end

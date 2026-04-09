@@ -49,6 +49,9 @@ Rails.application.routes.draw do
         post :trigger
       end
       resources :steps, only: [:new, :create, :edit, :update, :destroy] do
+        collection do
+          patch :reorder
+        end
         member do
           patch :move
         end

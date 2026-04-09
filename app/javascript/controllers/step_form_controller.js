@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "typeSelect", "skillFields", "bodyFields", "ciCheckFields",
-    "skillSelect", "skillPreview", "previewBody", "previewContent", "previewToggleText",
+    "typeSelect", "skillFields", "bodyFields", "ciCheckFields", "contextFetchFields",
+    "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "saveTemplateCheck", "saveTemplateFields"
   ]
@@ -23,6 +23,9 @@ export default class extends Controller {
     if (this.hasCiCheckFieldsTarget) {
       this.ciCheckFieldsTarget.style.display = type === "ci_check" ? "" : "none"
     }
+    if (this.hasContextFetchFieldsTarget) {
+      this.contextFetchFieldsTarget.style.display = type === "context_fetch" ? "" : "none"
+    }
   }
 
   ciModeChanged() {
@@ -38,6 +41,18 @@ export default class extends Controller {
     const hasSkill = id && this.skillsValue[id]
 
     this.skillPreviewTarget.style.display = hasSkill ? "" : "none"
+
+    // Update displayed skill name
+    if (this.hasSkillNameTarget) {
+      if (hasSkill) {
+        // Try to find the name from the skill panel card, or fall back to the skills data
+        const card = document.querySelector(`[data-skill-id="${id}"]`)
+        const name = card ? card.dataset.skillName : `Skill #${id}`
+        this.skillNameTarget.innerHTML = name
+      } else {
+        this.skillNameTarget.innerHTML = '<span class="text-content-muted">No skill selected</span>'
+      }
+    }
 
     if (hasSkill) {
       const code = document.createElement("code")
@@ -86,6 +101,10 @@ export default class extends Controller {
     if (template.step_type === "skill") {
       if (this.hasSkillSelectTarget && template.skill_id) {
         this.skillSelectTarget.value = template.skill_id
+        // Update the displayed name from template data
+        if (this.hasSkillNameTarget && template.skill_name) {
+          this.skillNameTarget.textContent = template.skill_name
+        }
         this.skillChanged()
       }
       this.field("skill_model").value = cfg.model || ""
@@ -93,6 +112,13 @@ export default class extends Controller {
       this.field("skill_capture_output").value = cfg.capture_output || ""
       this.field("skill_outputs").value = cfg.outputs ? JSON.stringify(cfg.outputs) : ""
       this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
+    }
+
+    // Context Fetch config
+    if (template.step_type === "context_fetch") {
+      this.field("fetch_method").value = cfg.method || "url"
+      this.field("fetch_url").value = cfg.url || ""
+      this.field("fetch_context_key").value = cfg.context_key || ""
     }
 
     // CI Check config

@@ -5,7 +5,7 @@ class Step < ApplicationRecord
 
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }
-  validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check"] }
+  validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check", "context_fetch"] }
   validates :max_retries, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :timeout, numericality: { only_integer: true, greater_than: 0 }
   validates :skill, presence: true, if: -> { step_type == "skill" }

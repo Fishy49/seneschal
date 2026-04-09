@@ -20,6 +20,7 @@ module ApplicationHelper
     "script" => "bg-success/15 text-success",
     "command" => "bg-info/15 text-info",
     "ci_check" => "bg-warning/15 text-warning",
+    "context_fetch" => "bg-info/15 text-info",
     "feature" => "bg-accent/15 text-accent",
     "bugfix" => "bg-danger/15 text-danger",
     "chore" => "bg-warning/15 text-warning"
