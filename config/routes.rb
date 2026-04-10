@@ -80,6 +80,7 @@ Rails.application.routes.draw do
       post :stop
       post :resume
       post :retry_from
+      post :follow_up
     end
   end
 

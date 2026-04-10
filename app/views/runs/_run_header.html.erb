@@ -16,6 +16,23 @@
       <% end %>
     </div>
   </div>
+  <% if run.status.in?(%w[completed failed]) %>
+    <details class="mb-4">
+      <summary class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors list-none [&::-webkit-details-marker]:hidden">
+        Follow Up
+      </summary>
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mt-3">
+        <p class="text-sm text-content-muted mb-3">Describe what to fix or change. The new run will inherit this run's context and re-execute the full workflow with your instructions available as <code class="text-xs bg-surface-input px-1 py-0.5 rounded">${follow_up_instructions}</code>.</p>
+        <%= form_with url: follow_up_run_path(run), method: :post, class: "space-y-3" do |f| %>
+          <%= f.text_area :instructions, rows: 4,
+                placeholder: "e.g. Use the repository pattern instead of direct DB calls in the service layer...",
+                class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y" %>
+          <%= f.submit "Start Follow-Up Run",
+                class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
   <% if (stats = run.usage_stats) && stats[:cost_usd] > 0 %>
     <div class="text-sm text-content-muted mb-4 flex flex-wrap gap-x-4 gap-y-1">
       <span>Cost: <span class="text-content font-medium"><%= format_cost(stats[:cost_usd]) %></span></span>

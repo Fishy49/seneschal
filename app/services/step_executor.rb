@@ -42,6 +42,13 @@ class StepExecutor
 
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
 
+    follow_up = @context["follow_up_instructions"]
+    if follow_up.present?
+      prompt = "#{prompt}\n\n## Follow-Up Instructions\n\n" \
+               "This is a follow-up run. The previous run produced results " \
+               "that need correction. Apply these instructions:\n\n#{follow_up}"
+    end
+
     cmd = build_skill_cmd(prompt, stream: block_given?)
 
     if block_given?

@@ -162,7 +162,9 @@ class ExecuteRunJob < ApplicationJob
       attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
       RunStep.where(id: run_step.id).update_all(attrs) if attrs.any?
       run_step.reload
-      broadcast_stream_log(run, run_step)
+      # Broadcast the full step (not just stream_log) to avoid a race where
+      # the #stream_log_<id> target doesn't exist yet after a step transition.
+      broadcast_step(run, run_step)
     }
 
     result = executor.execute(&on_progress)

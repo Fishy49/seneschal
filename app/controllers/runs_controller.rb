@@ -1,5 +1,5 @@
 class RunsController < ApplicationController
-  before_action :set_run, only: [:show, :stop, :resume, :retry_from]
+  before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up]
 
   def index
     @runs = Run.includes(workflow: :project).recent
@@ -44,6 +44,28 @@ class RunsController < ApplicationController
 
     ExecuteRunJob.perform_later(@run, failed_step.id, resume: true)
     redirect_to run_path(@run), notice: "Resuming from '#{failed_step.name}'."
+  end
+
+  def follow_up
+    instructions = params[:instructions].to_s.strip
+    if instructions.blank?
+      redirect_to run_path(@run), alert: "Follow-up instructions are required."
+      return
+    end
+
+    follow_up_context = @run.context.merge(
+      "follow_up_instructions" => instructions,
+      "follow_up_from_run" => @run.id.to_s
+    )
+
+    new_run = @run.workflow.runs.create!(
+      status: "pending",
+      context: follow_up_context,
+      input: @run.input.merge("follow_up_from_run" => @run.id.to_s)
+    )
+
+    ExecuteRunJob.perform_later(new_run)
+    redirect_to run_path(new_run), notice: "Follow-up run started."
   end
 
   def retry_from
