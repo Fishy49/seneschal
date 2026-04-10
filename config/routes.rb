@@ -72,6 +72,8 @@ Rails.application.routes.draw do
     member do
       post :execute
       patch :mark_ready
+      patch :archive
+      patch :unarchive
     end
   end
 

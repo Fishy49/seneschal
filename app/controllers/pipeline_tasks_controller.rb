@@ -1,10 +1,12 @@
 require "open3"
 
 class PipelineTasksController < ApplicationController
-  before_action :set_task, only: [:show, :edit, :update, :destroy, :execute, :mark_ready]
+  before_action :set_task, only: [:show, :edit, :update, :destroy, :execute, :mark_ready, :archive, :unarchive]
 
   def index
+    @show_archived = params[:archived] == "1"
     @tasks = PipelineTask.includes(:project, :workflow).recent
+    @tasks = @show_archived ? @tasks.archived : @tasks.active
 
     @tasks = @tasks.where(project_id: params[:project_id]) if params[:project_id].present?
     @tasks = @tasks.where(status: params[:status]) if params[:status].present?
@@ -81,6 +83,16 @@ class PipelineTasksController < ApplicationController
     else
       render json: { error: stderr.presence || "Claude CLI failed." }, status: :unprocessable_content
     end
+  end
+
+  def archive
+    @task.update!(archived_at: Time.current)
+    redirect_to pipeline_tasks_path, notice: "Task archived."
+  end
+
+  def unarchive
+    @task.update!(archived_at: nil)
+    redirect_to @task, notice: "Task unarchived."
   end
 
   def mark_ready

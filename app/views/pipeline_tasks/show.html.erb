@@ -2,7 +2,12 @@
 
 <div class="flex items-center justify-between mb-4">
   <div>
-    <h1 class="text-2xl font-semibold"><%= @task.title %> <%= status_badge(@task.status) %> <%= type_badge(@task.kind) %></h1>
+    <h1 class="text-2xl font-semibold">
+      <%= @task.title %> <%= status_badge(@task.status) %> <%= type_badge(@task.kind) %>
+      <% if @task.archived? %>
+        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-surface-input text-content-muted">archived</span>
+      <% end %>
+    </h1>
   </div>
   <div class="flex items-center gap-2">
     <%= link_to "Edit", edit_pipeline_task_path(@task), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
@@ -15,6 +20,14 @@
       <%= button_to "Execute", execute_pipeline_task_path(@task),
             class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
             data: { turbo_confirm: "Execute '#{@task.title}' with #{@task.workflow.name}?" } %>
+    <% end %>
+    <% if @task.archived? %>
+      <%= button_to "Unarchive", unarchive_pipeline_task_path(@task), method: :patch,
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    <% else %>
+      <%= button_to "Archive", archive_pipeline_task_path(@task), method: :patch,
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
+            data: { turbo_confirm: "Archive task '#{@task.title}'?" } %>
     <% end %>
     <%= button_to "Delete", pipeline_task_path(@task), method: :delete,
           class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",

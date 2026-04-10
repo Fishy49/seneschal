@@ -14,6 +14,10 @@ class PipelineTask < ApplicationRecord
 
   scope :recent, -> { order(updated_at: :desc) }
   scope :actionable, -> { where(status: ["draft", "ready"]) }
+  scope :active, -> { where(archived_at: nil) }
+  scope :archived, -> { where.not(archived_at: nil) }
+
+  def archived? = archived_at.present?
 
   def executable?
     workflow.present? && status.in?(["ready", "failed"])

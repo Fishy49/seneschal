@@ -22,8 +22,13 @@
       <% end %>
     </select>
     <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">Search</button>
-    <% if params[:q].present? || params[:project_id].present? || params[:status].present? || params[:kind].present? %>
+    <% if params[:q].present? || params[:project_id].present? || params[:status].present? || params[:kind].present? || params[:archived].present? %>
       <%= link_to "Clear", pipeline_tasks_path, class: "text-sm text-content-muted hover:text-content transition-colors" %>
+    <% end %>
+    <% if @show_archived %>
+      <%= link_to "Show Active", pipeline_tasks_path(request.query_parameters.except("archived")), class: "text-sm text-content-muted hover:text-content transition-colors" %>
+    <% else %>
+      <%= link_to "Show Archived", pipeline_tasks_path(request.query_parameters.merge(archived: "1")), class: "text-sm text-content-muted hover:text-content transition-colors" %>
     <% end %>
   <% end %>
 </div>
