@@ -189,6 +189,9 @@ class StepExecutor
     max_turns = @step.config["max_turns"]
     cmd += ["--max-turns", max_turns.to_s] if max_turns.present?
 
+    effort = @step.config["effort"].presence || "medium"
+    cmd += ["--effort", effort]
+
     cmd += ["--permission-mode", "dontAsk"]
 
     allowed = @step.config["allowed_tools"].presence ||

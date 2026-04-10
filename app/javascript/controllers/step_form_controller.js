@@ -108,6 +108,7 @@ export default class extends Controller {
         this.skillChanged()
       }
       this.field("skill_model").value = cfg.model || ""
+      this.field("skill_effort").value = cfg.effort || "medium"
       this.field("skill_max_turns").value = cfg.max_turns || ""
       this.field("skill_capture_output").value = cfg.capture_output || ""
       this.field("skill_outputs").value = cfg.outputs ? JSON.stringify(cfg.outputs) : ""
