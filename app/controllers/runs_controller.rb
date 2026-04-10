@@ -2,7 +2,7 @@ class RunsController < ApplicationController
   before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up]
 
   def index
-    @runs = Run.includes(workflow: :project).recent
+    @runs = Run.includes(:pipeline_task, workflow: :project).recent
 
     @runs = @runs.where(workflows: { project_id: params[:project_id] }) if params[:project_id].present?
     @runs = @runs.where(workflow_id: params[:workflow_id]) if params[:workflow_id].present?

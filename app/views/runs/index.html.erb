@@ -27,8 +27,7 @@
     <table class="w-full border-collapse">
       <thead>
         <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">ID</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Task</th>
           <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
           <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
           <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
@@ -38,8 +37,14 @@
       <tbody>
         <% @runs.each do |run| %>
           <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to "##{run.id}", run_path(run) %></td>
-            <td class="px-3 py-2 border-b border-edge"><%= run.workflow.name %></td>
+            <td class="px-3 py-2 border-b border-edge">
+              <% if run.pipeline_task %>
+                <div><%= link_to run.pipeline_task.title, run_path(run) %></div>
+              <% else %>
+                <div><%= link_to "Run ##{run.id}", run_path(run) %></div>
+              <% end %>
+              <div class="text-xs text-content-muted"><%= run.workflow.name %></div>
+            </td>
             <td class="px-3 py-2 border-b border-edge text-content-muted"><%= run.workflow.project.name %></td>
             <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
             <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
