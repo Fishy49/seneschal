@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_10_050331) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_11_052806) do
   create_table "pipeline_tasks", force: :cascade do |t|
     t.datetime "archived_at"
     t.text "body", null: false
@@ -115,11 +115,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_10_050331) do
     t.integer "max_retries", default: 0, null: false
     t.string "name", null: false
     t.integer "position", null: false
+    t.integer "run_id"
     t.integer "skill_id"
     t.string "step_type", null: false
     t.integer "timeout", default: 600, null: false
     t.datetime "updated_at", null: false
-    t.integer "workflow_id", null: false
+    t.integer "workflow_id"
+    t.index ["run_id"], name: "index_steps_on_run_id"
     t.index ["skill_id"], name: "index_steps_on_skill_id"
     t.index ["workflow_id"], name: "index_steps_on_workflow_id"
   end
@@ -157,6 +159,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_10_050331) do
   add_foreign_key "runs", "workflows"
   add_foreign_key "skills", "projects"
   add_foreign_key "step_templates", "skills"
+  add_foreign_key "steps", "runs"
   add_foreign_key "steps", "skills"
   add_foreign_key "steps", "workflows"
   add_foreign_key "workflows", "projects"

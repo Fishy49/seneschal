@@ -24,7 +24,7 @@ class StepExecutor
 
   def execute(&)
     case @step.step_type
-    when "skill"    then execute_skill(&)
+    when "skill", "prompt" then execute_skill(&)
     when "script"   then execute_script(&)
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
@@ -38,16 +38,9 @@ class StepExecutor
 
   def execute_skill(&)
     prompt = @step.prompt_body(@context)
-    return Result.new(exit_code: 1, stdout: "", stderr: "No skill assigned") unless prompt
+    return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
-
-    follow_up = @context["follow_up_instructions"]
-    if follow_up.present?
-      prompt = "#{prompt}\n\n## Follow-Up Instructions\n\n" \
-               "This is a follow-up run. The previous run produced results " \
-               "that need correction. Apply these instructions:\n\n#{follow_up}"
-    end
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
 

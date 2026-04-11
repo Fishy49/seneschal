@@ -17,6 +17,7 @@ module ApplicationHelper
 
   TYPE_CLASSES = {
     "skill" => "bg-accent/15 text-accent",
+    "prompt" => "bg-accent/15 text-accent",
     "script" => "bg-success/15 text-success",
     "command" => "bg-info/15 text-info",
     "ci_check" => "bg-warning/15 text-warning",

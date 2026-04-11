@@ -20,9 +20,12 @@ class ExecuteRunJob < ApplicationJob
 
     system("git", "-C", repo_path, "pull", "--ff-only")
 
-    # Build the execution queue from workflow steps (exclude inject-only steps)
-    # Queue entries are [step, queued_run_step_id] tuples
-    all_steps = run.workflow.steps.where(injectable_only: false).to_a
+    # Build the execution queue from workflow steps + any run-scoped ad-hoc steps
+    # (ad-hoc steps are appended by "Follow Up" and run after the workflow completes).
+    # Queue entries are [step, queued_run_step_id] tuples.
+    workflow_steps = run.workflow.steps.where(injectable_only: false).to_a
+    ad_hoc_steps = run.ad_hoc_steps.where(injectable_only: false).to_a
+    all_steps = workflow_steps + ad_hoc_steps
     queue = all_steps.map { |s| [s, nil] }
     injection_count = 0
 
@@ -147,8 +150,8 @@ class ExecuteRunJob < ApplicationJob
   end
 
   def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil)
-    # If resuming a crashed skill step, pass the session_id so Claude can continue
-    resume_sid = run_step.claude_session_id if step.step_type == "skill"
+    # If resuming a crashed skill/prompt step, pass the session_id so Claude can continue
+    resume_sid = run_step.claude_session_id if step.step_type.in?(["skill", "prompt"])
 
     executor = StepExecutor.new(step, run.context, repo_path,
                                 resolved_input_context: resolved_context,

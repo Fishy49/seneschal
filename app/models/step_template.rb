@@ -2,9 +2,9 @@ class StepTemplate < ApplicationRecord
   belongs_to :skill, optional: true
 
   validates :name, presence: true, uniqueness: true
-  validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check", "context_fetch"] }
+  validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check", "context_fetch", "prompt"] }
   validates :skill, presence: true, if: -> { step_type == "skill" }
-  validates :body, presence: true, if: -> { step_type.in?(["script", "command"]) }
+  validates :body, presence: true, if: -> { step_type.in?(["script", "command", "prompt"]) }
 
   scope :ordered, -> { order(:name) }
 

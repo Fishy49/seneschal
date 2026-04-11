@@ -95,8 +95,8 @@ class StepsController < ApplicationController
 
   def build_step_config(step_type, raw)
     case step_type
-    when "ci_check"    then build_ci_check_config(raw)
-    when "skill"       then build_skill_config(raw)
+    when "ci_check" then build_ci_check_config(raw)
+    when "skill", "prompt" then build_skill_config(raw)
     when "context_fetch" then build_context_fetch_config(raw)
     else {}
     end

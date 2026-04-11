@@ -2,9 +2,6 @@
   <h2 class="text-lg font-semibold mb-3">Run Info</h2>
   <table class="w-full border-collapse">
     <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td></tr>
-    <% if run.input["follow_up_from_run"].present? %>
-      <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Follow-up from</th><td class="px-3 py-2 border-b border-edge"><%= link_to "Run ##{run.input['follow_up_from_run']}", run_path(run.input["follow_up_from_run"]) %></td></tr>
-    <% end %>
     <% if run.input["resumed_from_run"].present? %>
       <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Resumed from</th><td class="px-3 py-2 border-b border-edge"><%= link_to "Run ##{run.input['resumed_from_run']}", run_path(run.input["resumed_from_run"]) %></td></tr>
     <% end %>

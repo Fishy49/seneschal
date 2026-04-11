@@ -47,25 +47,24 @@ class RunsController < ApplicationController
   end
 
   def follow_up
+    unless @run.status.in?(["completed", "failed", "stopped"])
+      redirect_to run_path(@run), alert: "Can only follow up on finished runs."
+      return
+    end
+
     instructions = params[:instructions].to_s.strip
     if instructions.blank?
       redirect_to run_path(@run), alert: "Follow-up instructions are required."
       return
     end
 
-    follow_up_context = @run.context.merge(
-      "follow_up_instructions" => instructions,
-      "follow_up_from_run" => @run.id.to_s
-    )
+    prompt_step = build_follow_up_steps(instructions, Array(params[:skill_ids]).compact_blank)
 
-    new_run = @run.workflow.runs.create!(
-      status: "pending",
-      context: follow_up_context,
-      input: @run.input.merge("follow_up_from_run" => @run.id.to_s)
-    )
+    @run.update!(status: "running", finished_at: nil, error_message: nil)
+    @run.pipeline_task&.update!(status: "running")
 
-    ExecuteRunJob.perform_later(new_run)
-    redirect_to run_path(new_run), notice: "Follow-up run started."
+    ExecuteRunJob.perform_later(@run, prompt_step.id, resume: true)
+    redirect_to run_path(@run), notice: "Follow-up running."
   end
 
   def retry_from
@@ -93,6 +92,33 @@ class RunsController < ApplicationController
   end
 
   private
+
+  def build_follow_up_steps(instructions, skill_ids)
+    ActiveRecord::Base.transaction do
+      position = @run.ad_hoc_steps.maximum(:position) || @run.workflow.steps.maximum(:position) || 0
+
+      position += 1
+      prompt_step = @run.ad_hoc_steps.create!(
+        name: "Follow Up", step_type: "prompt", position: position,
+        body: instructions, config: { "effort" => "medium" },
+        max_retries: 0, timeout: 1800
+      )
+
+      skill_ids.each do |skill_id|
+        skill = Skill.for_project(@run.workflow.project).find_by(id: skill_id)
+        next unless skill
+
+        position += 1
+        @run.ad_hoc_steps.create!(
+          name: skill.name, step_type: "skill", position: position,
+          skill: skill, config: { "effort" => "medium" },
+          max_retries: 0, timeout: 1800
+        )
+      end
+
+      prompt_step
+    end
+  end
 
   def set_run
     @run = Run.includes(workflow: :project, run_steps: :step).find(params[:id])

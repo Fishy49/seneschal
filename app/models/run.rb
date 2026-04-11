@@ -2,6 +2,7 @@ class Run < ApplicationRecord
   belongs_to :workflow
   belongs_to :pipeline_task, optional: true
   has_many :run_steps, dependent: :destroy
+  has_many :ad_hoc_steps, -> { order(:position) }, class_name: "Step", dependent: :destroy
   has_one :project, through: :workflow
 
   STATUSES = ["pending", "running", "completed", "failed", "stopped"].freeze

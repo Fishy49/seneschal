@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "typeSelect", "skillFields", "bodyFields", "ciCheckFields", "contextFetchFields",
+    "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "saveTemplateCheck", "saveTemplateFields"
@@ -19,7 +19,14 @@ export default class extends Controller {
   toggle() {
     const type = this.typeSelectTarget.value
     this.skillFieldsTarget.style.display = type === "skill" ? "" : "none"
-    this.bodyFieldsTarget.style.display = (type === "script" || type === "command") ? "" : "none"
+    this.bodyFieldsTarget.style.display = ["script", "command", "prompt"].includes(type) ? "" : "none"
+    if (this.hasClaudeConfigFieldsTarget) {
+      this.claudeConfigFieldsTarget.style.display = ["skill", "prompt"].includes(type) ? "" : "none"
+    }
+    if (this.hasBodyLabelTarget) {
+      const labels = { script: "Script", command: "Command", prompt: "Prompt" }
+      this.bodyLabelTarget.textContent = labels[type] || "Body"
+    }
     if (this.hasCiCheckFieldsTarget) {
       this.ciCheckFieldsTarget.style.display = type === "ci_check" ? "" : "none"
     }
@@ -97,11 +104,10 @@ export default class extends Controller {
     this.field("step[input_context]").value = template.input_context || ""
     this.field("step[injectable_only]").checked = template.injectable_only
 
-    // Skill config
-    if (template.step_type === "skill") {
-      if (this.hasSkillSelectTarget && template.skill_id) {
+    // Skill / Prompt config (shared Claude config)
+    if (template.step_type === "skill" || template.step_type === "prompt") {
+      if (template.step_type === "skill" && this.hasSkillSelectTarget && template.skill_id) {
         this.skillSelectTarget.value = template.skill_id
-        // Update the displayed name from template data
         if (this.hasSkillNameTarget && template.skill_name) {
           this.skillNameTarget.textContent = template.skill_name
         }
