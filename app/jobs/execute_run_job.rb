@@ -13,7 +13,15 @@ class ExecuteRunJob < ApplicationJob
       return
     end
 
-    run.update!(status: "running", started_at: run.started_at || Time.current)
+    # Claim this run with a unique token. If another ExecuteRunJob gets enqueued
+    # for the same run (e.g. via RunRecoveryJob), it'll overwrite this token and
+    # our loop will bail on the next iteration.
+    @job_token = SecureRandom.hex(8)
+    run.update!(
+      status: "running",
+      started_at: run.started_at || Time.current,
+      system_flags: (run.system_flags || {}).merge("job_token" => @job_token)
+    )
     run.update!(error_message: nil, finished_at: nil) if resume
     broadcast_run(run)
     repo_path = project.local_path
@@ -55,7 +63,9 @@ class ExecuteRunJob < ApplicationJob
 
     while queue.any?
       step, queued_run_step_id = queue.shift
-      return if run.reload.status == "stopped"
+      run.reload
+      return if run.status == "stopped"
+      return if run.system_flags["job_token"] != @job_token
 
       position += 1
 
@@ -158,12 +168,15 @@ class ExecuteRunJob < ApplicationJob
                                 resume_session_id: resume_sid)
 
     on_progress = lambda { |update|
-      attrs = {}
+      # Always bump updated_at so RunRecoveryJob's stale detection doesn't
+      # falsely trigger on long-running steps (e.g. CI polling). update_all
+      # skips Rails' automatic timestamp touching.
+      attrs = { updated_at: Time.current }
       attrs[:output] = update[:output] if update.key?(:output)
       attrs[:error_output] = update[:error_output] if update.key?(:error_output)
       attrs[:stream_log] = update[:stream_log] if update.key?(:stream_log)
       attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
-      RunStep.where(id: run_step.id).update_all(attrs) if attrs.any?
+      RunStep.where(id: run_step.id).update_all(attrs)
       run_step.reload
       # Broadcast the full step (not just stream_log) to avoid a race where
       # the #stream_log_<id> target doesn't exist yet after a step transition.
