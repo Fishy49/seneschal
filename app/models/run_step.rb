@@ -1,6 +1,8 @@
 class RunStep < ApplicationRecord
   belongs_to :run
   belongs_to :step
+  belongs_to :parent_run_step, class_name: "RunStep", optional: true
+  has_many :child_run_steps, class_name: "RunStep", foreign_key: :parent_run_step_id, dependent: :destroy
 
   STATUSES = ["pending", "queued", "running", "passed", "failed", "retrying", "skipped"].freeze
 

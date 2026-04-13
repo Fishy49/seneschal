@@ -35,8 +35,7 @@ class DataExporter
         skill_project_name: t.skill&.project&.name,
         max_retries: t.max_retries,
         timeout: t.timeout,
-        input_context: t.input_context,
-        injectable_only: t.injectable_only
+        input_context: t.input_context
       }
     end
   end
@@ -78,8 +77,7 @@ class DataExporter
       skill_project_name: step.skill&.project&.name,
       max_retries: step.max_retries,
       timeout: step.timeout,
-      input_context: step.input_context,
-      injectable_only: step.injectable_only
+      input_context: step.input_context
     }
   end
 

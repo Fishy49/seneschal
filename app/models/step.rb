@@ -5,13 +5,23 @@ class Step < ApplicationRecord
   has_many :run_steps, dependent: :destroy
 
   validates :name, presence: true
-  validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }
+  validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }
   validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check", "context_fetch", "prompt"] }
   validates :max_retries, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :timeout, numericality: { only_integer: true, greater_than: 0 }
   validates :skill, presence: true, if: -> { step_type == "skill" }
   validates :body, presence: true, if: -> { step_type.in?(["script", "command", "prompt"]) }
   validate :workflow_or_run_present
+
+  GLOBAL_VARIABLES = ["task_title", "task_body", "task_kind", "repo_owner", "repo_name", "context_files"].freeze
+
+  def produces
+    config["produces"] || []
+  end
+
+  def consumes
+    config["consumes"] || []
+  end
 
   def prompt_body(context = {})
     case step_type

@@ -33,6 +33,19 @@ class StepsController < ApplicationController
     redirect_to project_workflow_path(@project, @workflow), notice: "Step removed."
   end
 
+  def available_variables
+    position = params[:position].to_i
+    vars = Step::GLOBAL_VARIABLES.map { |v| { name: v, source: "global" } }
+
+    @workflow.steps.where(position: ...position).order(:position).each do |s|
+      s.produces.each do |var_name|
+        vars << { name: var_name, source: s.name }
+      end
+    end
+
+    render json: { variables: vars }
+  end
+
   def reorder
     ids = params[:step_ids] || []
     ids.each_with_index do |id, index|
@@ -70,24 +83,30 @@ class StepsController < ApplicationController
       skill_id: step.skill_id,
       max_retries: step.max_retries,
       timeout: step.timeout,
-      input_context: step.input_context,
-      injectable_only: step.injectable_only
+      input_context: step.input_context
     )
   end
 
   def step_params
-    permitted = params.expect(step: [:name, :position, :step_type, :max_retries, :timeout, :config, :skill_id, :body, :input_context,
-                                     :injectable_only]).to_h
+    permitted = params.expect(step: [:name, :position, :step_type, :max_retries, :timeout, :config, :skill_id, :body,
+                                     :input_context]).to_h
 
     raw = request.params
     permitted[:config] = build_step_config(permitted[:step_type], raw)
 
-    inject_steps = Array(raw["on_failure_inject"]).compact_blank
-    if inject_steps.any?
-      permitted[:config] = permitted[:config].merge(
-        "on_failure_inject" => inject_steps,
-        "max_injections" => (raw["max_injections"].presence || 3).to_i
-      )
+    # Pipeline: produces and consumes
+    produces = raw["produces"].to_s.split(",").map(&:strip).compact_blank
+    consumes = Array(raw["consumes"]).compact_blank
+    permitted[:config]["produces"] = produces if produces.any?
+    permitted[:config]["consumes"] = consumes if consumes.any?
+
+    # On-fail recovery action
+    if raw["on_fail_type"].present?
+      on_fail = { "type" => raw["on_fail_type"], "max_rounds" => (raw["on_fail_max_rounds"].presence || 3).to_i }
+      on_fail["skill_id"] = raw["on_fail_skill_id"].to_i if raw["on_fail_skill_id"].present?
+      on_fail["body"] = raw["on_fail_body"] if raw["on_fail_body"].present?
+      on_fail["instructions"] = raw["on_fail_instructions"] if raw["on_fail_instructions"].present?
+      permitted[:config]["on_fail_action"] = on_fail
     end
 
     permitted
@@ -120,8 +139,6 @@ class StepsController < ApplicationController
     config["effort"] = raw["skill_effort"].presence || "medium"
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
-    config["capture_output"] = raw["skill_capture_output"] if raw["skill_capture_output"].present?
-    config["outputs"] = begin; JSON.parse(raw["skill_outputs"]); rescue StandardError; {}; end if raw["skill_outputs"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
     config
   end

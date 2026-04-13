@@ -10,10 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_11_052806) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_13_025821) do
+  create_table "code_maps", force: :cascade do |t|
+    t.string "commit_sha"
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.integer "file_count", default: 0
+    t.json "file_index", default: {}, null: false
+    t.datetime "generated_at"
+    t.json "modules", default: [], null: false
+    t.integer "project_id", null: false
+    t.string "status", default: "pending", null: false
+    t.json "tree", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_code_maps_on_project_id", unique: true
+  end
+
   create_table "pipeline_tasks", force: :cascade do |t|
     t.datetime "archived_at"
     t.text "body", null: false
+    t.json "context_files", default: []
     t.datetime "created_at", null: false
     t.string "kind", default: "feature", null: false
     t.integer "project_id", null: false
@@ -151,6 +167,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_11_052806) do
     t.index ["project_id"], name: "index_workflows_on_project_id"
   end
 
+  add_foreign_key "code_maps", "projects"
   add_foreign_key "pipeline_tasks", "projects"
   add_foreign_key "pipeline_tasks", "workflows"
   add_foreign_key "run_steps", "runs"
@@ -163,4 +180,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_11_052806) do
   add_foreign_key "steps", "skills"
   add_foreign_key "steps", "workflows"
   add_foreign_key "workflows", "projects"
-end
+
+  # Virtual tables defined in this database.
+  # Note that virtual tables may not work with other database engines. Be careful if changing database.

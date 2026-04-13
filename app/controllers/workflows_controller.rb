@@ -4,7 +4,7 @@ class WorkflowsController < ApplicationController
 
   def show
     @steps = @workflow.steps
-    @recent_runs = @workflow.runs.recent.limit(10)
+    @recent_runs = @workflow.runs.includes(:pipeline_task).recent.limit(10)
   end
 
   def new

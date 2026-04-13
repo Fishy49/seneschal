@@ -1,10 +1,14 @@
 <ul class="list-none" id="run_steps_list">
-  <% run.run_steps.includes(:step).order(Arel.sql("CASE WHEN run_steps.status = 'queued' THEN 1 ELSE 0 END"), :id).each do |run_step| %>
+  <% parent_steps = run.run_steps.includes(:step, :child_run_steps).where(parent_run_step_id: nil).order(Arel.sql("CASE WHEN run_steps.status = 'queued' THEN 1 ELSE 0 END"), :id) %>
+  <% parent_steps.each do |run_step| %>
     <%= render "runs/run_step", run_step: run_step, run: run %>
+    <% run_step.child_run_steps.order(:id).each do |child| %>
+      <%= render "runs/run_step", run_step: child, run: run, nested: true %>
+    <% end %>
   <% end %>
-  <% # Show remaining workflow steps not yet executed %>
+  <%# Show remaining workflow steps not yet executed %>
   <% executed_step_ids = run.run_steps.pluck(:step_id) %>
-  <% run.workflow.steps.reject { |s| executed_step_ids.include?(s.id) || s.injectable_only? }.each do |step| %>
+  <% run.workflow.steps.reject { |s| executed_step_ids.include?(s.id) }.each do |step| %>
     <li class="flex items-start gap-2 py-2 border-b border-edge last:border-b-0" id="pending_step_<%= step.id %>">
       <span class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5"><%= step.position %></span>
       <div class="flex-1 min-w-0">

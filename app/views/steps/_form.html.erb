@@ -33,19 +33,10 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
   </div>
 
-  <div class="grid grid-cols-[1fr_auto] gap-4 items-end">
-    <div class="mb-4">
-      <%= f.label :position, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-      <%= f.number_field :position, min: 1,
-            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
-    </div>
-    <div class="mb-4">
-      <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted px-3 py-2">
-        <%= f.check_box :injectable_only, class: "accent-accent" %>
-        Inject only
-      </label>
-      <p class="text-xs text-content-muted mt-0.5 px-3">Skipped in normal runs, only runs when injected by a failing step</p>
-    </div>
+  <div class="mb-4">
+    <%= f.label :position, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.number_field :position, min: 1,
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
   </div>
 
   <div class="mb-4">
@@ -127,22 +118,6 @@
                value="<%= claude_cfg["max_turns"] %>" min="1" placeholder="Default"
                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
       </div>
-    </div>
-
-    <div class="mb-4">
-      <label for="skill_capture_output" class="block text-sm font-medium text-content-muted mb-1.5">Capture Output As</label>
-      <input type="text" name="skill_capture_output" id="skill_capture_output"
-             value="<%= claude_cfg["capture_output"] %>"
-             placeholder="e.g. implementation_plan"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-      <p class="text-sm text-content-muted mt-2">Store the full step output in run context under this key</p>
-    </div>
-
-    <div class="mb-4">
-      <label for="skill_outputs" class="block text-sm font-medium text-content-muted mb-1.5">Output Patterns (JSON)</label>
-      <textarea name="skill_outputs" id="skill_outputs" rows="3"
-                placeholder='{"pr_number": "PR #(\\d+)"}'
-                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= claude_cfg["outputs"]&.to_json %></textarea>
     </div>
 
     <div class="mb-4">
@@ -255,6 +230,43 @@
     </div>
   </div>
 
+  <%# === Pipeline: Produces / Consumes === %>
+  <% available_vars = Step::GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global" } } %>
+  <% @workflow.steps.where("position < ?", step.position.to_i).order(:position).each do |s| %>
+    <% s.produces.each { |v| available_vars << { "name" => v, "source" => s.name } } %>
+  <% end %>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div class="mb-4">
+      <label for="produces" class="block text-sm font-medium text-content-muted mb-1.5">Produces</label>
+      <input type="text" name="produces" id="produces"
+             value="<%= step.produces.join(", ") %>"
+             placeholder="pr_number, pr_url, branch_name"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+      <p class="text-xs text-content-muted mt-1">Comma-separated variable names this step outputs. For AI steps, Claude is instructed to produce these in a <code class="bg-surface-input px-1 rounded">```output</code> block. For scripts, use <code class="bg-surface-input px-1 rounded">::set-output name=value</code>.</p>
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Consumes</label>
+      <% if available_vars.any? %>
+        <div class="max-h-36 overflow-y-auto bg-surface-input border border-edge rounded-lg px-3 py-2 space-y-1">
+          <% available_vars.each do |var| %>
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" name="consumes[]" value="<%= var["name"] %>"
+                     <%= "checked" if step.consumes.include?(var["name"]) %>
+                     class="accent-accent">
+              <code class="text-xs"><%= var["name"] %></code>
+              <span class="text-xs text-content-muted"><%= var["source"] %></span>
+            </label>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-xs text-content-muted py-2">No variables available at this position. Global variables are always accessible.</p>
+      <% end %>
+      <p class="text-xs text-content-muted mt-1">Variables this step needs. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
+    </div>
+  </div>
+
   <%# === Input Context (all types) === %>
   <div class="mb-4">
     <%= f.label :input_context, "Additional Context", class: "block text-sm font-medium text-content-muted mb-1.5" %>
@@ -278,29 +290,57 @@
     </div>
   </div>
 
-  <%# === On Failure Inject (all types) === %>
-  <% injectable_steps = @workflow.steps.order(:position) %>
-  <% if injectable_steps.any? %>
-    <% current_inject = step.config&.dig("on_failure_inject") || [] %>
-    <div class="grid grid-cols-2 gap-4">
-      <div class="mb-4">
-        <label for="on_failure_inject" class="block text-sm font-medium text-content-muted mb-1.5">On Failure, Inject Steps</label>
-        <select name="on_failure_inject[]" id="on_failure_inject" multiple size="<%= [injectable_steps.count, 5].min %>"
-                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          <% injectable_steps.each do |s| %>
-            <option value="<%= s.name %>" <%= "selected" if current_inject.include?(s.name) %>><%= s.position %>. <%= s.name %></option>
-          <% end %>
-        </select>
-        <p class="text-sm text-content-muted mt-2">Steps to inject after this one on failure (hold Cmd/Ctrl to multi-select)</p>
-      </div>
-      <div class="mb-4">
-        <label for="max_injections" class="block text-sm font-medium text-content-muted mb-1.5">Max Injection Rounds</label>
-        <input type="number" name="max_injections" id="max_injections"
-               value="<%= step.config&.dig("max_injections") || 3 %>" min="1"
-               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+  <%# === On Fail Action === %>
+  <% on_fail = step.config&.dig("on_fail_action") || {} %>
+  <div class="mb-4" data-step-form-target="onFailFields">
+    <label for="on_fail_type" class="block text-sm font-medium text-content-muted mb-1.5">On Fail</label>
+    <div class="grid grid-cols-[1fr_auto] gap-4">
+      <select name="on_fail_type" id="on_fail_type"
+              data-step-form-target="onFailType" data-action="step-form#onFailChanged"
+              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+        <option value="">None</option>
+        <option value="reopen_previous" <%= "selected" if on_fail["type"] == "reopen_previous" %>>Re-Open Previous Step</option>
+        <option value="skill" <%= "selected" if on_fail["type"] == "skill" %>>Run Skill</option>
+        <option value="script" <%= "selected" if on_fail["type"] == "script" %>>Run Script</option>
+        <option value="command" <%= "selected" if on_fail["type"] == "command" %>>Run Command</option>
+      </select>
+      <div>
+        <input type="number" name="on_fail_max_rounds" id="on_fail_max_rounds"
+               value="<%= on_fail["max_rounds"] || 3 %>" min="1" placeholder="Rounds"
+               style="<%= 'display:none' unless on_fail["type"].present? %>"
+               data-step-form-target="onFailMaxRounds"
+               class="w-24 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
       </div>
     </div>
-  <% end %>
+
+    <div data-step-form-target="onFailSkillFields" style="<%= 'display:none' unless on_fail["type"] == "skill" %>" class="mt-2">
+      <label for="on_fail_skill_id" class="block text-sm font-medium text-content-muted mb-1.5">Recovery Skill</label>
+      <select name="on_fail_skill_id" id="on_fail_skill_id"
+              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+        <option value="">Select a skill...</option>
+        <% Skill.for_project(@project).order(:name).each do |s| %>
+          <option value="<%= s.id %>" <%= "selected" if on_fail["skill_id"].to_s == s.id.to_s %>><%= s.display_name %></option>
+        <% end %>
+      </select>
+      <p class="text-xs text-content-muted mt-1">The failure output and step name are automatically prepended to the skill's prompt — no need to reference <code class="bg-surface-input px-1 rounded">${previous_failure}</code> manually.</p>
+    </div>
+
+    <div data-step-form-target="onFailReopenFields" style="<%= 'display:none' unless on_fail["type"] == "reopen_previous" %>" class="mt-2">
+      <label for="on_fail_instructions" class="block text-sm font-medium text-content-muted mb-1.5">Additional Instructions</label>
+      <textarea name="on_fail_instructions" id="on_fail_instructions" rows="3"
+                placeholder="Optional extra guidance for the resumed session, e.g. 'Make sure to include a Test Plan section.'"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["instructions"] %></textarea>
+      <p class="text-xs text-content-muted mt-1">Resumes the previous skill step's Claude session with the failure output and these instructions. Much cheaper than re-running from scratch since the session context is preserved.</p>
+    </div>
+
+    <div data-step-form-target="onFailBodyFields" style="<%= 'display:none' unless on_fail["type"].in?(%w[script command]) %>" class="mt-2">
+      <label for="on_fail_body" class="block text-sm font-medium text-content-muted mb-1.5">Recovery <%= on_fail["type"]&.capitalize || "Script" %></label>
+      <textarea name="on_fail_body" id="on_fail_body" rows="4"
+                placeholder="Script or command to run on failure. Has access to $PREVIOUS_FAILURE and $PREVIOUS_FAILURE_STEP."
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["body"] %></textarea>
+    </div>
+    <p class="text-xs text-content-muted mt-1">When this step fails, run a recovery action then re-execute. Repeats up to max rounds.</p>
+  </div>
 
   <div class="mb-4 pt-4 border-t border-edge">
     <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">

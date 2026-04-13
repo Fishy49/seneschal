@@ -52,8 +52,8 @@
               <% if t.config.dig("model").present? %>
                 <span>Model: <%= t.config["model"].split("-").last(2).join(" ").capitalize %></span>
               <% end %>
-              <% if t.injectable_only? %>
-                <span class="text-warning">Inject only</span>
+              <% if t.config.dig("on_fail_action", "type").present? %>
+                <span class="text-info">Has recovery</span>
               <% end %>
             </div>
           </button>

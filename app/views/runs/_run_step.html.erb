@@ -1,5 +1,10 @@
-<li class="flex items-start gap-2 py-2 border-b border-edge last:border-b-0" id="run_step_<%= run_step.id %>">
-  <span class="w-7 h-7 rounded-full <%= run_step.status == "queued" ? "bg-info/15 text-info" : "bg-surface-input text-content-muted" %> text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5"><%= run_step.position.to_i > 0 ? run_step.position : "&middot;".html_safe %></span>
+<% nested = local_assigns.fetch(:nested, false) %>
+<li class="flex items-start gap-2 py-2 border-b border-edge last:border-b-0 <%= 'ml-9 border-l border-edge pl-3' if nested %>" id="run_step_<%= run_step.id %>">
+  <% if nested %>
+    <span class="w-5 h-5 rounded-full bg-surface-input text-content-muted text-[0.625rem] font-semibold flex items-center justify-center shrink-0 mt-0.5">&hookrightarrow;</span>
+  <% else %>
+    <span class="w-7 h-7 rounded-full <%= run_step.status == "queued" ? "bg-info/15 text-info" : "bg-surface-input text-content-muted" %> text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5"><%= run_step.position.to_i > 0 ? run_step.position : "&middot;".html_safe %></span>
+  <% end %>
   <div class="flex-1 min-w-0">
     <div class="flex items-center gap-2 flex-wrap">
       <span class="font-medium text-sm"><%= run_step.step.name %></span>
@@ -11,10 +16,20 @@
         <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
       <% end %>
     </div>
-    <% if run_step.resolved_input_context.present? %>
+    <% input_vars = run_step.step.consumes.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
+    <% if input_vars.any? || run_step.resolved_input_context.present? %>
+      <% all_input = input_vars %>
+      <% all_input += [["input_context", run_step.resolved_input_context]] if run_step.resolved_input_context.present? %>
       <details class="mt-1">
-        <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">input context</summary>
-        <div class="output-block mt-2"><%= run_step.resolved_input_context %></div>
+        <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">input <span class="text-content-muted">(<%= all_input.size %> var<%= "s" if all_input.size != 1 %>)</span></summary>
+        <div class="mt-1 space-y-0.5">
+          <% all_input.each do |key, value| %>
+            <details class="ml-2">
+              <summary class="text-xs font-semibold text-info cursor-pointer select-none hover:text-info/80"><%= key %></summary>
+              <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
+            </details>
+          <% end %>
+        </div>
       </details>
     <% end %>
     <% if run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
@@ -26,11 +41,25 @@
         <%= render "runs/stream_log", run_step: run_step %>
       </details>
     <% end %>
-    <% if run_step.output.present? || run_step.error_output.present? %>
+    <% output_vars = run_step.step.produces.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
+    <% if output_vars.any? || run_step.output.present? || run_step.error_output.present? %>
       <div class="mt-1">
+        <% if output_vars.any? %>
+          <details class="mt-0.5">
+            <summary class="text-[0.8125rem] text-success cursor-pointer select-none hover:text-success/80">output <span class="text-content-muted">(<%= output_vars.size %> var<%= "s" if output_vars.size != 1 %>)</span></summary>
+            <div class="mt-1 space-y-0.5">
+              <% output_vars.each do |key, value| %>
+                <details class="ml-2">
+                  <summary class="text-xs font-semibold text-success cursor-pointer select-none hover:text-success/80"><%= key %></summary>
+                  <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
+                </details>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
         <% if run_step.output.present? %>
           <details class="mt-0.5">
-            <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">output</summary>
+            <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">raw output</summary>
             <div class="output-block mt-2"><%= run_step.output %></div>
           </details>
         <% end %>

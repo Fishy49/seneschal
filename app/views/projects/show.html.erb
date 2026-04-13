@@ -71,6 +71,15 @@
   </div>
 
   <div>
+    <% if @project.repo_ready? %>
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold mb-0">Code Map</h2>
+        </div>
+        <%= render "code_maps/status", code_map: @project.code_map, project: @project %>
+      </div>
+    <% end %>
+
     <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
       <h2 class="text-lg font-semibold mb-3">Recent Runs</h2>
       <% if @recent_runs.any? %>

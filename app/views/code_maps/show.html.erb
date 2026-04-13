@@ -1,0 +1,70 @@
+<%= turbo_stream_from @project %>
+<%= render "shared/project_bar", project: @project %>
+
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold">Code Map</h1>
+    <p class="text-sm text-content-muted">
+      <%= pluralize(@code_map.file_count, "file") %> in <%= pluralize(@code_map.modules.size, "module") %>
+      <% if @code_map.commit_sha.present? %>
+        &middot; <code class="text-xs"><%= @code_map.commit_sha.first(8) %></code>
+      <% end %>
+      &middot; Generated <%= time_ago_short(@code_map.generated_at) %>
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <%= button_to "Regenerate", generate_project_code_map_path(@project),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+</div>
+
+<div data-controller="code-tree"
+     data-code-tree-tree-value="<%= @code_map.tree.to_json %>"
+     data-code-tree-modules-value="<%= @code_map.modules.to_json %>"
+     data-code-tree-file-index-value="<%= @code_map.file_index.to_json %>"
+     data-code-tree-search-url-value="<%= search_project_code_map_path(@project) %>">
+
+  <div class="flex items-center gap-2 mb-4">
+    <input type="text"
+           data-code-tree-target="search"
+           data-action="input->code-tree#onSearch"
+           placeholder="Search files..."
+           class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+    <button type="button"
+            data-action="code-tree#toggleGrouping"
+            data-code-tree-target="groupToggle"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+      Group by module
+    </button>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4">
+    <%# File tree panel %>
+    <div class="col-span-2">
+      <div class="bg-surface-card border border-edge rounded-lg">
+        <div data-code-tree-target="tree" class="font-mono text-sm divide-y divide-edge"></div>
+        <div data-code-tree-target="empty" class="p-8 text-center text-content-muted text-sm" style="display:none">
+          No files match your search
+        </div>
+      </div>
+    </div>
+
+    <%# Modules panel %>
+    <div>
+      <div class="bg-surface-card border border-edge rounded-lg p-4">
+        <h3 class="text-sm font-semibold mb-3">Modules</h3>
+        <% @code_map.modules.each do |mod| %>
+          <button type="button"
+                  data-action="code-tree#filterByModule"
+                  data-code-tree-target="moduleBtn"
+                  data-module="<%= mod["name"] %>"
+                  class="block w-full text-left px-2 py-1.5 rounded text-sm hover:bg-surface-input transition-colors mb-1 cursor-pointer">
+            <div class="font-medium text-content"><%= mod["name"] %></div>
+            <div class="text-xs text-content-muted"><%= mod["description"] %></div>
+            <div class="text-xs text-content-muted"><%= mod["files"]&.size || 0 %> files</div>
+          </button>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

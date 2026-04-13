@@ -119,8 +119,7 @@ class DataImporter
       skill: skill,
       max_retries: attrs[:max_retries] || 0,
       timeout: attrs[:timeout] || 600,
-      input_context: attrs[:input_context],
-      injectable_only: attrs[:injectable_only] || false
+      input_context: attrs[:input_context]
     )
     @stats[:steps] += 1
   end
@@ -151,8 +150,7 @@ class DataImporter
         skill: skill,
         max_retries: attrs[:max_retries] || 0,
         timeout: attrs[:timeout] || 600,
-        input_context: attrs[:input_context],
-        injectable_only: attrs[:injectable_only] || false
+        input_context: attrs[:input_context]
       )
       @stats[:step_templates] += 1
     end

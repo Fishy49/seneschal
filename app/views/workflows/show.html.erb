@@ -22,23 +22,21 @@
         <ul class="list-none" data-controller="sortable-steps"
             data-sortable-steps-url-value="<%= reorder_project_workflow_steps_path(@project, @workflow) %>">
           <% @steps.each do |step| %>
-            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0 <%= 'opacity-60' if step.injectable_only? %>"
+            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0"
                 draggable="true" data-step-id="<%= step.id %>"
                 data-sortable-steps-target="item"
                 data-action="dragstart->sortable-steps#dragstart dragend->sortable-steps#dragend dragover->sortable-steps#dragover dragleave->sortable-steps#dragleave drop->sortable-steps#drop"
                 style="cursor: grab;">
-              <% if step.injectable_only? %>
-                <span class="w-7 h-7 rounded-full bg-accent/15 text-accent text-[0.75rem] font-semibold flex items-center justify-center shrink-0" title="Inject only">&orarr;</span>
-              <% else %>
-                <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
-              <% end %>
+              <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
               <div class="flex-1">
-                <div class="font-medium">
-                  <%= step.name %>
-                  <% if step.injectable_only? %>
-                    <span class="text-xs font-normal text-accent">inject only</span>
-                  <% end %>
-                </div>
+                <% if step.consumes.any? %>
+                  <div class="flex flex-wrap gap-1 mb-1">
+                    <% step.consumes.each do |var| %>
+                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-info/15 text-info font-mono">&larr; <%= var %></span>
+                    <% end %>
+                  </div>
+                <% end %>
+                <div class="font-medium"><%= step.name %></div>
                 <div class="text-[0.8125rem] text-content-muted">
                   <%= type_badge(step.step_type) %>
                   <% if step.max_retries > 0 %>
@@ -46,6 +44,13 @@
                   <% end %>
                   &middot; <%= step.timeout %>s timeout
                 </div>
+                <% if step.produces.any? %>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <% step.produces.each do |var| %>
+                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-success/15 text-success font-mono">&rarr; <%= var %></span>
+                    <% end %>
+                  </div>
+                <% end %>
               </div>
               <div class="flex items-center gap-2">
                 <%= link_to "Edit", edit_project_workflow_step_path(@project, @workflow, step), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
@@ -70,6 +75,7 @@
         <table class="w-full border-collapse">
           <thead>
             <tr>
+              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Task</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
@@ -78,6 +84,7 @@
           <tbody>
             <% @recent_runs.each do |run| %>
               <tr>
+                <td class="px-3 py-2 border-b border-edge text-sm"><%= run.pipeline_task ? link_to(run.pipeline_task.title, pipeline_task_path(run.pipeline_task)) : content_tag(:span, "Manual", class: "text-content-muted") %></td>
                 <td class="px-3 py-2 border-b border-edge"><%= link_to status_badge(run.status), run_path(run) %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>

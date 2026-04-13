@@ -1,0 +1,41 @@
+<div id="code_map_status"
+     <% if code_map&.generating? %>
+       data-controller="poll-status"
+       data-poll-status-url-value="<%= status_project_code_map_path(project) %>"
+     <% end %>>
+  <% if code_map.nil? || code_map.status == "pending" %>
+    <%= button_to "Generate Code Map",
+          generate_project_code_map_path(project),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+
+  <% elsif code_map.generating? %>
+    <div class="flex items-center gap-2 text-sm text-content-muted">
+      <span class="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+      Generating code map...
+    </div>
+
+  <% elsif code_map.ready? %>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-content-muted">
+        <%= pluralize(code_map.file_count, "file") %> &middot;
+        <%= pluralize(code_map.modules.size, "module") %> &middot;
+        <%= time_ago_short(code_map.generated_at) %>
+      </span>
+      <%= link_to "Explore",
+            project_code_map_path(project),
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      <%= button_to "Regenerate",
+            generate_project_code_map_path(project),
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    </div>
+
+  <% elsif code_map.status == "error" %>
+    <div class="flex items-center gap-2">
+      <%= status_badge("failed") %>
+      <span class="text-xs text-content-muted"><%= code_map.error_message %></span>
+      <%= button_to "Retry",
+            generate_project_code_map_path(project),
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+    </div>
+  <% end %>
+</div>

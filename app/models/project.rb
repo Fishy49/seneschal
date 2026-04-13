@@ -3,6 +3,7 @@ class Project < ApplicationRecord
   has_many :runs, through: :workflows
   has_many :skills, dependent: :destroy
   has_many :pipeline_tasks, dependent: :destroy
+  has_one :code_map, dependent: :destroy
 
   REPO_STATUSES = ["not_cloned", "cloning", "ready", "error"].freeze
 

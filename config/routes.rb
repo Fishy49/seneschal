@@ -44,6 +44,12 @@ Rails.application.routes.draw do
       get :repo_status
       post :import_skills
     end
+    resource :code_map, only: [:show] do
+      post :generate
+      get :status
+      get :search
+      post :suggestions
+    end
     resources :workflows do
       member do
         post :trigger
@@ -51,6 +57,7 @@ Rails.application.routes.draw do
       resources :steps, only: [:new, :create, :edit, :update, :destroy] do
         collection do
           patch :reorder
+          get :available_variables
         end
         member do
           patch :move

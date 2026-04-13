@@ -5,7 +5,6 @@ skill_template:
   config: {}
   max_retries: 1
   timeout: 300
-  injectable_only: false
 
 command_template:
   name: "Git Checkout Main"
@@ -14,7 +13,6 @@ command_template:
   config: {}
   max_retries: 0
   timeout: 120
-  injectable_only: false
 
 ci_check_template:
   name: "Wait for PR Checks"
@@ -25,4 +23,3 @@ ci_check_template:
     poll_interval: 30
   max_retries: 0
   timeout: 600
-  injectable_only: false

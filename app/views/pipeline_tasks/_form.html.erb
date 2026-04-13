@@ -52,6 +52,42 @@
     <%= f.hidden_field :body, data: { code_editor_target: "input", format_body_target: "input" } %>
   </div>
 
+  <% if task.project&.code_map&.ready? %>
+    <div class="mb-4" data-controller="task-suggestions"
+         data-task-suggestions-url-value="<%= suggestions_project_code_map_path(task.project) %>">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="block text-sm font-medium text-content-muted">Relevant Files</span>
+        <button type="button"
+                data-action="task-suggestions#suggest"
+                data-task-suggestions-target="btn"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+          Suggest with Claude
+        </button>
+      </div>
+      <div data-task-suggestions-target="results" class="text-sm">
+        <% if task.context_files.present? && task.context_files.any? %>
+          <% task.context_files.each do |entry| %>
+            <% path = entry.is_a?(Hash) ? entry["path"] : entry.to_s %>
+            <% reason = entry.is_a?(Hash) ? entry["reason"] : "" %>
+            <label class="flex items-start gap-2 py-1.5 cursor-pointer hover:bg-surface-input rounded px-2 -mx-2">
+              <input type="checkbox" checked value="<%= path %>"
+                     data-reason="<%= reason %>"
+                     data-action="change->task-suggestions#updateSelected"
+                     class="mt-0.5 rounded border-edge" />
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-mono text-content truncate"><%= path %></div>
+                <% if reason.present? %>
+                  <div class="text-xs text-content-muted"><%= reason %></div>
+                <% end %>
+              </div>
+            </label>
+          <% end %>
+        <% end %>
+      </div>
+      <%= f.hidden_field :context_files, value: (task.context_files || []).to_json, data: { task_suggestions_target: "selectedFiles" } %>
+    </div>
+  <% end %>
+
   <div class="flex gap-2">
     <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
     <%= link_to "Cancel", (task.persisted? ? pipeline_task_path(task) : pipeline_tasks_path), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>

@@ -18,8 +18,7 @@ class StepTemplate < ApplicationRecord
       skill_name: skill&.display_name,
       max_retries: max_retries,
       timeout: timeout,
-      input_context: input_context,
-      injectable_only: injectable_only
+      input_context: input_context
     }
   end
 end

@@ -5,6 +5,7 @@ export default class extends Controller {
     "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
+    "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
     "saveTemplateCheck", "saveTemplateFields"
   ]
   static values = { skills: Object, templates: Object }
@@ -84,6 +85,16 @@ export default class extends Controller {
     this.previewToggleTextTarget.textContent = this.previewVisible ? "Hide" : "Show"
   }
 
+  onFailChanged() {
+    if (!this.hasOnFailTypeTarget) return
+    const type = this.onFailTypeTarget.value
+    const hasAction = type !== ""
+    if (this.hasOnFailMaxRoundsTarget) this.onFailMaxRoundsTarget.style.display = hasAction ? "" : "none"
+    if (this.hasOnFailSkillFieldsTarget) this.onFailSkillFieldsTarget.style.display = type === "skill" ? "" : "none"
+    if (this.hasOnFailReopenFieldsTarget) this.onFailReopenFieldsTarget.style.display = type === "reopen_previous" ? "" : "none"
+    if (this.hasOnFailBodyFieldsTarget) this.onFailBodyFieldsTarget.style.display = ["script", "command"].includes(type) ? "" : "none"
+  }
+
   toggleSaveTemplate() {
     if (!this.hasSaveTemplateFieldsTarget) return
     this.saveTemplateFieldsTarget.style.display = this.saveTemplateCheckTarget.checked ? "" : "none"
@@ -102,7 +113,13 @@ export default class extends Controller {
     this.field("step[max_retries]").value = template.max_retries
     this.field("step[timeout]").value = template.timeout
     this.field("step[input_context]").value = template.input_context || ""
-    this.field("step[injectable_only]").checked = template.injectable_only
+    // On-fail action
+    const onFail = cfg.on_fail_action || {}
+    this.field("on_fail_type").value = onFail.type || ""
+    this.field("on_fail_max_rounds").value = onFail.max_rounds || 3
+    this.field("on_fail_skill_id").value = onFail.skill_id || ""
+    this.field("on_fail_body").value = onFail.body || ""
+    if (this.hasOnFailTypeTarget) this.onFailChanged()
 
     // Skill / Prompt config (shared Claude config)
     if (template.step_type === "skill" || template.step_type === "prompt") {
@@ -116,10 +133,14 @@ export default class extends Controller {
       this.field("skill_model").value = cfg.model || ""
       this.field("skill_effort").value = cfg.effort || "medium"
       this.field("skill_max_turns").value = cfg.max_turns || ""
-      this.field("skill_capture_output").value = cfg.capture_output || ""
-      this.field("skill_outputs").value = cfg.outputs ? JSON.stringify(cfg.outputs) : ""
       this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
     }
+
+    // Pipeline: produces / consumes
+    this.field("produces").value = (cfg.produces || []).join(", ")
+    const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')
+    const consumes = cfg.consumes || []
+    consumeCheckboxes.forEach(cb => { cb.checked = consumes.includes(cb.value) })
 
     // Context Fetch config
     if (template.step_type === "context_fetch") {

@@ -1,6 +1,6 @@
 require "open3"
 
-class StepExecutor
+class StepExecutor # rubocop:disable Metrics/ClassLength
   include ContextFetcher
 
   Result = Data.define(:exit_code, :stdout, :stderr, :stream_events) do
@@ -14,12 +14,13 @@ class StepExecutor
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
-  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil)
+  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/ParameterLists
     @step = step
     @context = context
     @repo_path = repo_path
     @resolved_input_context = resolved_input_context
     @resume_session_id = resume_session_id
+    @resume_message = resume_message
   end
 
   def execute(&)
@@ -40,7 +41,9 @@ class StepExecutor
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
+    prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
+    prompt = append_produces_instructions(prompt) if @step.produces.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
 
@@ -175,7 +178,7 @@ class StepExecutor
       cmd += ["--resume", @resume_session_id, "-p"]
       cmd += ["--output-format", "stream-json"] if stream
       cmd += ["--verbose"]
-      cmd << "Your previous session was interrupted. Continue and complete the task."
+      cmd << (@resume_message || "Your previous session was interrupted. Continue and complete the task.")
     else
       cmd += ["-p"]
       cmd += ["--output-format", "stream-json"] if stream
@@ -363,6 +366,45 @@ class StepExecutor
     )
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
     vars
+  end
+
+  def prepend_failure_context(prompt)
+    step_name = @context["previous_failure_step"] || "previous step"
+    round = @context["recovery_round"]
+    header = "## Recovery Context (round #{round})\n\nThe step \"#{step_name}\" failed. Here is the output from the failure:\n\n"
+    failure = @context["previous_failure"].to_s.truncate(20_000)
+    "#{header}```\n#{failure}\n```\n\nUsing the failure information above, complete the following task:\n\n#{prompt}"
+  end
+
+  def append_produces_instructions(prompt)
+    vars = @step.produces.map { |v| "#{v}: <value>" }.join("\n")
+    prompt + <<~INSTRUCTIONS
+
+      ## Required Output Variables
+
+      After completing the task, you MUST include an output block at the very end of your response.
+
+      For short values (IDs, numbers, names), use single-line format:
+      ```output
+      pr_number: 42
+      branch_name: feature/my-feature
+      ```
+
+      For long values (plans, code, descriptions), use the multiline `|` format:
+      ```output
+      my_variable: |
+        The full content goes here.
+        Everything indented with 2 spaces is part of the value.
+        Include ALL content — never summarize to "complete" or "done".
+      ```
+
+      You MUST produce these variables with their FULL content:
+      ```output
+      #{vars}
+      ```
+
+      CRITICAL: Each value must contain the actual content, not a status word. If a variable should hold a plan, include the entire plan. If it should hold a number, include the number.
+    INSTRUCTIONS
   end
 
   def interpolate_string(str)

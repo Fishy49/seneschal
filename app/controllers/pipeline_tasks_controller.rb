@@ -115,6 +115,20 @@ class PipelineTasksController < ApplicationController
 
     project = @task.project
 
+    context = {
+      "task_title" => @task.title,
+      "task_body" => @task.body,
+      "task_kind" => @task.kind,
+      "repo_owner" => project.repo_owner,
+      "repo_name" => project.repo_name
+    }
+
+    if @task.context_files.present? && @task.context_files.any?
+      context["context_files"] = @task.context_files.map do |f|
+        f.is_a?(Hash) ? "#{f["path"]}: #{f["reason"]}" : f.to_s
+      end.join("\n")
+    end
+
     run = @task.runs.create!(
       workflow: @task.workflow,
       input: {
@@ -122,13 +136,7 @@ class PipelineTasksController < ApplicationController
         "task_title" => @task.title,
         "task_kind" => @task.kind
       },
-      context: {
-        "task_title" => @task.title,
-        "task_body" => @task.body,
-        "task_kind" => @task.kind,
-        "repo_owner" => project.repo_owner,
-        "repo_name" => project.repo_name
-      }
+      context: context
     )
 
     ExecuteRunJob.perform_later(run)
@@ -142,6 +150,14 @@ class PipelineTasksController < ApplicationController
   end
 
   def task_params
-    params.expect(pipeline_task: [:title, :body, :kind, :status, :project_id, :workflow_id])
+    permitted = params.expect(pipeline_task: [:title, :body, :kind, :status, :project_id, :workflow_id, :context_files])
+    if permitted[:context_files].is_a?(String)
+      permitted[:context_files] = begin
+        JSON.parse(permitted[:context_files])
+      rescue StandardError
+        []
+      end
+    end
+    permitted
   end
 end
