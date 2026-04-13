@@ -127,7 +127,6 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       run.reload
       return false if run.status == "stopped"
 
-      # Inject failure context for the recovery action
       failure_output = [parent_run_step.output, parent_run_step.error_output].compact.join("\n")
       run.update!(context: run.context.merge(
         "previous_failure" => failure_output,
@@ -135,7 +134,6 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         "recovery_round" => round.to_s
       ))
 
-      # Create an ad-hoc step for the recovery action
       recovery_step = run.ad_hoc_steps.create!(
         name: "#{step.name} - recovery (round #{round})",
         step_type: on_fail["type"],
@@ -145,7 +143,6 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         config: on_fail.slice("model", "effort", "max_turns", "allowed_tools", "produces", "consumes")
       )
 
-      # Execute recovery as a child step
       child_run_step = run.run_steps.create!(
         step: recovery_step,
         parent_run_step_id: parent_run_step.id,
@@ -170,36 +167,50 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       end
       broadcast_step(run, child_run_step)
 
-      # Re-execute the original step
-      parent_run_step.update!(status: "retrying", attempt: round + 1, started_at: Time.current)
-      broadcast_step(run, parent_run_step)
+      # Re-execute the original step — return true if it passes, otherwise continue loop
+      return true if retry_after_recovery(run, parent_run_step, step, repo_path, round)
+    end
 
-      resolved_context = resolve_input_context(step, run.context)
-      scoped = scope_context(step, run.context)
-      executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context)
-      result = executor.execute { |update| broadcast_child_progress(parent_run_step, update) }
+    false
+  rescue StandardError => e
+    parent_run_step.update!(
+      status: "failed", finished_at: Time.current,
+      error_output: [parent_run_step.error_output, "Recovery crashed: #{e.message}"].compact.join("\n")
+    )
+    Rails.logger.error("Recovery failed for '#{step.name}': #{e.message}")
+    false
+  end
 
-      if result.passed?
-        mark_passed(parent_run_step, result)
+  def retry_after_recovery(run, parent_run_step, step, repo_path, round) # rubocop:disable Naming/PredicateMethod
+    parent_run_step.update!(status: "retrying", attempt: round + 1, started_at: Time.current,
+                            output: nil, error_output: nil)
+    broadcast_step(run, parent_run_step)
 
-        extracted = PipelineExtractor.new(step, result.stdout).extract
-        run.update!(context: run.context.merge(extracted)) if extracted.any?
+    resolved_context = resolve_input_context(step, run.context)
+    scoped = scope_context(step, run.context)
+    executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context)
+    result = executor.execute { |update| broadcast_child_progress(parent_run_step, update) }
 
-        missing = step.produces - extracted.keys
-        return true if missing.empty?
+    if result.passed?
+      mark_passed(parent_run_step, result)
 
-        validation_msg = "Pipeline validation: step '#{step.name}' did not produce: #{missing.join(", ")}"
-        parent_run_step.update!(status: "failed", error_output: [parent_run_step.error_output, validation_msg].compact.join("\n"))
+      extracted = PipelineExtractor.new(step, result.stdout).extract
+      run.update!(context: run.context.merge(extracted)) if extracted.any?
 
-      else
-        mark_failed(parent_run_step, result)
-      end
+      missing = step.produces - extracted.keys
+      return true if missing.empty?
+
+      validation_msg = "Pipeline validation: step '#{step.name}' did not produce: #{missing.join(", ")}"
+      parent_run_step.update!(status: "failed",
+                              error_output: [parent_run_step.error_output, validation_msg].compact.join("\n"))
+    else
+      mark_failed(parent_run_step, result)
     end
 
     false
   end
 
-  def attempt_reopen_previous(run, parent_run_step, step, on_fail, repo_path, max_rounds) # rubocop:disable Metrics/ParameterLists,Naming/PredicateMethod
+  def attempt_reopen_previous(run, parent_run_step, step, on_fail, repo_path, max_rounds) # rubocop:disable Metrics/ParameterLists
     # Find the previous skill/prompt RunStep that has a Claude session to resume
     prev_run_step = run.run_steps
                        .where(parent_run_step_id: nil)
@@ -263,31 +274,16 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       broadcast_step(run, child_run_step)
 
       # Re-execute the current (verification) step with updated context
-      parent_run_step.update!(status: "retrying", attempt: round + 1, started_at: Time.current,
-                              output: nil, error_output: nil)
-      broadcast_step(run, parent_run_step)
-
-      resolved_context = resolve_input_context(step, run.context)
-      scoped = scope_context(step, run.context)
-      executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context)
-      result = executor.execute { |update| broadcast_child_progress(parent_run_step, update) }
-
-      if result.passed?
-        mark_passed(parent_run_step, result)
-
-        extracted = PipelineExtractor.new(step, result.stdout).extract
-        run.update!(context: run.context.merge(extracted)) if extracted.any?
-
-        missing = step.produces - extracted.keys
-        return true if missing.empty?
-
-        validation_msg = "Pipeline validation: step '#{step.name}' did not produce: #{missing.join(", ")}"
-        parent_run_step.update!(status: "failed", error_output: [parent_run_step.error_output, validation_msg].compact.join("\n"))
-      else
-        mark_failed(parent_run_step, result)
-      end
+      return true if retry_after_recovery(run, parent_run_step, step, repo_path, round)
     end
 
+    false
+  rescue StandardError => e
+    parent_run_step.update!(
+      status: "failed", finished_at: Time.current,
+      error_output: [parent_run_step.error_output, "Recovery crashed: #{e.message}"].compact.join("\n")
+    )
+    Rails.logger.error("Reopen-previous failed for '#{step.name}': #{e.message}")
     false
   end
 

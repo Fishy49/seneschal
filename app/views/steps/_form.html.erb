@@ -328,9 +328,9 @@
     <div data-step-form-target="onFailReopenFields" style="<%= 'display:none' unless on_fail["type"] == "reopen_previous" %>" class="mt-2">
       <label for="on_fail_instructions" class="block text-sm font-medium text-content-muted mb-1.5">Additional Instructions</label>
       <textarea name="on_fail_instructions" id="on_fail_instructions" rows="3"
-                placeholder="Optional extra guidance for the resumed session, e.g. 'Make sure to include a Test Plan section.'"
+                placeholder="Optional extra guidance for the resumed session"
                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["instructions"] %></textarea>
-      <p class="text-xs text-content-muted mt-1">Resumes the previous skill step's Claude session with the failure output and these instructions. Much cheaper than re-running from scratch since the session context is preserved.</p>
+      <p class="text-xs text-content-muted mt-1">Resumes the previous skill step's Claude session with the full output of this step and these instructions.</p>
     </div>
 
     <div data-step-form-target="onFailBodyFields" style="<%= 'display:none' unless on_fail["type"].in?(%w[script command]) %>" class="mt-2">
