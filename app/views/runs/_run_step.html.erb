@@ -17,6 +17,9 @@
       <% end %>
     </div>
     <% input_vars = run_step.step.consumes.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
+    <% if nested && run_step.resolved_input_context.present? %>
+      <% input_vars += [["failure_context", run_step.resolved_input_context]] %>
+    <% end %>
     <% if input_vars.any? || run_step.resolved_input_context.present? %>
       <% all_input = input_vars %>
       <% all_input += [["input_context", run_step.resolved_input_context]] if run_step.resolved_input_context.present? %>

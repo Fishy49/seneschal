@@ -147,7 +147,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         step: recovery_step,
         parent_run_step_id: parent_run_step.id,
         status: "running", attempt: 1, position: 0,
-        started_at: Time.current
+        started_at: Time.current,
+        resolved_input_context: failure_output
       )
       broadcast_run(run)
 
@@ -246,7 +247,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         parent_run_step_id: parent_run_step.id,
         status: "running", attempt: round, position: 0,
         started_at: Time.current,
-        claude_session_id: prev_run_step.claude_session_id
+        claude_session_id: prev_run_step.claude_session_id,
+        resolved_input_context: failure_output
       )
       broadcast_run(run)
 
