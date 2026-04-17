@@ -83,6 +83,7 @@ FOREIGN KEY ("skill_id")
 CREATE INDEX "index_step_templates_on_skill_id" ON "step_templates" ("skill_id") /*application='Seneschal'*/;
 CREATE UNIQUE INDEX "index_step_templates_on_name" ON "step_templates" ("name") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260417141730'),
 ('20260413044358'),
 ('20260413025821'),
 ('20260413025756'),
