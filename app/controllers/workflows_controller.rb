@@ -52,7 +52,7 @@ class WorkflowsController < ApplicationController
   end
 
   def workflow_params
-    params.expect(workflow: [:name, :description, :trigger_type, :trigger_config])
+    params.expect(workflow: [:name, :description])
   end
 
   def trigger_input_params

@@ -1,0 +1,73 @@
+<%
+  current_cron    = task.cron_expression
+  preset_values   = PipelineTask::CRON_PRESETS.map { |p| p[:cron] }
+  selected_preset = preset_values.include?(current_cron) ? current_cron : (current_cron.present? ? "custom" : PipelineTask::CRON_PRESETS.first[:cron])
+  initial_branch  = task.watched_branch
+%>
+
+<div class="mb-4"
+     data-controller="trigger-config"
+     data-trigger-config-branches-url-value="<%= remote_task_branches_path %>">
+  <%= f.label :trigger_type, "Trigger", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+  <%= f.select :trigger_type,
+        [["Manual (run from the UI)", "manual"],
+         ["Cron (scheduled)",         "cron"],
+         ["GitHub branch watch",       "github_watch"]],
+        {},
+        class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+        data: {
+          trigger_config_target: "type",
+          action: "change->trigger-config#typeChanged"
+        } %>
+
+  <div hidden data-trigger-config-target="cronPanel" class="mt-3 p-3 bg-surface-input rounded-lg border border-edge">
+    <label class="block text-sm font-medium text-content-muted mb-1.5">Schedule</label>
+    <%= select_tag "pipeline_task[trigger_config][cron_preset]",
+          options_for_select(
+            PipelineTask::CRON_PRESETS.map { |p| [p[:label], p[:cron]] } + [["Custom...", "custom"]],
+            selected_preset
+          ),
+          class: "w-full px-3 py-2 bg-surface-card border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+          data: {
+            trigger_config_target: "cronPreset",
+            action: "change->trigger-config#presetChanged"
+          } %>
+
+    <div hidden data-trigger-config-target="cronCustom" class="mt-2">
+      <label class="block text-xs text-content-muted mb-1">Cron expression <span class="font-mono">(min hr dom mon dow)</span></label>
+      <%= text_field_tag "pipeline_task[trigger_config][cron]",
+            (selected_preset == "custom" ? current_cron : ""),
+            placeholder: "0 9 * * 1-5",
+            class: "w-full px-3 py-2 bg-surface-card border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent" %>
+      <p class="text-xs text-content-muted mt-1">Timezone: <span class="font-mono"><%= Time.zone.name %></span></p>
+    </div>
+  </div>
+
+  <div hidden data-trigger-config-target="watchPanel" class="mt-3 p-3 bg-surface-input rounded-lg border border-edge">
+    <label class="block text-sm font-medium text-content-muted mb-1.5">GitHub repo URL</label>
+    <div class="flex gap-2 mb-2">
+      <%= text_field_tag "pipeline_task[trigger_config][repo_url]",
+            task.watched_repo_url,
+            placeholder: "git@github.com:owner/repo.git",
+            class: "flex-1 px-3 py-2 bg-surface-card border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+            data: { trigger_config_target: "repoUrl" } %>
+      <button type="button"
+              data-trigger-config-target="loadBranchesBtn"
+              data-action="trigger-config#loadBranches"
+              class="inline-flex items-center gap-1.5 px-3 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+        Load Branches
+      </button>
+    </div>
+
+    <label class="block text-sm font-medium text-content-muted mb-1.5">Branch</label>
+    <%= select_tag "pipeline_task[trigger_config][branch]",
+          initial_branch.present? ? content_tag(:option, initial_branch, value: initial_branch, selected: true) : nil,
+          disabled: initial_branch.blank?,
+          class: "w-full px-3 py-2 bg-surface-card border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent disabled:opacity-50",
+          data: { trigger_config_target: "branch", initial_value: initial_branch } %>
+
+    <p class="text-xs text-content-muted mt-2" data-trigger-config-target="branchStatus">
+      Uses the host's git auth (SSH keys). Runs fire when the branch HEAD changes.
+    </p>
+  </div>
+</div>

@@ -82,4 +82,58 @@ class PipelineTaskTest < ActiveSupport::TestCase
     assert stats[:cost_usd].positive?
     assert stats[:input_tokens].positive?
   end
+
+  test "defaults to manual trigger" do
+    t = PipelineTask.create!(
+      title: "m", body: "m", kind: "feature", status: "draft",
+      project: projects(:seneschal)
+    )
+    assert_equal "manual", t.trigger_type
+    assert t.manual?
+  end
+
+  test "cron trigger requires a valid expression" do
+    t = pipeline_tasks(:ready_task)
+    t.trigger_type = "cron"
+    t.trigger_config = { "cron" => "not a cron" }
+    assert_not t.valid?
+    assert_includes t.errors[:trigger_config].join, "invalid cron"
+
+    t.trigger_config = { "cron" => "0 9 * * 1-5" }
+    assert t.valid?
+  end
+
+  test "cron trigger rejects blank expression" do
+    t = pipeline_tasks(:ready_task)
+    t.trigger_type = "cron"
+    t.trigger_config = {}
+    assert_not t.valid?
+    assert_includes t.errors[:trigger_config].join, "cron expression"
+  end
+
+  test "github_watch requires repo url and branch" do
+    t = pipeline_tasks(:ready_task)
+    t.trigger_type = "github_watch"
+    t.trigger_config = {}
+    assert_not t.valid?
+
+    t.trigger_config = { "repo_url" => "git@github.com:a/b.git", "branch" => "main" }
+    assert t.valid?
+  end
+
+  test "record_cron_fire! persists iso8601 timestamp" do
+    t = pipeline_tasks(:ready_task)
+    t.update!(trigger_type: "cron", trigger_config: { "cron" => "0 * * * *" })
+    fired = Time.zone.parse("2025-01-02 03:00:00")
+    t.record_cron_fire!(fired)
+    assert_equal fired, t.reload.last_fired_at
+  end
+
+  test "record_seen_sha! persists sha" do
+    t = pipeline_tasks(:ready_task)
+    t.update!(trigger_type: "github_watch",
+              trigger_config: { "repo_url" => "git@github.com:a/b.git", "branch" => "main" })
+    t.record_seen_sha!("deadbeef")
+    assert_equal "deadbeef", t.reload.last_seen_sha
+  end
 end

@@ -16,8 +16,20 @@ production:
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+  cron_tick:
+    class: CronTickJob
+    schedule: every minute
+  branch_watch_poll:
+    class: BranchWatchPollJob
+    schedule: every 15 minutes
 
 development:
   run_recovery:
     class: RunRecoveryJob
     schedule: every 5 minutes
+  cron_tick:
+    class: CronTickJob
+    schedule: every minute
+  branch_watch_poll:
+    class: BranchWatchPollJob
+    schedule: every 15 minutes

@@ -85,6 +85,19 @@ class PipelineTasksController < ApplicationController
     end
   end
 
+  def remote_branches
+    url = params[:repo_url].to_s.strip
+    if url.blank?
+      render json: { error: "Provide a repo URL." }, status: :unprocessable_content
+      return
+    end
+
+    branches = GitRemote.branches(url)
+    render json: { branches: branches }
+  rescue GitRemote::Error => e
+    render json: { error: e.message }, status: :unprocessable_content
+  end
+
   def archive
     @task.update!(archived_at: Time.current)
     redirect_to pipeline_tasks_path, notice: "Task archived."
@@ -111,35 +124,7 @@ class PipelineTasksController < ApplicationController
       return
     end
 
-    @task.update!(status: "running")
-
-    project = @task.project
-
-    context = {
-      "task_title" => @task.title,
-      "task_body" => @task.body,
-      "task_kind" => @task.kind,
-      "repo_owner" => project.repo_owner,
-      "repo_name" => project.repo_name
-    }
-
-    if @task.context_files.present? && @task.context_files.any?
-      context["context_files"] = @task.context_files.map do |f|
-        f.is_a?(Hash) ? "#{f["path"]}: #{f["reason"]}" : f.to_s
-      end.join("\n")
-    end
-
-    run = @task.runs.create!(
-      workflow: @task.workflow,
-      input: {
-        "task_id" => @task.id,
-        "task_title" => @task.title,
-        "task_kind" => @task.kind
-      },
-      context: context
-    )
-
-    ExecuteRunJob.perform_later(run)
+    run = @task.enqueue_run!(reason: "manual")
     redirect_to run_path(run), notice: "Run started for '#{@task.title}'."
   end
 
@@ -150,7 +135,14 @@ class PipelineTasksController < ApplicationController
   end
 
   def task_params
-    permitted = params.expect(pipeline_task: [:title, :body, :kind, :status, :project_id, :workflow_id, :context_files])
+    permitted = params.expect(
+      pipeline_task: [
+        :title, :body, :kind, :status, :project_id, :workflow_id,
+        :context_files, :trigger_type,
+        { trigger_config: [:cron_preset, :cron, :repo_url, :branch] }
+      ]
+    )
+
     if permitted[:context_files].is_a?(String)
       permitted[:context_files] = begin
         JSON.parse(permitted[:context_files])
@@ -158,6 +150,32 @@ class PipelineTasksController < ApplicationController
         []
       end
     end
+
+    permitted[:trigger_config] = build_trigger_config(permitted[:trigger_type], permitted[:trigger_config])
     permitted
+  end
+
+  def build_trigger_config(type, raw)
+    raw = (raw || {}).to_h.with_indifferent_access
+    existing = @task&.trigger_config || {}
+
+    case type
+    when "cron"
+      cron = raw[:cron_preset].presence == "custom" ? raw[:cron].to_s.strip : raw[:cron_preset].to_s.strip
+      { "cron" => cron, "last_fired_at" => existing["last_fired_at"] }.compact
+    when "github_watch"
+      new_url = raw[:repo_url].to_s.strip
+      new_branch = raw[:branch].to_s.strip
+      # Reset last_seen_sha when the user changes repo or branch so the next
+      # poll arms the watcher instead of firing on stale state.
+      keep_sha = existing["repo_url"] == new_url && existing["branch"] == new_branch
+      {
+        "repo_url" => new_url,
+        "branch" => new_branch,
+        "last_seen_sha" => keep_sha ? existing["last_seen_sha"] : nil
+      }.compact
+    else
+      {}
+    end
   end
 end

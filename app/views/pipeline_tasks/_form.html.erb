@@ -38,6 +38,8 @@
     </div>
   </div>
 
+  <%= render "trigger_fields", f: f, task: task %>
+
   <div class="mb-4" data-controller="code-editor format-body" data-format-body-url-value="<%= format_task_body_path %>">
     <div class="flex items-center justify-between mb-1.5">
       <span class="block text-sm font-medium text-content-muted">Spec</span>

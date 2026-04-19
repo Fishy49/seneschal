@@ -74,7 +74,8 @@ Rails.application.routes.draw do
   get  "data/export", to: "data#export", as: :data_export
   post "data/import", to: "data#import", as: :data_import
 
-  post "tasks/format_body", to: "pipeline_tasks#format_body", as: :format_task_body
+  post "tasks/format_body",     to: "pipeline_tasks#format_body",     as: :format_task_body
+  get  "tasks/remote_branches", to: "pipeline_tasks#remote_branches", as: :remote_task_branches
   resources :pipeline_tasks, path: "tasks" do
     member do
       post :execute

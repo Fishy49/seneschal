@@ -340,6 +340,7 @@ DEPENDENCIES
   bundler-audit
   capybara
   debug
+  fugit (~> 1.11)
   importmap-rails
   propshaft
   puma (>= 5.0)

@@ -52,6 +52,30 @@
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th><td class="px-3 py-2 border-b border-edge"><%= @task.workflow ? link_to(@task.workflow.name, project_workflow_path(@task.project, @task.workflow)) : "Not assigned" %></td></tr>
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th><td class="px-3 py-2 border-b border-edge"><%= type_badge(@task.kind) %></td></tr>
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(@task.status) %></td></tr>
+        <tr>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Trigger</th>
+          <td class="px-3 py-2 border-b border-edge text-sm">
+            <% if @task.cron? %>
+              <div><span class="font-medium">Cron:</span> <span class="font-mono"><%= @task.cron_expression %></span></div>
+              <% if @task.last_fired_at %>
+                <div class="text-xs text-content-muted">Last fired <%= time_ago_short(@task.last_fired_at) %></div>
+              <% end %>
+              <% if (next_at = @task.fugit_cron&.next_time(Time.current)&.to_t) %>
+                <div class="text-xs text-content-muted">Next fire <%= next_at.strftime("%Y-%m-%d %H:%M %Z") %></div>
+              <% end %>
+            <% elsif @task.github_watch? %>
+              <div><span class="font-medium">Branch watch:</span> <span class="font-mono"><%= @task.watched_branch %></span></div>
+              <div class="text-xs text-content-muted break-all"><%= @task.watched_repo_url %></div>
+              <% if @task.last_seen_sha.present? %>
+                <div class="text-xs text-content-muted">Last seen <span class="font-mono"><%= @task.last_seen_sha.first(7) %></span></div>
+              <% else %>
+                <div class="text-xs text-content-muted">Arming on next poll...</div>
+              <% end %>
+            <% else %>
+              <span class="text-content-muted">Manual</span>
+            <% end %>
+          </td>
+        </tr>
         <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></td></tr>
         <% if (stats = @task.usage_stats) && stats[:cost_usd] > 0 %>
           <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Cost</th><td class="px-3 py-2 border-b border-edge text-sm font-medium"><%= format_cost(stats[:cost_usd]) %></td></tr>
