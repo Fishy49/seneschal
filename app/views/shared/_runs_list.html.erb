@@ -1,0 +1,33 @@
+<%# Renders a consistent 3-column table of runs.
+    Locals:
+      runs:          collection of Run records
+      empty_message: text shown when the collection is empty (default: "No runs yet") %>
+<% empty_message = local_assigns.fetch(:empty_message, "No runs yet") %>
+<% if runs.any? %>
+  <table class="w-full border-collapse">
+    <thead>
+      <tr>
+        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Run</th>
+        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% runs.each do |run| %>
+        <tr>
+          <td class="px-3 py-2 border-b border-edge">
+            <div><%= link_to "##{run.id} - #{run.pipeline_task&.title || 'Manual Run'}", run_path(run) %></div>
+            <div class="text-xs text-content-muted">
+              Workflow:
+              <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-content transition-colors" %>
+            </div>
+          </td>
+          <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
+          <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.started_at || run.created_at) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p class="text-center py-8 text-content-muted"><%= empty_message %></p>
+<% end %>

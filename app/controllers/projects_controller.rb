@@ -10,7 +10,7 @@ class ProjectsController < ApplicationController
     @project.refresh_repo_status!
     @workflows = @project.workflows.order(:name)
     @tasks = @project.pipeline_tasks.active.recent.limit(10)
-    @recent_runs = @project.runs.includes(:workflow).recent.limit(10)
+    @recent_runs = @project.runs.includes(:pipeline_task, workflow: :project).recent.limit(10)
   end
 
   def new
