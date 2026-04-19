@@ -44,6 +44,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     prompt = append_produces_instructions(prompt) if @step.produces.any?
+    prompt = append_context_projects(prompt) if context_project_paths.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
 
@@ -201,6 +202,8 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
               Setting["default_allowed_tools"].presence ||
               DEFAULT_ALLOWED_TOOLS
     cmd += ["--allowedTools", allowed]
+
+    context_project_paths.each { |path| cmd += ["--add-dir", path] }
 
     cmd
   end
@@ -374,6 +377,24 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     header = "## Recovery Context (round #{round})\n\nThe step \"#{step_name}\" failed. Here is the output from the failure:\n\n"
     failure = @context["previous_failure"].to_s.truncate(20_000)
     "#{header}```\n#{failure}\n```\n\nUsing the failure information above, complete the following task:\n\n#{prompt}"
+  end
+
+  def context_project_paths
+    @context_project_paths ||= @step.ready_context_projects.map(&:local_path)
+  end
+
+  def append_context_projects(prompt)
+    projects = @step.ready_context_projects
+    lines = projects.map { |p| "- #{p.name}: #{p.local_path}" }.join("\n")
+    prompt + <<~CONTEXT
+
+
+      ## Available Project Directories
+
+      You also have read access to the following Seneschal project directories for reference. Use them when helpful, but remember the primary working directory is the repo you were launched in.
+
+      #{lines}
+    CONTEXT
   end
 
   def append_produces_instructions(prompt)

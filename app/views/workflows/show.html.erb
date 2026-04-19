@@ -44,6 +44,14 @@
                   <% end %>
                   &middot; <%= step.timeout %>s timeout
                 </div>
+                <% ctx = Project.where(id: step.context_project_ids).order(:name) %>
+                <% if ctx.any? %>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <% ctx.each do |p| %>
+                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-accent/15 text-accent font-mono">+ <%= p.name %></span>
+                    <% end %>
+                  </div>
+                <% end %>
                 <% if step.produces.any? %>
                   <div class="flex flex-wrap gap-1 mt-1">
                     <% step.produces.each do |var| %>

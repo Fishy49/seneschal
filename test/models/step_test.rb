@@ -92,4 +92,26 @@ class StepTest < ActiveSupport::TestCase
     s.timeout = 0
     assert_not s.valid?
   end
+
+  test "context_project_ids returns integers deduped" do
+    s = steps(:skill_step)
+    s.update!(config: s.config.merge("context_projects" => ["1", 2, "2", 3]))
+    assert_equal [1, 2, 3], s.context_project_ids
+  end
+
+  test "ready_context_projects includes only cloned projects" do
+    ready = projects(:seneschal) # repo_status: ready
+    not_ready = projects(:other_project) # repo_status: not_cloned
+    FileUtils.mkdir_p(ready.local_path)
+    s = steps(:skill_step)
+    s.update!(config: s.config.merge("context_projects" => [ready.id, not_ready.id]))
+
+    assert_equal [ready], s.ready_context_projects
+  end
+
+  test "ready_context_projects skips unknown ids without raising" do
+    s = steps(:skill_step)
+    s.update!(config: s.config.merge("context_projects" => [9_999_999]))
+    assert_equal [], s.ready_context_projects
+  end
 end

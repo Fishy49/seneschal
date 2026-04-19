@@ -23,6 +23,29 @@ class Step < ApplicationRecord
     config["consumes"] || []
   end
 
+  def context_project_ids
+    Array(config["context_projects"]).map(&:to_i).uniq
+  end
+
+  # Returns Project records for context_projects that are currently cloned
+  # and on disk. Any selected IDs that don't resolve — deleted project,
+  # missing local_path, or never cloned — are logged and silently skipped
+  # so the step still runs.
+  def ready_context_projects
+    ids = context_project_ids
+    return [] if ids.empty?
+
+    found = Project.where(id: ids).to_a
+    ready = found.select { |p| p.repo_ready? && p.local_path_exists? }
+
+    missing = ids - found.map(&:id)
+    not_ready = (found - ready).map(&:id)
+    Rails.logger.warn("Step #{id} context project ids not found: #{missing.inspect}") if missing.any?
+    Rails.logger.warn("Step #{id} context projects not ready: #{not_ready.inspect}") if not_ready.any?
+
+    ready
+  end
+
   def prompt_body(context = {})
     case step_type
     when "skill"  then TemplateRenderer.new(skill.body, context).render if skill

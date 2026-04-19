@@ -79,7 +79,7 @@ class StepsController < ApplicationController
       name: params[:template_name],
       step_type: step.step_type,
       body: step.body,
-      config: step.config,
+      config: step.config.except("context_projects"),
       skill_id: step.skill_id,
       max_retries: step.max_retries,
       timeout: step.timeout,
@@ -140,6 +140,10 @@ class StepsController < ApplicationController
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
+
+    context_ids = Array(raw["skill_context_projects"]).compact_blank.map(&:to_i).uniq
+    config["context_projects"] = context_ids if context_ids.any?
+
     config
   end
 
