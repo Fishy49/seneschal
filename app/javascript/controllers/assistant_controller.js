@@ -7,10 +7,19 @@ export default class extends Controller {
   connect() {
     this.updatePagePath()
     window.addEventListener("keydown", this.handleKeydown)
+    this.element.addEventListener("submit", this.handleSubmit, true)
   }
 
   disconnect() {
     window.removeEventListener("keydown", this.handleKeydown)
+    this.element.removeEventListener("submit", this.handleSubmit, true)
+  }
+
+  handleSubmit = (event) => {
+    const path = window.location.pathname
+    event.target.querySelectorAll('input[name="current_page_path"]').forEach((input) => {
+      input.value = path
+    })
   }
 
   toggle() {
@@ -96,5 +105,9 @@ export default class extends Controller {
 
   messagesTargetConnected() {
     this.scrollToBottom()
+  }
+
+  pagePathTargetConnected() {
+    this.updatePagePath()
   }
 }
