@@ -5,8 +5,10 @@ class AssistantMessagesController < ApplicationController
     content = params[:payload_value].presence || params[:content].to_s.strip
     return head :unprocessable_content if content.blank?
 
-    @conversation.update!(last_page_path: params[:current_page_path].presence)
-    @conversation.update!(turbo_token: SecureRandom.hex(32))
+    @conversation.update!(
+      last_page_path: params[:current_page_path].presence,
+      turbo_token: SecureRandom.hex(32)
+    )
 
     @message = @conversation.assistant_messages.create!(role: "user", content: content)
     @conversation.update!(status: "thinking")
@@ -23,6 +25,6 @@ class AssistantMessagesController < ApplicationController
 
   def set_conversation
     @conversation = current_user.assistant_conversations.recent.first ||
-                    current_user.assistant_conversations.create!(status: "idle", turbo_token: SecureRandom.hex(32))
+                    current_user.assistant_conversations.create!(status: "idle")
   end
 end

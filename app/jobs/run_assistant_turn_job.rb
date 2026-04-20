@@ -37,7 +37,7 @@ class RunAssistantTurnJob < ApplicationJob
 
   private
 
-  def broadcast_progress(conversation, event)
+  def broadcast_progress(conversation, _event)
     Turbo::StreamsChannel.broadcast_replace_to(
       [conversation.user, :assistant],
       target: "#{conversation.dom_id_for_panel}_status",

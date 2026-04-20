@@ -6,8 +6,7 @@ class AssistantConversationsController < ApplicationController
   def create
     @conversation = current_user.assistant_conversations.create!(
       project_id: params[:project_id].presence,
-      status: "idle",
-      turbo_token: SecureRandom.hex(32)
+      status: "idle"
     )
 
     respond_to do |format|
@@ -26,6 +25,6 @@ class AssistantConversationsController < ApplicationController
 
   def set_conversation
     @conversation = current_user.assistant_conversations.recent.first ||
-                    current_user.assistant_conversations.create!(status: "idle", turbo_token: SecureRandom.hex(32))
+                    current_user.assistant_conversations.create!(status: "idle")
   end
 end

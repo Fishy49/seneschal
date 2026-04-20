@@ -68,7 +68,7 @@ class AssistantFlowTest < ActionDispatch::IntegrationTest
     Turbo::StreamsChannel.stub(:broadcast_stream_to, true) do
       post assistant_api_ui_navigate_path,
            params: { path: "/projects/#{project.id}/workflows/#{workflow.id}" },
-           headers: { "Authorization" => "Bearer #{token}" }.merge({ "Content-Type" => "application/json" })
+           headers: { "Authorization" => "Bearer #{token}" }
       assert_response :success
     end
   end

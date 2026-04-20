@@ -25,7 +25,7 @@ class AssistantPageContext
 
     record_summary = case controller
                      when "projects"       then project_summary(id)
-                     when "workflows"      then workflow_summary(id, params[:project_id])
+                     when "workflows"      then workflow_summary(id)
                      when "runs"           then run_summary(id)
                      when "pipeline_tasks" then pipeline_task_summary(id)
                      when "skills"         then skill_summary(id)
@@ -49,7 +49,7 @@ class AssistantPageContext
     }
   end
 
-  def workflow_summary(id, project_id)
+  def workflow_summary(id)
     return unless id
     workflow = Workflow.find_by(id: id)
     return unless workflow

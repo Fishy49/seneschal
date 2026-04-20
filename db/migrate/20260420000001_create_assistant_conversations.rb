@@ -13,7 +13,7 @@ class CreateAssistantConversations < ActiveRecord::Migration[8.1]
     end
 
     add_index :assistant_conversations, [:user_id, :updated_at]
-    add_foreign_key :assistant_conversations, :users
-    add_foreign_key :assistant_conversations, :projects
+    add_foreign_key :assistant_conversations, :users, on_delete: :cascade
+    add_foreign_key :assistant_conversations, :projects, on_delete: :cascade
   end
 end

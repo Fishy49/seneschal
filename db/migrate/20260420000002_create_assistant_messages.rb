@@ -12,6 +12,6 @@ class CreateAssistantMessages < ActiveRecord::Migration[8.1]
     end
 
     add_index :assistant_messages, [:assistant_conversation_id, :created_at]
-    add_foreign_key :assistant_messages, :assistant_conversations
+    add_foreign_key :assistant_messages, :assistant_conversations, on_delete: :cascade
   end
 end

@@ -8,8 +8,9 @@ module Assistant
       private
 
       def authenticate_bearer!
-        token = request.headers["Authorization"].to_s.split(" ").last
-        @current_conversation = AssistantConversation.find_by(turbo_token: token)
+        header = request.headers["Authorization"].to_s
+        token = header.start_with?("Bearer ") ? header.sub(/\ABearer\s+/, "").strip : nil
+        @current_conversation = AssistantConversation.find_by(turbo_token: token) if token.present?
 
         render json: { error: "Unauthorized" }, status: :unauthorized unless @current_conversation
       end

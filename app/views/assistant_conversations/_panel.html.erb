@@ -22,7 +22,7 @@
     <% if conversation.assistant_messages.none? %>
       <%= render "assistant_messages/empty", conversation: conversation %>
     <% else %>
-      <%= render conversation.assistant_messages %>
+      <%= render partial: "assistant_messages/message", collection: conversation.assistant_messages, as: :message %>
     <% end %>
   </div>
 

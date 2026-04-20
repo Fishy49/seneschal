@@ -57,7 +57,7 @@ class AssistantOrchestrator
       end
 
       stderr_thread.join
-      wait_thr.value.exitstatus || 1
+      wait_thr.value
 
       yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id }) if block_given?
     end
@@ -70,21 +70,13 @@ class AssistantOrchestrator
   private
 
   def build_cmd(prompt)
-    cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose",
-           "--model", MODEL,
-           "--permission-mode", "dontAsk",
-           "--allowedTools", ALLOWED_TOOLS]
-
-    if @conversation.claude_session_id.present?
-      cmd = ["claude", "--resume", @conversation.claude_session_id, "-p",
-             "--output-format", "stream-json", "--verbose",
-             "--permission-mode", "dontAsk",
-             "--allowedTools", ALLOWED_TOOLS]
-      cmd << prompt
-    else
-      cmd << prompt
-    end
-
+    cmd = ["claude"]
+    cmd += ["--resume", @conversation.claude_session_id] if @conversation.claude_session_id.present?
+    cmd += ["-p", "--output-format", "stream-json", "--verbose",
+            "--model", MODEL,
+            "--permission-mode", "dontAsk",
+            "--allowedTools", ALLOWED_TOOLS]
+    cmd << prompt
     cmd
   end
 
