@@ -90,6 +90,10 @@
         </button>
       </nav>
 
+      <% if current_user %>
+        <%= render "layouts/assistant_bubble" %>
+      <% end %>
+
       <main class="p-8 max-w-[1400px] relative">
         <div class="main-watermark" style="background-image: url('<%= image_path('seneschal_bg.png') %>')"></div>
         <div class="relative z-10">

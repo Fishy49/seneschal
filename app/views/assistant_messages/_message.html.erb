@@ -1,0 +1,13 @@
+<div class="flex <%= message.role == 'user' ? 'justify-end' : 'justify-start' %> w-full">
+  <div class="max-w-[85%] rounded-xl px-3 py-2 text-sm
+              <%= message.role == 'user' ? 'bg-accent text-white' : 'bg-surface-input text-content' %>">
+    <% if message.role == "system" %>
+      <span class="text-xs text-danger"><%= message.content %></span>
+    <% else %>
+      <div class="whitespace-pre-wrap break-words"><%= message.content %></div>
+    <% end %>
+    <% if message.choices_array.any? %>
+      <%= render "assistant_messages/choices", message: message %>
+    <% end %>
+  </div>
+</div>

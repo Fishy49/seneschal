@@ -94,5 +94,30 @@ Rails.application.routes.draw do
     end
   end
 
+  resource :assistant_conversation, only: %i[show create destroy] do
+    resources :assistant_messages, only: [:create]
+  end
+
+  namespace :assistant do
+    namespace :api do
+      resources :projects, only: %i[index show create update] do
+        resources :workflows, only: %i[index show create update destroy] do
+          member { post :trigger }
+          resources :steps, only: %i[index create update destroy] do
+            collection { post :reorder }
+          end
+        end
+      end
+      resources :skills
+      resources :pipeline_tasks
+      get  "page_contexts",            to: "page_contexts#show"
+      post "ui/navigate",              to: "ui#navigate"
+      post "ui/ask_choices",           to: "ui#ask_choices"
+      post "ui/ask_text",              to: "ui#ask_text"
+      get  "conversation/state",       to: "conversation#state"
+      post "conversation/finish_turn", to: "conversation#finish_turn"
+    end
+  end
+
   get "up" => "rails/health#show", as: :rails_health_check
 end

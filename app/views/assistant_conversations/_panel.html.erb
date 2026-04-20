@@ -1,0 +1,45 @@
+<div id="<%= conversation.dom_id_for_panel %>"
+     class="flex flex-col h-full max-h-[600px]">
+
+  <div class="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface-card">
+    <span class="text-sm font-semibold text-content">Assistant</span>
+    <div class="flex items-center gap-2">
+      <span id="<%= "#{conversation.dom_id_for_panel}_status" %>"
+            class="text-xs text-content-muted">
+        <%= conversation.status == "thinking" ? "Thinking…" : "" %>
+      </span>
+      <%= button_to assistant_conversation_path, method: :delete,
+            class: "text-xs text-content-muted hover:text-content bg-transparent border-none cursor-pointer",
+            title: "Clear history" do %>
+        Clear
+      <% end %>
+    </div>
+  </div>
+
+  <div id="<%= "#{conversation.dom_id_for_panel}_messages" %>"
+       data-assistant-target="messages"
+       class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+    <% if conversation.assistant_messages.none? %>
+      <%= render "assistant_messages/empty", conversation: conversation %>
+    <% else %>
+      <%= render conversation.assistant_messages %>
+    <% end %>
+  </div>
+
+  <div class="border-t border-edge p-3">
+    <%= turbo_stream_from [current_user, :assistant] %>
+    <%= form_with url: assistant_conversation_assistant_messages_path do |f| %>
+      <input type="hidden" name="current_page_path" data-assistant-target="pagePath">
+      <div class="flex gap-2">
+        <%= f.text_area :content,
+              rows: 2,
+              placeholder: "Ask anything…",
+              autofocus: true,
+              data: { assistant_target: "input" },
+              class: "flex-1 rounded-lg border border-edge bg-surface-input text-content text-sm p-2 resize-none focus:outline-none focus:ring-1 focus:ring-accent" %>
+        <%= f.submit "Send",
+              class: "px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>

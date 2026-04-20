@@ -22,4 +22,8 @@ ActionDispatch::IntegrationTest.class_eval do
     delete logout_path
     follow_redirect!
   end
+
+  def assistant_sign_in(conversation)
+    @headers = { "Authorization" => "Bearer #{conversation.turbo_token}" }
+  end
 end

@@ -1,0 +1,14 @@
+<div class="flex flex-col gap-3 items-start w-full">
+  <p class="text-sm text-content-muted">Hi! I can help you manage workflows, skills, and tasks. Try:</p>
+  <% [
+    ["Create a new workflow", "Create a new workflow"],
+    ["Explain this page", "Explain what's on this page"],
+    ["List my skills", "List all available skills"]
+  ].each do |label, value| %>
+    <%= button_to assistant_conversation_assistant_messages_path,
+          params: { payload_value: value, current_page_path: "" },
+          class: "px-3 py-2 rounded-lg border border-edge text-xs text-content hover:bg-accent hover:text-white hover:border-accent transition-colors bg-surface-card cursor-pointer text-left" do %>
+      <%= label %>
+    <% end %>
+  <% end %>
+</div>

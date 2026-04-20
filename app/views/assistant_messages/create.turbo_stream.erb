@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "#{@conversation.dom_id_for_panel}_status" do %>
+  <span id="<%= "#{@conversation.dom_id_for_panel}_status" %>" class="text-xs text-content-muted animate-pulse">Thinking…</span>
+<% end %>

@@ -1,0 +1,12 @@
+<div class="flex flex-wrap gap-2 mt-2">
+  <% message.choices_array.each do |choice| %>
+    <%= button_to assistant_conversation_assistant_messages_path,
+          params: {
+            payload_value: choice["value"] || choice[:value],
+            current_page_path: ""
+          },
+          class: "px-3 py-1 rounded-lg border border-edge text-xs text-content hover:bg-accent hover:text-white hover:border-accent transition-colors bg-surface-card cursor-pointer" do %>
+      <%= choice["label"] || choice[:label] %>
+    <% end %>
+  <% end %>
+</div>

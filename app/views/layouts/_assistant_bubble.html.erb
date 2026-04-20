@@ -1,0 +1,16 @@
+<div data-controller="assistant"
+     data-assistant-create-url-value="<%= assistant_conversation_path %>"
+     class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+
+  <div id="assistant_panel_content"
+       data-assistant-target="panel"
+       class="hidden w-96 max-h-[600px] bg-surface-card border border-edge rounded-xl shadow-2xl flex-col overflow-hidden">
+  </div>
+
+  <button type="button"
+          data-action="click->assistant#toggle"
+          class="w-12 h-12 rounded-full bg-accent text-white shadow-lg flex items-center justify-center hover:bg-accent/90 transition-colors text-lg font-bold"
+          title="Assistant (⌘/)">
+    ✦
+  </button>
+</div>

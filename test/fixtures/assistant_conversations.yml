@@ -1,0 +1,12 @@
+admin_conversation:
+  user: admin
+  project: seneschal
+  status: idle
+  turbo_token: test-token-admin-abc123
+  last_page_path: /projects/1
+  title: Test Conversation
+
+other_conversation:
+  user: other
+  status: idle
+  turbo_token: test-token-other-xyz789

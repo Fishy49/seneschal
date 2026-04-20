@@ -1,0 +1,24 @@
+user_message:
+  assistant_conversation: admin_conversation
+  role: user
+  content: Create a new workflow
+  choices: []
+  events: []
+
+assistant_message_with_choices:
+  assistant_conversation: admin_conversation
+  role: assistant
+  content: What kind of workflow would you like?
+  choices:
+    - label: Manual trigger
+      value: manual
+    - label: Scheduled
+      value: cron
+  events: []
+
+plain_assistant_message:
+  assistant_conversation: admin_conversation
+  role: assistant
+  content: I have created the workflow successfully.
+  choices: []
+  events: []
