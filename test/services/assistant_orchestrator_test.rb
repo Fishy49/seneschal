@@ -32,6 +32,16 @@ class AssistantOrchestratorTest < ActiveSupport::TestCase
     end
   end
 
+  test "run surfaces stderr when claude exits nonzero with no output" do
+    stderr_text = "Error: Input must be provided either through stdin or as a prompt argument when using --print\n"
+    stub_popen3(stdout: "", stderr: stderr_text, exit_code: 1) do
+      orchestrator = AssistantOrchestrator.new(@conversation)
+      result = orchestrator.run("test")
+      assert_match(/claude CLI exited 1/, result[:error])
+      assert_match(/Input must be provided/, result[:error])
+    end
+  end
+
   test "run handles popen3 errors" do
     Open3.stub(:popen3, ->(*_args, **_kwargs) { raise Errno::ENOENT, "claude not found" }) do
       orchestrator = AssistantOrchestrator.new(@conversation)
@@ -65,15 +75,16 @@ class AssistantOrchestratorTest < ActiveSupport::TestCase
 
   private
 
-  def stub_popen3(stdout:, exit_code:, &)
+  def stub_popen3(stdout:, exit_code:, stderr: "", &)
     stdin_mock = StringIO.new
     stdin_mock.define_singleton_method(:close) { nil }
     stdout_mock = StringIO.new(stdout)
-    stderr_mock = StringIO.new("")
-    wait_mock = Minitest::Mock.new
-    status_mock = Minitest::Mock.new
-    status_mock.expect(:exitstatus, exit_code)
-    wait_mock.expect(:value, status_mock)
+    stderr_mock = StringIO.new(stderr)
+    status_mock = Object.new
+    status_mock.define_singleton_method(:exitstatus) { exit_code }
+    status_mock.define_singleton_method(:success?) { exit_code.zero? }
+    wait_mock = Object.new
+    wait_mock.define_singleton_method(:value) { status_mock }
 
     Open3.stub(:popen3, lambda { |*_args, **_kwargs, &blk|
       blk.call(stdin_mock, stdout_mock, stderr_mock, wait_mock)

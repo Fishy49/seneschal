@@ -4,13 +4,13 @@ class AssistantOrchestrator
   BROADCAST_INTERVAL = 2.0
   MAX_EVENTS = 50
   MODEL = "claude-sonnet-4-6".freeze
-  ALLOWED_TOOLS = "Bash(curl *) WebFetch".freeze
+  TOOLS = "Bash,WebFetch".freeze
 
   def initialize(conversation)
     @conversation = conversation
   end
 
-  def run(user_message, &block) # rubocop:disable Metrics/AbcSize
+  def run(user_message, &block) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength,Metrics/PerceivedComplexity
     prompt = AssistantPromptBuilder.new(@conversation, user_message).build
     cmd = build_cmd(prompt)
     env = build_env
@@ -19,6 +19,7 @@ class AssistantOrchestrator
     result_text = +""
     stderr_acc = +""
     session_id = nil
+    exit_status = nil
 
     Open3.popen3(env, *cmd, chdir: Rails.root.to_s) do |stdin, stdout, stderr, wait_thr|
       stdin.close
@@ -57,13 +58,19 @@ class AssistantOrchestrator
       end
 
       stderr_thread.join
-      wait_thr.value
+      exit_status = wait_thr.value
 
       yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id }) if block_given?
     end
 
+    if result_text.empty? && !exit_status&.success?
+      Rails.logger.error("AssistantOrchestrator: claude exited #{exit_status&.exitstatus.inspect}, stderr=#{stderr_acc.strip.inspect}")
+      return { output: "", events: events, error: stderr_error_message(exit_status, stderr_acc), claude_session_id: session_id }
+    end
+
     { output: result_text, events: events, claude_session_id: session_id }
   rescue StandardError => e
+    Rails.logger.error("AssistantOrchestrator: #{e.class}: #{e.message}")
     { output: "", events: [], error: e.message, claude_session_id: nil }
   end
 
@@ -74,8 +81,9 @@ class AssistantOrchestrator
     cmd += ["--resume", @conversation.claude_session_id] if @conversation.claude_session_id.present?
     cmd += ["-p", "--output-format", "stream-json", "--verbose",
             "--model", MODEL,
-            "--permission-mode", "dontAsk",
-            "--allowedTools", ALLOWED_TOOLS]
+            "--permission-mode", "bypassPermissions",
+            "--tools", TOOLS]
+    cmd << "--"
     cmd << prompt
     cmd
   end
@@ -90,5 +98,12 @@ class AssistantOrchestrator
 
   def monotonic_now
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  def stderr_error_message(exit_status, stderr_acc)
+    snippet = stderr_acc.strip.lines.last(5).join.strip
+    snippet = snippet[0, 500] if snippet.length > 500
+    code = exit_status&.exitstatus
+    snippet.empty? ? "claude CLI exited #{code}" : "claude CLI exited #{code}: #{snippet}"
   end
 end
