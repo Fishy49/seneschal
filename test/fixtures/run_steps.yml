@@ -56,11 +56,11 @@ failed_step:
   claude_session_id: "sess_abc123"
 
 passed_step_with_todos:
-  run: completed_run
+  run: todo_run
   step: skill_step
   status: passed
   attempt: 1
-  position: 3
+  position: 1
   exit_code: 0
   started_at: <%= 2.hours.ago %>
   finished_at: <%= 90.minutes.ago %>

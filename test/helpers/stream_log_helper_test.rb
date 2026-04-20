@@ -118,36 +118,22 @@ class StreamLogHelperTest < ActionView::TestCase
 
   test "latest_todo_list returns last TodoWrite when multiple exist" do
     log = [
-      {
-        "type" => "assistant",
-        "message" => {
-          "content" => [{
-            "type" => "tool_use",
-            "name" => "TodoWrite",
-            "input" => { "todos" => [{ "content" => "Old", "status" => "pending" }] }
-          }]
-        }
-      },
-      {
-        "type" => "assistant",
-        "message" => {
-          "content" => [{
-            "type" => "tool_use",
-            "name" => "TodoWrite",
-            "input" => {
-              "todos" => [
-                { "content" => "Task 1", "status" => "completed" },
-                { "content" => "Task 2", "status" => "in_progress" },
-                { "content" => "Task 3", "status" => "pending" }
-              ]
-            }
-          }]
-        }
-      }
+      build_todo_event([{ "content" => "Old", "status" => "pending" }]),
+      build_todo_event([{ "content" => "Task 1", "status" => "completed" },
+                        { "content" => "Task 2", "status" => "in_progress" },
+                        { "content" => "Task 3", "status" => "pending" }])
     ]
     result = latest_todo_list(log)
-    assert_equal 3, result.length
-    assert_not result.map { |t| t["content"] }.join.include?("Old")
+    assert_equal ["Task 1", "Task 2", "Task 3"], result.pluck("content")
+  end
+
+  def build_todo_event(todos)
+    {
+      "type" => "assistant",
+      "message" => {
+        "content" => [{ "type" => "tool_use", "name" => "TodoWrite", "input" => { "todos" => todos } }]
+      }
+    }
   end
 
   test "latest_todo_list returns nil when no TodoWrite events" do

@@ -29,3 +29,11 @@ pending_run:
   status: pending
   context: {}
   input: {}
+
+todo_run:
+  workflow: deploy
+  status: completed
+  started_at: <%= 2.hours.ago %>
+  finished_at: <%= 90.minutes.ago %>
+  context: {}
+  input: {}
