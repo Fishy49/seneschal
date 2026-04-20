@@ -41,6 +41,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
+    prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     prompt = append_produces_instructions(prompt) if @step.produces.any?
@@ -377,6 +378,27 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     header = "## Recovery Context (round #{round})\n\nThe step \"#{step_name}\" failed. Here is the output from the failure:\n\n"
     failure = @context["previous_failure"].to_s.truncate(20_000)
     "#{header}```\n#{failure}\n```\n\nUsing the failure information above, complete the following task:\n\n#{prompt}"
+  end
+
+  def prepend_consumes_context(prompt)
+    blocks = @step.consumes.filter_map do |name|
+      value = @context[name] || @context[name.to_s] || @context[name.to_sym]
+      next if value.nil? || value.to_s.strip.empty?
+
+      "<#{name}>\n#{value}\n</#{name}>"
+    end
+    return prompt if blocks.empty?
+
+    <<~CONTEXT + prompt
+      ## Input Variables
+
+      The workflow has provided the following values for this step. Use them as input:
+
+      #{blocks.join("\n\n")}
+
+      ---
+
+    CONTEXT
   end
 
   def context_project_paths
