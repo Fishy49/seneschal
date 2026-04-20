@@ -17,7 +17,7 @@ module Assistant
         if project.save
           render json: project_json(project), status: :created
         else
-          render json: { errors: project.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: project.errors.full_messages }, status: :unprocessable_content
         end
       end
 
@@ -25,7 +25,7 @@ module Assistant
         if @project.update(project_params)
           render json: project_json(@project)
         else
-          render json: { errors: @project.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: @project.errors.full_messages }, status: :unprocessable_content
         end
       end
 

@@ -16,7 +16,7 @@ module Assistant
       test "GET index lists tasks" do
         get assistant_api_pipeline_tasks_path, headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_kind_of Array, data
       end
 

@@ -37,8 +37,10 @@ class AssistantPageContext
 
   def project_summary(id)
     return unless id
+
     project = Project.find_by(id: id)
     return unless project
+
     {
       id: project.id,
       name: project.name,
@@ -51,8 +53,10 @@ class AssistantPageContext
 
   def workflow_summary(id)
     return unless id
+
     workflow = Workflow.find_by(id: id)
     return unless workflow
+
     {
       id: workflow.id,
       name: workflow.name,
@@ -65,8 +69,10 @@ class AssistantPageContext
 
   def run_summary(id)
     return unless id
+
     run = Run.find_by(id: id)
     return unless run
+
     {
       id: run.id,
       status: run.status,
@@ -78,8 +84,10 @@ class AssistantPageContext
 
   def pipeline_task_summary(id)
     return unless id
+
     task = PipelineTask.find_by(id: id)
     return unless task
+
     {
       id: task.id,
       title: task.title,
@@ -91,8 +99,10 @@ class AssistantPageContext
 
   def skill_summary(id)
     return unless id
+
     skill = Skill.find_by(id: id)
     return unless skill
+
     {
       id: skill.id,
       name: skill.name,
@@ -103,8 +113,10 @@ class AssistantPageContext
 
   def step_template_summary(id)
     return unless id
+
     template = StepTemplate.find_by(id: id)
     return unless template
+
     {
       id: template.id,
       name: template.name,

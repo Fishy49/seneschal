@@ -4,7 +4,7 @@ require "rails/test_help"
 
 # Lightweight stub/mock helpers (Minitest 6 no longer ships Minitest::Mock).
 class Object
-  def stub(name, val_or_callable, &block)
+  def stub(name, val_or_callable, &)
     metaclass = singleton_class
     original = metaclass.instance_method(name) if metaclass.method_defined?(name) || metaclass.private_method_defined?(name)
     if val_or_callable.respond_to?(:call)
@@ -14,7 +14,11 @@ class Object
     end
     yield
   ensure
-    metaclass.send(:remove_method, name) rescue nil
+    begin
+      metaclass.send(:remove_method, name)
+    rescue StandardError
+      nil
+    end
     metaclass.send(:define_method, name, original) if original
   end
 end
@@ -30,7 +34,7 @@ module Minitest
       self
     end
 
-    def method_missing(name, *args, **kwargs, &_block)
+    def method_missing(name, *args, **kwargs, &)
       if (calls = @expected[name]) && calls.any?
         calls.shift[:retval]
       else
@@ -42,7 +46,7 @@ module Minitest
       @expected.key?(name) || super
     end
 
-    def verify
+    def verify # rubocop:disable Naming/PredicateMethod
       true
     end
   end

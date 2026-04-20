@@ -18,7 +18,7 @@ module Assistant
       test "GET index lists steps for workflow" do
         get assistant_api_project_workflow_steps_path(project_id: @project, workflow_id: @workflow), headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_kind_of Array, data
       end
 

@@ -17,7 +17,7 @@ module Assistant
         if skill.save
           render json: skill_json(skill), status: :created
         else
-          render json: { errors: skill.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: skill.errors.full_messages }, status: :unprocessable_content
         end
       end
 
@@ -25,7 +25,7 @@ module Assistant
         if @skill.update(skill_params)
           render json: skill_json(@skill)
         else
-          render json: { errors: @skill.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: @skill.errors.full_messages }, status: :unprocessable_content
         end
       end
 

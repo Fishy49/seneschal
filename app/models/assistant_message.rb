@@ -1,7 +1,7 @@
 class AssistantMessage < ApplicationRecord
   belongs_to :assistant_conversation
 
-  ROLES = %w[user assistant system tool_result].freeze
+  ROLES = ["user", "assistant", "system", "tool_result"].freeze
   validates :role, inclusion: { in: ROLES }
 
   after_create_commit :broadcast_append

@@ -15,7 +15,7 @@ module Assistant
         if step.save
           render json: step_json(step), status: :created
         else
-          render json: { errors: step.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: step.errors.full_messages }, status: :unprocessable_content
         end
       end
 
@@ -23,7 +23,7 @@ module Assistant
         if @step.update(step_params)
           render json: step_json(@step)
         else
-          render json: { errors: @step.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: @step.errors.full_messages }, status: :unprocessable_content
         end
       end
 

@@ -19,7 +19,7 @@ module Assistant
             params: { path: "/projects/#{project.id}" },
             headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_equal "projects", data["controller"]
         assert_equal project.id, data.dig("record", "id")
         assert_equal project.name, data.dig("record", "name")
@@ -30,7 +30,7 @@ module Assistant
             params: { path: "/nonexistent/path/xyz" },
             headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_equal "/nonexistent/path/xyz", data["path"]
       end
 

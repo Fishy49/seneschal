@@ -18,7 +18,7 @@ module Assistant
         if workflow.save
           render json: workflow_json(workflow), status: :created
         else
-          render json: { errors: workflow.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: workflow.errors.full_messages }, status: :unprocessable_content
         end
       end
 
@@ -26,7 +26,7 @@ module Assistant
         if @workflow.update(workflow_params)
           render json: workflow_json(@workflow)
         else
-          render json: { errors: @workflow.errors.full_messages }, status: :unprocessable_entity
+          render json: { errors: @workflow.errors.full_messages }, status: :unprocessable_content
         end
       end
 

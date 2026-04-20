@@ -51,19 +51,19 @@ class RunAssistantTurnJobTest < ActiveJob::TestCase
 
   test "handles missing conversation gracefully" do
     assert_nothing_raised do
-      RunAssistantTurnJob.perform_now(99999999)
+      RunAssistantTurnJob.perform_now(99_999_999)
     end
   end
 
   private
 
-  def stub_orchestrator(output: "", events: [], session_id: nil, error: nil, &block)
+  def stub_orchestrator(output: "", events: [], session_id: nil, error: nil, &)
     result = { output: output, events: events, claude_session_id: session_id }
     result[:error] = error if error
 
     mock_orchestrator = Object.new
     mock_orchestrator.define_singleton_method(:run) { |_msg, &_blk| result }
 
-    AssistantOrchestrator.stub(:new, ->(_conv) { mock_orchestrator }, &block)
+    AssistantOrchestrator.stub(:new, ->(_conv) { mock_orchestrator }, &)
   end
 end

@@ -18,9 +18,9 @@ module Assistant
       test "GET index lists workflows for project" do
         get assistant_api_project_workflows_path(project_id: @project), headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_kind_of Array, data
-        names = data.map { |w| w["name"] }
+        names = data.pluck("name")
         assert_includes names, @workflow.name
       end
 
@@ -31,7 +31,7 @@ module Assistant
                headers: auth_headers
         end
         assert_response :created
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_equal "New Workflow", data["name"]
       end
 

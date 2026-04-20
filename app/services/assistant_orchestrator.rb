@@ -10,7 +10,7 @@ class AssistantOrchestrator
     @conversation = conversation
   end
 
-  def run(user_message, &block)
+  def run(user_message, &block) # rubocop:disable Metrics/AbcSize
     prompt = AssistantPromptBuilder.new(@conversation, user_message).build
     cmd = build_cmd(prompt)
     env = build_env
@@ -30,10 +30,10 @@ class AssistantOrchestrator
         next if line.empty?
 
         event = begin
-                  JSON.parse(line)
-                rescue JSON::ParserError
-                  next
-                end
+          JSON.parse(line)
+        rescue JSON::ParserError
+          next
+        end
 
         events << event
         events.shift if events.size > MAX_EVENTS

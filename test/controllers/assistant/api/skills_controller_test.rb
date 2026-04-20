@@ -16,7 +16,7 @@ module Assistant
       test "GET index lists skills" do
         get assistant_api_skills_path, headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_kind_of Array, data
       end
 
@@ -27,7 +27,7 @@ module Assistant
                headers: auth_headers
         end
         assert_response :created
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert data["shared"]
       end
 
@@ -39,7 +39,7 @@ module Assistant
                headers: auth_headers
         end
         assert_response :created
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_equal project.id, data["project_id"]
       end
 

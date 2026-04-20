@@ -4,7 +4,7 @@ class AssistantToolCatalogTest < ActiveSupport::TestCase
   test "markdown returns a non-empty string" do
     result = AssistantToolCatalog.markdown
     assert_kind_of String, result
-    assert result.length > 0
+    assert result.length.positive?
   end
 
   test "markdown includes key API endpoints" do

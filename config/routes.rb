@@ -94,16 +94,16 @@ Rails.application.routes.draw do
     end
   end
 
-  resource :assistant_conversation, only: %i[show create destroy] do
+  resource :assistant_conversation, only: [:show, :create, :destroy] do
     resources :assistant_messages, only: [:create]
   end
 
   namespace :assistant do
     namespace :api do
-      resources :projects, only: %i[index show create update] do
-        resources :workflows, only: %i[index show create update destroy] do
+      resources :projects, only: [:index, :show, :create, :update] do
+        resources :workflows, only: [:index, :show, :create, :update, :destroy] do
           member { post :trigger }
-          resources :steps, only: %i[index create update destroy] do
+          resources :steps, only: [:index, :create, :update, :destroy] do
             collection { post :reorder }
           end
         end

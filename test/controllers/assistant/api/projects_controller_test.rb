@@ -11,7 +11,7 @@ module Assistant
       test "GET index returns projects with valid token" do
         get assistant_api_projects_path, headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_kind_of Array, data
       end
 
@@ -29,7 +29,7 @@ module Assistant
         project = projects(:seneschal)
         get assistant_api_project_path(project), headers: auth_headers
         assert_response :success
-        data = JSON.parse(response.body)
+        data = response.parsed_body
         assert_equal project.id, data["id"]
         assert_equal project.name, data["name"]
       end

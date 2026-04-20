@@ -12,7 +12,7 @@ class AssistantMessageTest < ActiveSupport::TestCase
   end
 
   test "accepts valid roles" do
-    %w[user assistant system tool_result].each do |role|
+    ["user", "assistant", "system", "tool_result"].each do |role|
       msg = AssistantMessage.new(
         assistant_conversation: assistant_conversations(:admin_conversation),
         role: role,

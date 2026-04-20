@@ -75,9 +75,9 @@ class AssistantFlowTest < ActionDispatch::IntegrationTest
 
   private
 
-  def stub_orchestrator_for_test(&block)
+  def stub_orchestrator_for_test(&)
     mock_orch = Object.new
     mock_orch.define_singleton_method(:run) { |_msg, &_blk| { output: "done", events: [], claude_session_id: nil } }
-    AssistantOrchestrator.stub(:new, ->(_c) { mock_orch }, &block)
+    AssistantOrchestrator.stub(:new, ->(_c) { mock_orch }, &)
   end
 end
