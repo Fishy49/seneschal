@@ -283,7 +283,7 @@
       <% else %>
         <p class="text-xs text-content-muted py-2">No variables available at this position. Global variables are always accessible.</p>
       <% end %>
-      <p class="text-xs text-content-muted mt-1">Variables this step needs. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
+      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
     </div>
   </div>
 
