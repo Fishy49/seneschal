@@ -46,6 +46,14 @@ module StreamLogHelper
       "#{input["pattern"]}#{" in #{short_path(input["path"])}" if input["path"].present?}"
     when "WebSearch", "WebFetch"
       input["query"].to_s.truncate(80)
+    when "TodoWrite"
+      todos = input["todos"]
+      if todos.is_a?(Array) && todos.any?
+        counts = todos.group_by { |t| t["status"].to_s }.transform_values(&:size)
+        "#{todos.size} todos (#{counts["in_progress"].to_i} in progress, #{counts["pending"].to_i} pending, #{counts["completed"].to_i} completed)"
+      else
+        input.to_s.truncate(80)
+      end
     else
       input.to_s.truncate(80)
     end
@@ -54,8 +62,46 @@ module StreamLogHelper
   TOOL_ICONS = {
     "Read" => "eye", "Edit" => "pencil", "Write" => "file-plus",
     "Bash" => "terminal", "Glob" => "search", "Grep" => "search",
-    "Agent" => "cpu", "WebSearch" => "globe", "WebFetch" => "globe"
+    "Agent" => "cpu", "WebSearch" => "globe", "WebFetch" => "globe",
+    "TodoWrite" => "check-square"
   }.freeze
+
+  TODO_STATUS_ICONS = {
+    "completed" => "✓",
+    "in_progress" => "▸",
+    "pending" => "○"
+  }.freeze
+
+  TODO_STATUS_CLASSES = {
+    "completed" => "text-success line-through",
+    "in_progress" => "text-accent font-semibold",
+    "pending" => "text-content-muted"
+  }.freeze
+
+  def latest_todo_list(stream_log)
+    return nil unless stream_log.is_a?(Array)
+
+    stream_log.reverse_each do |event|
+      next unless event["type"] == "assistant"
+
+      content = event.dig("message", "content") || []
+      block = content.select { |b| b["type"] == "tool_use" && b["name"] == "TodoWrite" }.last
+      next unless block
+
+      todos = block.dig("input", "todos")
+      return todos if todos.is_a?(Array) && todos.any?
+    end
+
+    nil
+  end
+
+  def todo_status_icon(status)
+    TODO_STATUS_ICONS[status] || TODO_STATUS_ICONS["pending"]
+  end
+
+  def todo_status_class(status)
+    TODO_STATUS_CLASSES[status] || TODO_STATUS_CLASSES["pending"]
+  end
 
   def tool_icon_class(tool)
     TOOL_ICONS[tool] || "zap"
