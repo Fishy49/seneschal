@@ -56,6 +56,10 @@ Metrics/AbcSize:
 Metrics/ClassLength:
   Max: 300
 
+Metrics/ModuleLength:
+  Exclude:
+    - "app/helpers/stream_log_helper.rb"
+
 Metrics/BlockLength:
   Exclude:
     - "config/routes.rb"

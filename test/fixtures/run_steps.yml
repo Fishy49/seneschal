@@ -54,3 +54,54 @@ failed_step:
   finished_at: <%= 1.hour.ago %>
   duration: 60.0
   claude_session_id: "sess_abc123"
+
+passed_step_with_todos:
+  run: todo_run
+  step: skill_step
+  status: passed
+  attempt: 1
+  position: 1
+  exit_code: 0
+  started_at: <%= 2.hours.ago %>
+  finished_at: <%= 90.minutes.ago %>
+  duration: 1800.0
+  stream_log:
+    - type: system
+      model: claude-sonnet-4-20250514
+    - type: assistant
+      message:
+        content:
+          - type: tool_use
+            name: TodoWrite
+            id: tu_001
+            input:
+              todos:
+                - content: Old
+                  activeForm: Doing old
+                  status: pending
+    - type: assistant
+      message:
+        content:
+          - type: tool_use
+            name: TodoWrite
+            id: tu_002
+            input:
+              todos:
+                - content: Explore code
+                  activeForm: Exploring code
+                  status: completed
+                - content: Write plan
+                  activeForm: Writing plan
+                  status: in_progress
+                - content: Review plan
+                  activeForm: Reviewing plan
+                  status: pending
+    - type: result
+      total_cost_usd: 0.02
+      num_turns: 4
+      duration_ms: 30000
+      usage:
+        input_tokens: 10000
+        output_tokens: 2000
+        cache_read_input_tokens: 3000
+        cache_creation_input_tokens: 500
