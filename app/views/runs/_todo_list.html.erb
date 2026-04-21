@@ -1,0 +1,15 @@
+<% todos = latest_todo_list(run_step.stream_log) %>
+<% if todos.present? %>
+  <% completed_count = todos.count { |t| t["status"] == "completed" } %>
+  <div id="todo_list_<%= run_step.id %>" class="mt-2 rounded-lg bg-surface border border-edge p-3 space-y-1">
+    <div class="text-xs font-semibold text-content-muted">Todo list <span class="font-normal">(<%= completed_count %>/<%= todos.size %>)</span></div>
+    <% todos.each do |todo| %>
+      <% status = todo["status"].to_s %>
+      <% text = (status == "in_progress" && todo["activeForm"].present?) ? todo["activeForm"] : todo["content"] %>
+      <div class="flex items-start gap-2">
+        <span class="text-xs shrink-0 mt-0.5"><%= todo_status_icon(status) %></span>
+        <span class="text-xs <%= todo_status_class(status) %>"><%= text %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>

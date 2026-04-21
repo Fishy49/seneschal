@@ -35,6 +35,7 @@
         </div>
       </details>
     <% end %>
+    <%= render "runs/todo_list", run_step: run_step %>
     <% if run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
       <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
       <details class="mt-1" <%= "open" if run_step.status.in?(%w[running retrying]) %>>
