@@ -119,7 +119,7 @@ class StepExecutorTest < ActiveSupport::TestCase
 
     @ready.update!(markdown_context: "# Brand New\n\nFresh policy.")
 
-    executor2 = StepExecutor.new(@step, {}, @ready.local_path)
+    executor2 = StepExecutor.new(Step.find(@step.id), {}, @ready.local_path)
     prompt2 = executor2.send(:prepend_project_context, "body")
 
     assert_includes prompt1, "Always use double quotes"

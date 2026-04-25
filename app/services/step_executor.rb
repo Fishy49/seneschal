@@ -379,9 +379,16 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def prepend_project_context(prompt)
     project = project_for_step
-    return prompt unless project&.markdown_context.present?
+    return prompt if project&.markdown_context.blank?
 
-    "## Project Context\n\n#{project.markdown_context}\n---\n\n#{prompt}"
+    <<~CONTEXT + prompt
+      ## Project Context
+
+      #{project.markdown_context}
+
+      ---
+
+    CONTEXT
   end
 
   def prepend_failure_context(prompt)
