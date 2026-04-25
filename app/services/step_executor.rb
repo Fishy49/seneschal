@@ -41,6 +41,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
+    prompt = prepend_project_context(prompt)
     prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
@@ -370,6 +371,24 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     )
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
     vars
+  end
+
+  def project_for_step
+    @project_for_step ||= @step.workflow&.project || @step.run&.workflow&.project
+  end
+
+  def prepend_project_context(prompt)
+    project = project_for_step
+    return prompt if project&.markdown_context.blank?
+
+    <<~CONTEXT + prompt
+      ## Project Context
+
+      #{project.markdown_context}
+
+      ---
+
+    CONTEXT
   end
 
   def prepend_failure_context(prompt)

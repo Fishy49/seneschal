@@ -76,4 +76,55 @@ class StepExecutorTest < ActiveSupport::TestCase
 
     assert_equal "skill body", prompt
   end
+
+  test "execute_skill prepends project markdown_context to prompt" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    prompt = executor.send(:prepend_project_context, "skill body here")
+
+    assert_includes prompt, "## Project Context"
+    assert_includes prompt, "Always use double quotes for strings"
+    assert prompt.end_with?("skill body here")
+  end
+
+  test "prepend_project_context handles ad-hoc step via run.workflow.project" do
+    workflow = workflows(:deploy)
+    run = workflow.runs.create!(status: "running", context: {})
+    ad_hoc_step = Step.create!(
+      run: run,
+      name: "ad-hoc",
+      step_type: "skill",
+      skill: skills(:project_skill),
+      position: 1,
+      timeout: 300,
+      max_retries: 0,
+      config: {}
+    )
+    executor = StepExecutor.new(ad_hoc_step, {}, @ready.local_path)
+    prompt = executor.send(:prepend_project_context, "body")
+
+    assert_includes prompt, "Project Context"
+  end
+
+  test "prepend_project_context returns prompt unchanged when markdown_context is blank" do
+    @ready.update!(markdown_context: nil)
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    prompt = executor.send(:prepend_project_context, "raw prompt")
+
+    assert_equal "raw prompt", prompt
+  end
+
+  test "prepend_project_context reads markdown_context fresh at execution time" do
+    executor1 = StepExecutor.new(@step, {}, @ready.local_path)
+    prompt1 = executor1.send(:prepend_project_context, "body")
+
+    @ready.update!(markdown_context: "# Brand New\n\nFresh policy.")
+
+    executor2 = StepExecutor.new(Step.find(@step.id), {}, @ready.local_path)
+    prompt2 = executor2.send(:prepend_project_context, "body")
+
+    assert_includes prompt1, "Always use double quotes"
+    assert_includes prompt2, "Brand New"
+    assert_includes prompt2, "Fresh policy"
+    assert_not_includes prompt2, "Always use double quotes"
+  end
 end

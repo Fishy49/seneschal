@@ -107,4 +107,24 @@ class ProjectTest < ActiveSupport::TestCase
       assert_equal "ready", project.repo_status
     end
   end
+
+  test "project valid without markdown_context" do
+    project = Project.new(
+      name: "NoCtx",
+      repo_url: "https://github.com/test/noctx.git",
+      local_path: Rails.root.join("tmp/test_repos/noctx").to_s
+    )
+    assert project.valid?
+    assert_nil project.markdown_context
+  end
+
+  test "markdown_context persists round-trip" do
+    p = Project.create!(
+      name: "CtxPersist",
+      repo_url: "https://github.com/test/ctxpersist.git",
+      local_path: Rails.root.join("tmp/test_repos/ctxpersist").to_s,
+      markdown_context: "# Title\n- item"
+    )
+    assert_equal "# Title\n- item", Project.find(p.id).markdown_context
+  end
 end

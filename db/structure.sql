@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL /*application='Seneschal'*/);
+CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL /*application='Seneschal'*/, "markdown_context" text);
 CREATE TABLE IF NOT EXISTS "pipeline_tasks" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "kind" varchar DEFAULT 'feature' NOT NULL, "project_id" integer NOT NULL, "status" varchar DEFAULT 'draft' NOT NULL, "title" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer, "archived_at" datetime(6) /*application='Seneschal'*/, "context_files" json DEFAULT '[]' /*application='Seneschal'*/, "trigger_type" varchar DEFAULT 'manual' NOT NULL, "trigger_config" json DEFAULT '{}' NOT NULL, CONSTRAINT "fk_rails_03c1924935"
 FOREIGN KEY ("project_id")
   REFERENCES "projects" ("id")
@@ -84,6 +84,7 @@ CREATE INDEX "index_step_templates_on_skill_id" ON "step_templates" ("skill_id")
 CREATE UNIQUE INDEX "index_step_templates_on_name" ON "step_templates" ("name") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_trigger_type" ON "pipeline_tasks" ("trigger_type");
 INSERT INTO "schema_migrations" (version) VALUES
+('20260425000001'),
 ('20260419025604'),
 ('20260417141730'),
 ('20260413044358'),

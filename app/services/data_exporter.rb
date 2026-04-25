@@ -51,6 +51,7 @@ class DataExporter
       repo_url: project.repo_url,
       local_path: project.local_path,
       description: project.description,
+      markdown_context: project.markdown_context,
       workflows: project.workflows.sort_by(&:name).map { |w| export_workflow(w) },
       tasks: project.pipeline_tasks.sort_by(&:title).map { |t| export_task(t) }
     }

@@ -58,6 +58,7 @@ class DataImporter
         repo_url: proj_attrs[:repo_url],
         local_path: proj_attrs[:local_path],
         description: proj_attrs[:description],
+        markdown_context: proj_attrs[:markdown_context],
         repo_status: "not_cloned"
       )
       project.save!(validate: false)

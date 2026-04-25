@@ -70,6 +70,6 @@ class ProjectsController < ApplicationController
   end
 
   def project_params
-    params.expect(project: [:name, :repo_url, :local_path, :description])
+    params.expect(project: [:name, :repo_url, :local_path, :description, :markdown_context])
   end
 end
