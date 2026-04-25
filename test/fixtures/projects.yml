@@ -4,6 +4,10 @@ seneschal:
   local_path: <%= Rails.root.join("tmp", "test_repos", "seneschal") %>
   repo_status: ready
   description: Test project
+  markdown_context: |
+    # Project Guidelines
+
+    Always use double quotes for strings in this codebase.
 
 other_project:
   name: OtherProject

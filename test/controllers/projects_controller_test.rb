@@ -75,4 +75,39 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     get projects_path
     assert_redirected_to login_path
   end
+
+  test "POST create stores markdown_context" do
+    assert_difference "Project.count", 1 do
+      post projects_path, params: {
+        project: {
+          name: "WithCtx",
+          repo_url: "https://github.com/test/withctx.git",
+          local_path: Rails.root.join("tmp/test_repos/withctx").to_s,
+          markdown_context: "# Hello\n\nGuidelines here."
+        }
+      }
+    end
+    assert_redirected_to project_path(Project.last)
+    assert_equal "# Hello\n\nGuidelines here.", Project.last.markdown_context
+  end
+
+  test "PATCH update modifies markdown_context" do
+    patch project_path(projects(:seneschal)), params: {
+      project: { markdown_context: "# Updated\n\nNew guidelines." }
+    }
+    assert_redirected_to project_path(projects(:seneschal))
+    assert_equal "# Updated\n\nNew guidelines.", projects(:seneschal).reload.markdown_context
+  end
+
+  test "GET new and edit render markdown_context preview field" do
+    get new_project_path
+    assert_response :success
+    assert_select "div[data-controller=\"code-editor\"]"
+    assert_select "input[name=\"project[markdown_context]\"][type=\"hidden\"]"
+
+    get edit_project_path(projects(:seneschal))
+    assert_response :success
+    assert_select "div[data-controller=\"code-editor\"]"
+    assert_select "input[name=\"project[markdown_context]\"][type=\"hidden\"]"
+  end
 end

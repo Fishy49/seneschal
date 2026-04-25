@@ -41,6 +41,15 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y min-h-20" %>
   </div>
 
+  <div class="mb-4" data-controller="code-editor">
+    <%= f.label :markdown_context, "Project Context (Markdown)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <p class="text-sm text-content-muted mb-2">Shared guidance auto-injected into Claude Code CLI invocations for every workflow step under this project. Optional.</p>
+    <div class="codejar-wrap">
+      <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
+    </div>
+    <%= f.hidden_field :markdown_context, data: { code_editor_target: "input" } %>
+  </div>
+
   <div class="flex gap-2">
     <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
     <%= link_to "Cancel", projects_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
