@@ -44,20 +44,47 @@
           <div class="pl-3" data-sidebar-toggle-target="list" style="display:none">
             <% ProjectGroup.ordered.includes(:projects).each do |group| %>
               <% next if group.projects.empty? %>
-              <p class="px-3 py-1 text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide mt-1"><%= group.name %></p>
-              <% group.projects.order(:name).each do |project| %>
-                <%= link_to project.name, project_path(project),
-                      class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
-              <% end %>
+              <div data-controller="sidebar-toggle"
+                   data-sidebar-toggle-storage-key-value="sidebar_group_<%= group.id %>_open"
+                   data-sidebar-toggle-default-open-value="true">
+                <button type="button"
+                        class="w-full flex items-center gap-1.5 px-3 py-1 mt-1 bg-transparent border-none text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide cursor-pointer hover:text-content rounded-lg"
+                        data-action="sidebar-toggle#toggle">
+                  <span class="text-[0.625rem] leading-none" data-sidebar-toggle-target="icon">▾</span>
+                  <span><%= group.name %></span>
+                </button>
+                <div data-sidebar-toggle-target="list">
+                  <% group.projects.order(:name).each do |project| %>
+                    <%= link_to project.name, project_path(project),
+                          class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+                  <% end %>
+                </div>
+              </div>
             <% end %>
             <% ungrouped = Project.where(project_group_id: nil).order(:name) %>
             <% if ungrouped.any? %>
               <% if ProjectGroup.exists? %>
-                <p class="px-3 py-1 text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide mt-1">Ungrouped</p>
-              <% end %>
-              <% ungrouped.each do |project| %>
-                <%= link_to project.name, project_path(project),
-                      class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+                <div data-controller="sidebar-toggle"
+                     data-sidebar-toggle-storage-key-value="sidebar_group_ungrouped_open"
+                     data-sidebar-toggle-default-open-value="true">
+                  <button type="button"
+                          class="w-full flex items-center gap-1.5 px-3 py-1 mt-1 bg-transparent border-none text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide cursor-pointer hover:text-content rounded-lg"
+                          data-action="sidebar-toggle#toggle">
+                    <span class="text-[0.625rem] leading-none" data-sidebar-toggle-target="icon">▾</span>
+                    <span>Ungrouped</span>
+                  </button>
+                  <div data-sidebar-toggle-target="list">
+                    <% ungrouped.each do |project| %>
+                      <%= link_to project.name, project_path(project),
+                            class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+                    <% end %>
+                  </div>
+                </div>
+              <% else %>
+                <% ungrouped.each do |project| %>
+                  <%= link_to project.name, project_path(project),
+                        class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+                <% end %>
               <% end %>
             <% end %>
           </div>
