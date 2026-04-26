@@ -1,0 +1,37 @@
+<% sections = step_context_sources(run_step) %>
+<div class="inline-block" data-controller="step-context-modal" data-step-context-modal-title-value="Context for &quot;<%= run_step.step.name %>&quot;">
+  <button type="button"
+          data-action="step-context-modal#open"
+          class="inline-flex items-center gap-1 px-2 py-0.5 bg-transparent border border-edge text-content-muted rounded text-[0.75rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+    View Context
+  </button>
+  <template data-step-context-modal-target="template">
+    <div class="space-y-3">
+      <p class="text-sm text-content-muted">All context Claude sees for this step, in order. Sections appear top-to-bottom in the assembled prompt; CLAUDE.md is read separately by Claude Code itself.</p>
+      <% sections.each do |section| %>
+        <details class="border border-edge rounded-lg" <%= "open" if section[:key] == "input_context" && section[:content].present? %>>
+          <summary class="cursor-pointer select-none px-3 py-2 flex items-center justify-between gap-2 hover:bg-surface-input rounded-lg">
+            <div class="flex flex-col">
+              <span class="text-sm font-semibold"><%= section[:title] %></span>
+              <% if section[:subtitle].present? %>
+                <span class="text-xs text-content-muted font-mono"><%= section[:subtitle] %></span>
+              <% end %>
+            </div>
+            <% if section[:content].present? %>
+              <span class="text-[0.6875rem] text-content-muted shrink-0"><%= number_with_delimiter(section[:content].length) %> chars</span>
+            <% else %>
+              <span class="text-[0.6875rem] text-content-muted shrink-0">empty</span>
+            <% end %>
+          </summary>
+          <div class="px-3 py-2 border-t border-edge">
+            <% if section[:content].present? %>
+              <pre class="whitespace-pre-wrap break-words text-xs font-mono text-content max-h-96 overflow-y-auto"><%= section[:content] %></pre>
+            <% else %>
+              <p class="text-xs text-content-muted italic"><%= section[:blank] %></p>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  </template>
+</div>
