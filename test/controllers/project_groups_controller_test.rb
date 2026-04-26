@@ -30,6 +30,24 @@ class ProjectGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
   end
 
+  test "POST create as JSON returns id and name on success" do
+    assert_difference "ProjectGroup.count", 1 do
+      post project_groups_path(format: :json), params: { project_group: { name: "Mobile" } }
+    end
+    assert_response :created
+    body = response.parsed_body
+    assert_equal "Mobile", body["name"]
+    assert_equal ProjectGroup.find_by(name: "Mobile").id, body["id"]
+  end
+
+  test "POST create as JSON returns errors on failure" do
+    assert_no_difference "ProjectGroup.count" do
+      post project_groups_path(format: :json), params: { project_group: { name: "" } }
+    end
+    assert_response :unprocessable_content
+    assert_includes response.parsed_body["errors"].join(" "), "Name"
+  end
+
   test "GET edit renders form" do
     get edit_project_group_path(project_groups(:frontend))
     assert_response :success

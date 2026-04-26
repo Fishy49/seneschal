@@ -14,9 +14,15 @@ class ProjectGroupsController < ApplicationController
   def create
     @group = ProjectGroup.new(group_params)
     if @group.save
-      redirect_to project_groups_path, notice: "Group created."
+      respond_to do |format|
+        format.html { redirect_to project_groups_path, notice: "Group created." }
+        format.json { render json: { id: @group.id, name: @group.name }, status: :created }
+      end
     else
-      render :new, status: :unprocessable_content
+      respond_to do |format|
+        format.html { render :new, status: :unprocessable_content }
+        format.json { render json: { errors: @group.errors.full_messages }, status: :unprocessable_content }
+      end
     end
   end
 
