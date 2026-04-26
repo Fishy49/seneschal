@@ -70,14 +70,14 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     run = workflows(:deploy).runs.create!(status: "running", context: {})
     get run_path(run)
     assert_response :success
-    assert_match /Danger Mode/, response.body
+    assert_match(/Danger Mode/, response.body)
   end
 
   test "GET runs index shows danger indicator next to runs" do
     projects(:seneschal).update!(skip_permissions: true)
-    run = workflows(:deploy).runs.create!(status: "running", context: {})
+    workflows(:deploy).runs.create!(status: "running", context: {})
     get runs_path
     assert_response :success
-    assert_match /Danger Mode/, response.body
+    assert_match(/Danger Mode/, response.body)
   end
 end

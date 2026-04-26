@@ -73,7 +73,7 @@ class DataExporterTest < ActiveSupport::TestCase
     data = DataExporter.new.call
     export = data[:seneschal_export]
 
-    assert export[:project_groups].any? { |g| g[:name] == "Frontend" }
+    assert(export[:project_groups].any? { |g| g[:name] == "Frontend" })
 
     seneschal_entry = export[:projects].find { |p| p[:name] == "Seneschal" }
     assert_not_nil seneschal_entry

@@ -8,7 +8,7 @@ class Project < ApplicationRecord
   has_one :code_map, dependent: :destroy
 
   scope :ordered, -> { order(:name) }
-  scope :in_group, ->(group_id) {
+  scope :in_group, lambda { |group_id|
     group_id == "none" ? where(project_group_id: nil) : where(project_group_id: group_id)
   }
 
