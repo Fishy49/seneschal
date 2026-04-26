@@ -4,6 +4,7 @@ class DataExporter
       seneschal_export: {
         version: 1,
         exported_at: Time.current.iso8601,
+        project_groups: export_project_groups,
         skills: export_skills,
         step_templates: export_step_templates,
         projects: export_projects
@@ -12,6 +13,15 @@ class DataExporter
   end
 
   private
+
+  def export_project_groups
+    ProjectGroup.order(:name).map do |group|
+      {
+        name: group.name,
+        description: group.description
+      }
+    end
+  end
 
   def export_skills
     Skill.includes(:project).order(:name).map do |skill|
@@ -52,6 +62,8 @@ class DataExporter
       local_path: project.local_path,
       description: project.description,
       markdown_context: project.markdown_context,
+      project_group_name: project.project_group&.name,
+      skip_permissions: project.skip_permissions,
       workflows: project.workflows.sort_by(&:name).map { |w| export_workflow(w) },
       tasks: project.pipeline_tasks.sort_by(&:title).map { |t| export_task(t) }
     }

@@ -35,19 +35,35 @@
           <div class="flex items-center justify-between">
             <%= link_to "Projects", projects_path,
                   class: "flex-1 block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'projects' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-            <% if (projects = Project.order(:name)).any? %>
+            <% if Project.exists? %>
               <button type="button" class="bg-transparent border-none text-content-muted cursor-pointer px-2 py-1 text-xs rounded-lg hover:text-content hover:bg-surface-input" data-action="sidebar-toggle#toggle" data-sidebar-toggle-target="btn">
                 <span data-sidebar-toggle-target="icon">&#9656;</span>
               </button>
             <% end %>
           </div>
           <div class="pl-3" data-sidebar-toggle-target="list" style="display:none">
-            <% projects.each do |project| %>
-              <%= link_to project.name, project_path(project),
-                    class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+            <% ProjectGroup.ordered.includes(:projects).each do |group| %>
+              <% next if group.projects.empty? %>
+              <p class="px-3 py-1 text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide mt-1"><%= group.name %></p>
+              <% group.projects.order(:name).each do |project| %>
+                <%= link_to project.name, project_path(project),
+                      class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+              <% end %>
+            <% end %>
+            <% ungrouped = Project.where(project_group_id: nil).order(:name) %>
+            <% if ungrouped.any? %>
+              <% if ProjectGroup.exists? %>
+                <p class="px-3 py-1 text-[0.75rem] font-semibold text-content-muted uppercase tracking-wide mt-1">Ungrouped</p>
+              <% end %>
+              <% ungrouped.each do |project| %>
+                <%= link_to project.name, project_path(project),
+                      class: "block px-3 py-1 rounded-lg text-[0.8125rem] transition-colors #{(controller_name == 'projects' && params[:id].to_s == project.id.to_s) ? 'text-content' : 'text-content-muted opacity-80 hover:opacity-100 hover:text-content'}" %>
+              <% end %>
             <% end %>
           </div>
         </div>
+        <%= link_to "Groups", project_groups_path,
+              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'project_groups' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Tasks", pipeline_tasks_path,
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'pipeline_tasks' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Skills", skills_path,

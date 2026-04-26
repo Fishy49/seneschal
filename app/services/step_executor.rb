@@ -198,12 +198,16 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     effort = @step.config["effort"].presence || "medium"
     cmd += ["--effort", effort]
 
-    cmd += ["--permission-mode", "dontAsk"]
+    if project_for_step&.skip_permissions?
+      cmd += ["--dangerously-skip-permissions"]
+    else
+      cmd += ["--permission-mode", "dontAsk"]
 
-    allowed = @step.config["allowed_tools"].presence ||
-              Setting["default_allowed_tools"].presence ||
-              DEFAULT_ALLOWED_TOOLS
-    cmd += ["--allowedTools", allowed]
+      allowed = @step.config["allowed_tools"].presence ||
+                Setting["default_allowed_tools"].presence ||
+                DEFAULT_ALLOWED_TOOLS
+      cmd += ["--allowedTools", allowed]
+    end
 
     context_project_paths.each { |path| cmd += ["--add-dir", path] }
 

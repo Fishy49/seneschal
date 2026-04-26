@@ -54,6 +54,7 @@ Rails.application.routes.draw do
       member do
         post :trigger
       end
+      resource :copy, only: [:new, :create], controller: "workflow_copies"
       resources :steps, only: [:new, :create, :edit, :update, :destroy] do
         collection do
           patch :reorder
@@ -67,6 +68,7 @@ Rails.application.routes.draw do
   end
 
   resources :skills
+  resources :project_groups
   resources :step_templates, path: "templates", only: [:index, :destroy]
 
   # Data management (admin only)

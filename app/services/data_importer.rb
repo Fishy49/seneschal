@@ -4,6 +4,7 @@ class DataImporter
   def initialize(data)
     @data = data.deep_symbolize_keys[:seneschal_export]
     @skill_map = {}
+    @group_map = {}
     @stats = Hash.new(0)
   end
 
@@ -11,6 +12,7 @@ class DataImporter
     validate!
     ActiveRecord::Base.transaction do
       wipe!
+      import_project_groups
       import_skills
       import_projects
       import_step_templates
@@ -34,6 +36,18 @@ class DataImporter
     Workflow.delete_all
     Skill.delete_all
     Project.delete_all
+    ProjectGroup.delete_all
+  end
+
+  def import_project_groups
+    (@data[:project_groups] || []).each do |attrs|
+      group = ProjectGroup.create!(
+        name: attrs[:name],
+        description: attrs[:description]
+      )
+      @group_map[attrs[:name]] = group
+      @stats[:project_groups] += 1
+    end
   end
 
   def import_skills
@@ -59,6 +73,8 @@ class DataImporter
         local_path: proj_attrs[:local_path],
         description: proj_attrs[:description],
         markdown_context: proj_attrs[:markdown_context],
+        project_group: @group_map[proj_attrs[:project_group_name]],
+        skip_permissions: proj_attrs[:skip_permissions] || false,
         repo_status: "not_cloned"
       )
       project.save!(validate: false)

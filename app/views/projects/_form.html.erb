@@ -41,6 +41,14 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y min-h-20" %>
   </div>
 
+  <div class="mb-4">
+    <%= f.label :project_group_id, "Project Group", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.select :project_group_id,
+          options_for_select(ProjectGroup.ordered.pluck(:name, :id), project.project_group_id),
+          { include_blank: "(no group)" },
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+  </div>
+
   <div class="mb-4" data-controller="code-editor">
     <%= f.label :markdown_context, "Project Context (Markdown)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
     <p class="text-sm text-content-muted mb-2">Shared guidance auto-injected into Claude Code CLI invocations for every workflow step under this project. Optional.</p>
@@ -48,6 +56,19 @@
       <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
     </div>
     <%= f.hidden_field :markdown_context, data: { code_editor_target: "input" } %>
+  </div>
+
+  <div class="mb-6 p-4 bg-danger/5 border border-danger/30 rounded-lg">
+    <div class="flex items-start gap-3">
+      <div class="flex-1">
+        <label class="block text-sm font-semibold text-danger mb-1">Danger Mode</label>
+        <p class="text-sm text-content-muted mb-3">When enabled, Claude will run with <code class="font-mono text-xs bg-surface-input px-1 py-0.5 rounded">--dangerously-skip-permissions</code> and may take destructive actions without confirmation. Use only in trusted, isolated environments.</p>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <%= f.check_box :skip_permissions, class: "w-4 h-4 accent-danger" %>
+          <span class="text-sm text-content">Enable danger mode for this project</span>
+        </label>
+      </div>
+    </div>
   </div>
 
   <div class="flex gap-2">

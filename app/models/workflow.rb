@@ -5,4 +5,8 @@ class Workflow < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { scope: :project_id }
   validates :trigger_type, presence: true, inclusion: { in: ["manual", "cron", "file_watch"] }
+
+  def duplicate_to(target_project)
+    WorkflowCopier.new(self, target_project).call
+  end
 end

@@ -110,4 +110,32 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select "div[data-controller=\"code-editor\"]"
     assert_select "input[name=\"project[markdown_context]\"][type=\"hidden\"]"
   end
+
+  test "GET projects index filters by group_id" do
+    get projects_path, params: { group_id: project_groups(:frontend).id }
+    assert_response :success
+    assert_match "Seneschal", response.body
+    assert_no_match "OtherProject", response.body
+  end
+
+  test "GET projects index group_id=none shows only ungrouped" do
+    get projects_path, params: { group_id: "none" }
+    assert_response :success
+    assert_match "OtherProject", response.body
+    assert_no_match "Seneschal", response.body
+  end
+
+  test "GET edit renders group select and danger toggle" do
+    get edit_project_path(projects(:seneschal))
+    assert_response :success
+    assert_select "select[name='project[project_group_id]']"
+    assert_select "input[type='checkbox'][name='project[skip_permissions]']"
+  end
+
+  test "PATCH update toggles skip_permissions" do
+    projects(:seneschal).update!(skip_permissions: false)
+    patch project_path(projects(:seneschal)), params: { project: { skip_permissions: "1" } }
+    assert_redirected_to project_path(projects(:seneschal))
+    assert_equal true, projects(:seneschal).reload.skip_permissions
+  end
 end

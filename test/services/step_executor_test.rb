@@ -127,4 +127,47 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_includes prompt2, "Fresh policy"
     assert_not_includes prompt2, "Always use double quotes"
   end
+
+  test "skill cmd uses --dangerously-skip-permissions when project.skip_permissions" do
+    projects(:seneschal).update!(skip_permissions: true)
+    step = steps(:skill_step)
+    executor = StepExecutor.new(step, {}, projects(:seneschal).local_path)
+    cmd = executor.send(:build_skill_cmd, "hi")
+    assert_includes cmd, "--dangerously-skip-permissions"
+    assert_not_includes cmd, "--permission-mode"
+    assert_not_includes cmd, "--allowedTools"
+  end
+
+  test "skill cmd uses --permission-mode dontAsk when skip_permissions false" do
+    projects(:seneschal).update!(skip_permissions: false)
+    step = steps(:skill_step)
+    executor = StepExecutor.new(step, {}, projects(:seneschal).local_path)
+    cmd = executor.send(:build_skill_cmd, "hi")
+    assert_includes cmd, "--permission-mode"
+    idx = cmd.index("--permission-mode")
+    assert_equal "dontAsk", cmd[idx + 1]
+    assert_includes cmd, "--allowedTools"
+    assert_not_includes cmd, "--dangerously-skip-permissions"
+  end
+
+  test "skip_permissions on one project does not affect another" do
+    projects(:seneschal).update!(skip_permissions: true)
+    other = projects(:other_project)
+    other.update!(skip_permissions: false)
+    workflow = other.workflows.create!(name: "Other Wf", trigger_type: "manual")
+    other_step = workflow.steps.create!(
+      name: "Other Step",
+      step_type: "skill",
+      skill: skills(:shared_skill),
+      position: 1,
+      timeout: 300,
+      max_retries: 0,
+      config: {}
+    )
+    FileUtils.mkdir_p(other.local_path)
+    executor = StepExecutor.new(other_step, {}, other.local_path)
+    cmd = executor.send(:build_skill_cmd, "hi")
+    assert_includes cmd, "--permission-mode"
+    assert_not_includes cmd, "--dangerously-skip-permissions"
+  end
 end

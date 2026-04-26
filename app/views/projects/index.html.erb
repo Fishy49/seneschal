@@ -3,6 +3,26 @@
   <%= link_to "New Project", new_project_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
 </div>
 
+<% if @project_groups.any? %>
+  <div class="mb-4">
+    <%= form_with url: projects_path, method: :get, data: { turbo: false } do |f| %>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-content-muted">Filter by group:</label>
+        <%= f.select :group_id,
+              options_for_select(
+                [["All projects", ""]] +
+                @project_groups.map { |g| [g.name, g.id] } +
+                [["(ungrouped)", "none"]],
+                params[:group_id]
+              ),
+              {},
+              class: "px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+              onchange: "this.form.submit()" %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
 <% if @projects.any? %>
   <% @projects.each do |project| %>
     <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4 group">
@@ -10,7 +30,13 @@
         <div class="flex-1">
           <h3 class="text-base font-semibold">
             <%= link_to project.name, project_path(project), class: "text-content hover:text-accent transition-colors" %>
+            <% if project.skip_permissions? %>
+              <span class="ml-1 text-danger" title="Danger Mode">&#9888;</span>
+            <% end %>
           </h3>
+          <% if project.project_group.present? %>
+            <p class="text-xs text-content-muted"><%= project.project_group.name %></p>
+          <% end %>
           <p class="text-sm text-content-muted"><%= project.repo_url %></p>
           <% if project.description.present? %>
             <p class="text-sm text-content-muted mt-1"><%= project.description %></p>
