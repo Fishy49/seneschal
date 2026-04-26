@@ -114,15 +114,15 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "GET projects index filters by group_id" do
     get projects_path, params: { group_id: project_groups(:frontend).id }
     assert_response :success
-    assert_match "Seneschal", response.body
-    assert_no_match "OtherProject", response.body
+    assert_select "h3", text: /Seneschal/
+    assert_select "h3", text: /OtherProject/, count: 0
   end
 
   test "GET projects index group_id=none shows only ungrouped" do
     get projects_path, params: { group_id: "none" }
     assert_response :success
-    assert_match "OtherProject", response.body
-    assert_no_match "Seneschal", response.body
+    assert_select "h3", text: /OtherProject/
+    assert_select "h3", text: /\ASeneschal\z/, count: 0
   end
 
   test "GET edit renders group select and danger toggle" do

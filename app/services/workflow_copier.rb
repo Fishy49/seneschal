@@ -29,8 +29,7 @@ class WorkflowCopier
           skill: resolved_skill,
           max_retries: step.max_retries,
           timeout: step.timeout,
-          input_context: step.input_context,
-          injectable_only: step.injectable_only
+          input_context: step.input_context
         )
         copied_steps << new_step
       end
@@ -50,6 +49,7 @@ class WorkflowCopier
     loop do
       candidate = "#{base_name} (copy #{n})"
       return candidate unless @target.workflows.exists?(name: candidate)
+
       n += 1
     end
   end

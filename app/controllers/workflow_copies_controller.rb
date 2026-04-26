@@ -11,7 +11,9 @@ class WorkflowCopiesController < ApplicationController
 
     notice = "Workflow copied to #{target.name}."
     if result.missing_skills.any?
-      notice += " Note: the following project-scoped skills are not present in #{target.name} and will reference the original project's skill until you create local replacements: #{result.missing_skills.join(', ')}."
+      missing = result.missing_skills.join(", ")
+      notice += " Note: the following project-scoped skills are not present in #{target.name} " \
+                "and will reference the original project's skill until you create local replacements: #{missing}."
     end
 
     redirect_to project_workflow_path(target, result.workflow), notice: notice

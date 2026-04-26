@@ -1,4 +1,3 @@
-CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL /*application='Seneschal'*/, "markdown_context" text);
 CREATE TABLE IF NOT EXISTS "pipeline_tasks" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "kind" varchar DEFAULT 'feature' NOT NULL, "project_id" integer NOT NULL, "status" varchar DEFAULT 'draft' NOT NULL, "title" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer, "archived_at" datetime(6) /*application='Seneschal'*/, "context_files" json DEFAULT '[]' /*application='Seneschal'*/, "trigger_type" varchar DEFAULT 'manual' NOT NULL, "trigger_config" json DEFAULT '{}' NOT NULL, CONSTRAINT "fk_rails_03c1924935"
 FOREIGN KEY ("project_id")
   REFERENCES "projects" ("id")
@@ -83,7 +82,17 @@ FOREIGN KEY ("skill_id")
 CREATE INDEX "index_step_templates_on_skill_id" ON "step_templates" ("skill_id") /*application='Seneschal'*/;
 CREATE UNIQUE INDEX "index_step_templates_on_name" ON "step_templates" ("name") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_trigger_type" ON "pipeline_tasks" ("trigger_type");
+CREATE TABLE IF NOT EXISTS "project_groups" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "description" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
+CREATE UNIQUE INDEX "index_project_groups_on_name" ON "project_groups" ("name");
+CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL, "markdown_context" text, "project_group_id" integer, "skip_permissions" boolean DEFAULT FALSE NOT NULL, CONSTRAINT "fk_rails_1ce32c7182"
+FOREIGN KEY ("project_group_id")
+  REFERENCES "project_groups" ("id")
+);
+CREATE INDEX "index_projects_on_project_group_id" ON "projects" ("project_group_id");
 INSERT INTO "schema_migrations" (version) VALUES
+('20260426000003'),
+('20260426000002'),
+('20260426000001'),
 ('20260425000001'),
 ('20260419025604'),
 ('20260417141730'),
