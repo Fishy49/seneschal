@@ -67,4 +67,17 @@ class DataExporterTest < ActiveSupport::TestCase
     parsed = JSON.parse(json)
     assert_equal 1, parsed["seneschal_export"]["version"]
   end
+
+  test "exporter includes project_groups and project skip_permissions" do
+    projects(:seneschal).update!(project_group: project_groups(:frontend), skip_permissions: true)
+    data = DataExporter.new.call
+    export = data[:seneschal_export]
+
+    assert(export[:project_groups].any? { |g| g[:name] == "Frontend" })
+
+    seneschal_entry = export[:projects].find { |p| p[:name] == "Seneschal" }
+    assert_not_nil seneschal_entry
+    assert_equal "Frontend", seneschal_entry[:project_group_name]
+    assert_equal true, seneschal_entry[:skip_permissions]
+  end
 end

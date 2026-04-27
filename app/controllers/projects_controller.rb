@@ -2,7 +2,9 @@ class ProjectsController < ApplicationController
   before_action :set_project, only: [:show, :edit, :update, :destroy, :clone]
 
   def index
-    @projects = Project.order(:name)
+    @project_groups = ProjectGroup.ordered
+    @projects = Project.includes(:project_group).order(:name)
+    @projects = @projects.in_group(params[:group_id]) if params[:group_id].present?
     @projects.each(&:refresh_repo_status!)
   end
 
@@ -70,6 +72,6 @@ class ProjectsController < ApplicationController
   end
 
   def project_params
-    params.expect(project: [:name, :repo_url, :local_path, :description, :markdown_context])
+    params.expect(project: [:name, :repo_url, :local_path, :description, :markdown_context, :project_group_id, :skip_permissions])
   end
 end

@@ -1,0 +1,35 @@
+<%= render "shared/project_bar", project: @source_project, workflow: @source_workflow %>
+
+<h1 class="text-2xl font-semibold mb-6">Copy "<%= @source_workflow.name %>" to another project</h1>
+
+<% project_scoped_skills = @source_workflow.steps.includes(:skill).filter_map { |s| s.skill if s.skill && !s.skill.shared? }.uniq %>
+<% if project_scoped_skills.any? %>
+  <div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-6">
+    <p class="text-sm font-semibold text-warning mb-2">Project-scoped skills detected</p>
+    <p class="text-sm text-content-muted mb-2">The following skills belong to <strong><%= @source_project.name %></strong>. If the target project has a skill with the same name, it will be used; otherwise the step will reference the original skill.</p>
+    <ul class="list-disc list-inside text-sm text-content-muted space-y-1">
+      <% project_scoped_skills.each do |skill| %>
+        <li><%= skill.display_name %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<div class="max-w-md">
+  <%= form_with url: project_workflow_copy_path(@source_project, @source_workflow), method: :post do |f| %>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Target Project</label>
+      <select name="target_project_id" class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+        <option value="">Select a project...</option>
+        <% @target_projects.each do |project| %>
+          <option value="<%= project.id %>"><%= project.name %></option>
+        <% end %>
+      </select>
+    </div>
+
+    <div class="flex gap-2">
+      <%= f.submit "Copy Workflow", class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+      <%= link_to "Cancel", project_workflow_path(@source_project, @source_workflow), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+    </div>
+  <% end %>
+</div>

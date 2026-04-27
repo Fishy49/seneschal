@@ -15,6 +15,9 @@
       <% if run_step.attempt > 1 %>
         <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
       <% end %>
+      <% if run_step.step.step_type.in?(%w[skill prompt]) %>
+        <%= render "runs/step_context_modal", run_step: run_step %>
+      <% end %>
     </div>
     <% input_vars = run_step.step.consumes.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
     <% if nested && run_step.resolved_input_context.present? %>

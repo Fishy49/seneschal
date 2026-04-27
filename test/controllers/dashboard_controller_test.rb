@@ -31,4 +31,11 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     get root_path
     assert_response :success
   end
+
+  test "dashboard sidebar lists project groups" do
+    get root_path
+    assert_response :success
+    assert_match "Frontend", response.body
+    assert_match project_path(projects(:seneschal)), response.body
+  end
 end

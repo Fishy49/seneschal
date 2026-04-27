@@ -1,0 +1,7 @@
+frontend:
+  name: Frontend
+  description: Frontend projects
+
+backend:
+  name: Backend
+  description: Backend projects

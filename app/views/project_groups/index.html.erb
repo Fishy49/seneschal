@@ -1,0 +1,34 @@
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Project Groups</h1>
+  <%= link_to "New Group", new_project_group_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+</div>
+
+<% if @groups.any? %>
+  <% @groups.each do |group| %>
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <h3 class="text-base font-semibold"><%= group.name %></h3>
+          <% if group.description.present? %>
+            <p class="text-sm text-content-muted mt-1"><%= group.description %></p>
+          <% end %>
+          <div class="text-xs text-content-muted mt-2">
+            <%= pluralize(group.projects.size, "project") %>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <%= link_to "Edit", edit_project_group_path(group), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          <%= button_to "Delete", project_group_path(group),
+                method: :delete,
+                class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
+                data: { turbo_confirm: "Delete group '#{group.name}'? Projects will be ungrouped." } %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+    <p>No project groups yet.</p>
+    <p class="mt-2"><%= link_to "Create your first group", new_project_group_path %></p>
+  </div>
+<% end %>

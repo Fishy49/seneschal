@@ -323,21 +323,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   def resolve_input_context(step, context)
     return nil if step.input_context.blank?
 
-    any_resolved = false
     resolved = step.input_context.gsub(/\$\{(\w+)\}/) do
-      value = context[::Regexp.last_match(1)] || context[::Regexp.last_match(1).to_sym]
-      if value.present?
-        any_resolved = true
-        value
-      else
-        ""
-      end
+      context[::Regexp.last_match(1)] || context[::Regexp.last_match(1).to_sym] || ""
     end
 
-    return nil unless any_resolved
-
-    resolved = resolved.strip
-    resolved.presence
+    resolved.strip.presence
   end
 
   def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil)

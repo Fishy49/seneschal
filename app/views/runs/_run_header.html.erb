@@ -1,7 +1,12 @@
 <div id="run_header">
   <div class="flex items-center justify-between mb-4">
     <div>
-      <h1 class="text-2xl font-semibold">Run #<%= run.id %> <%= status_badge(run.status) %></h1>
+      <h1 class="text-2xl font-semibold">
+        Run #<%= run.id %> <%= status_badge(run.status) %>
+        <% if run.workflow.project.skip_permissions? %>
+          <span class="bg-danger/15 text-danger border border-danger/25 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide" title="Run executed with --dangerously-skip-permissions">&#9888; Danger Mode</span>
+        <% end %>
+      </h1>
     </div>
     <div class="flex items-center gap-2">
       <% if run.active? %>

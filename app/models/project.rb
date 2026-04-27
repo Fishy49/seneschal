@@ -1,9 +1,16 @@
 class Project < ApplicationRecord
+  belongs_to :project_group, optional: true
+
   has_many :workflows, dependent: :destroy
   has_many :runs, through: :workflows
   has_many :skills, dependent: :destroy
   has_many :pipeline_tasks, dependent: :destroy
   has_one :code_map, dependent: :destroy
+
+  scope :ordered, -> { order(:name) }
+  scope :in_group, lambda { |group_id|
+    group_id == "none" ? where(project_group_id: nil) : where(project_group_id: group_id)
+  }
 
   REPO_STATUSES = ["not_cloned", "cloning", "ready", "error"].freeze
 
