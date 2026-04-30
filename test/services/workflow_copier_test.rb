@@ -101,7 +101,7 @@ class WorkflowCopierTest < ActiveSupport::TestCase
     same_group_target = Project.create!(
       name: "FrontendSibling",
       repo_url: "https://github.com/t/sibling.git",
-      local_path: Rails.root.join("tmp", "test_repos", "sibling").to_s,
+      local_path: Rails.root.join("tmp/test_repos/sibling").to_s,
       project_group: project_groups(:frontend),
       repo_status: "ready"
     )
