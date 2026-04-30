@@ -1,9 +1,11 @@
 <div class="flex items-center justify-between mb-4">
   <div>
-    <% if @skill.project %>
-      <p class="text-sm text-content-muted"><%= @skill.project.name %></p>
-    <% else %>
+    <% if @skill.group_scoped? %>
+      <p class="text-sm text-content-muted">Group: <%= @skill.project_group.name %></p>
+    <% elsif @skill.shared? %>
       <p class="text-sm text-content-muted">Shared</p>
+    <% else %>
+      <p class="text-sm text-content-muted"><%= @skill.project.name %></p>
     <% end %>
     <h1 class="text-2xl font-semibold"><%= @skill.name %></h1>
   </div>

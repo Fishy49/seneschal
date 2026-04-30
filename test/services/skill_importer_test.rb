@@ -77,4 +77,33 @@ class SkillImporterTest < ActiveSupport::TestCase
       assert_equal ["fallback-name"], result[:imported]
     end
   end
+
+  test "imports skills under a project group when target is a ProjectGroup" do
+    Dir.mktmpdir do |dir|
+      project = Project.new(name: "GroupImportTest", repo_url: "https://github.com/t/t.git", local_path: dir)
+      project.save!(validate: false)
+      group = ProjectGroup.create!(name: "ImportGroup")
+
+      skill_dir = File.join(dir, ".claude", "skills", "foo")
+      FileUtils.mkdir_p(skill_dir)
+      File.write(File.join(skill_dir, "SKILL.md"), <<~MD)
+        ---
+        name: foo
+        description: A group skill
+        ---
+
+        Do foo things.
+      MD
+
+      result = SkillImporter.new(project, target: group).call
+      assert_equal ["foo"], result[:imported]
+      assert_empty result[:skipped]
+
+      skill = Skill.find_by(name: "foo")
+      assert_not_nil skill
+      assert_equal group.id, skill.project_group_id
+      assert_nil skill.project_id
+      assert_empty project.skills
+    end
+  end
 end

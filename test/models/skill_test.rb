@@ -11,6 +11,14 @@ class SkillTest < ActiveSupport::TestCase
     assert s.valid?
   end
 
+  test "valid group skill" do
+    s = Skill.new(name: "g_skill", body: "do", project_group: project_groups(:frontend))
+    assert s.valid?
+    assert_equal project_groups(:frontend).id, s.project_group_id
+    assert_not s.shared?
+    assert s.group_scoped?
+  end
+
   test "requires name" do
     s = Skill.new(body: "Do something")
     assert_not s.valid?
@@ -33,12 +41,34 @@ class SkillTest < ActiveSupport::TestCase
     assert s.valid?
   end
 
+  test "scope is exclusive: cannot have both project and group" do
+    s = Skill.new(name: "x", body: "y", project: projects(:seneschal), project_group: project_groups(:frontend))
+    assert_not s.valid?
+    assert_includes s.errors[:base], "Skill cannot belong to both a project and a project group"
+  end
+
   test "shared? returns true for nil project" do
     assert skills(:shared_skill).shared?
   end
 
   test "shared? returns false for project skill" do
     assert_not skills(:project_skill).shared?
+  end
+
+  test "shared? returns false for group skill" do
+    assert_not skills(:group_skill).shared?
+  end
+
+  test "group_scoped? returns true for group skill" do
+    assert skills(:group_skill).group_scoped?
+  end
+
+  test "group_scoped? returns false for shared skill" do
+    assert_not skills(:shared_skill).group_scoped?
+  end
+
+  test "project_scoped? returns true for project skill" do
+    assert skills(:project_skill).project_scoped?
   end
 
   test "display_name for shared skill" do
@@ -48,6 +78,11 @@ class SkillTest < ActiveSupport::TestCase
   test "display_name for project skill" do
     skill = skills(:project_skill)
     assert_equal "Seneschal/deploy_check", skill.display_name
+  end
+
+  test "display_name for group skill" do
+    skill = skills(:group_skill)
+    assert_equal "Frontend/lint_check", skill.display_name
   end
 
   test "shared scope returns only shared skills" do
@@ -62,11 +97,35 @@ class SkillTest < ActiveSupport::TestCase
     assert_includes scoped, skills(:project_skill)
   end
 
+  test "for_project includes group skills when project belongs to the group" do
+    project = projects(:seneschal)
+    scoped = Skill.for_project(project)
+    assert_includes scoped, skills(:shared_skill)
+    assert_includes scoped, skills(:project_skill)
+    assert_includes scoped, skills(:group_skill)
+
+    backend_skill = Skill.create!(name: "backend_lint", body: "x", project_group: project_groups(:backend))
+    assert_not_includes Skill.for_project(project), backend_skill
+  end
+
+  test "for_project excludes group skills when project has no group" do
+    project = projects(:other_project)
+    scoped = Skill.for_project(project)
+    assert_not_includes scoped, skills(:group_skill)
+  end
+
   test "destroying skill nullifies steps" do
     skill = skills(:shared_skill)
     step = steps(:skill_step)
     assert_equal skill, step.skill
     skill.destroy
     assert_nil step.reload.skill_id
+  end
+
+  test "destroying a project_group nilifies project_group_id on its skills" do
+    skill = skills(:group_skill)
+    assert_not_nil skill.project_group_id
+    project_groups(:frontend).destroy
+    assert_nil skill.reload.project_group_id
   end
 end

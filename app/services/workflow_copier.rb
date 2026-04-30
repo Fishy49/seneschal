@@ -57,11 +57,12 @@ class WorkflowCopier
   def resolve_skill(skill, missing_skills)
     return nil if skill.nil?
     return skill if skill.shared?
+    return skill if skill.group_scoped? && @target.project_group_id == skill.project_group_id
 
     target_skill = @target.skills.find_by(name: skill.name)
     return target_skill if target_skill
 
-    missing_skills << "#{skill.project.name}/#{skill.name}"
+    missing_skills << skill.display_name
     skill
   end
 end

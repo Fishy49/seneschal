@@ -9,3 +9,9 @@ project_skill:
   body: "Run deployment checks for ${repo_name}"
   description: Project-specific deployment skill
   project: seneschal
+
+group_skill:
+  name: lint_check
+  body: "Run linter for ${repo_name}"
+  description: Group-level lint skill
+  project_group: frontend

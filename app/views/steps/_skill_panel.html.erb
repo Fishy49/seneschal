@@ -24,7 +24,8 @@
 
   <%# Skill cards %>
   <div class="flex-1 overflow-y-auto p-5 space-y-3" data-skill-panel-target="list">
-    <% project_skills = skills.reject(&:shared?) %>
+    <% project_skills = skills.select(&:project_scoped?) %>
+    <% group_skills = skills.select(&:group_scoped?) %>
     <% shared_skills = skills.select(&:shared?) %>
 
     <% if project_skills.any? %>
@@ -34,7 +35,18 @@
       <% end %>
     <% end %>
 
-    <% if project_skills.any? && shared_skills.any? %>
+    <% if project_skills.any? && group_skills.any? %>
+      <div class="border-t border-edge my-3"></div>
+    <% end %>
+
+    <% if group_skills.any? %>
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Group Skills</p>
+      <% group_skills.each do |s| %>
+        <%= render "steps/skill_card", skill: s %>
+      <% end %>
+    <% end %>
+
+    <% if (project_skills.any? || group_skills.any?) && shared_skills.any? %>
       <div class="border-t border-edge my-3"></div>
     <% end %>
 
