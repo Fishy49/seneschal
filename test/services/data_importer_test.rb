@@ -80,6 +80,16 @@ class DataImporterTest < ActiveSupport::TestCase
     assert_equal original_count, Project.count
   end
 
+  test "round-trip preserves group-scoped skills" do
+    DataImporter.new(@export_data).call
+
+    skill = Skill.find_by(name: "lint_check")
+    assert_not_nil skill
+    assert_nil skill.project_id
+    assert_not_nil skill.project_group_id
+    assert_equal "Frontend", skill.project_group.name
+  end
+
   test "falls back to draft for tasks without workflow" do
     data = {
       seneschal_export: {

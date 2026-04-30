@@ -96,4 +96,42 @@ class WorkflowCopierTest < ActiveSupport::TestCase
     result = WorkflowCopier.new(@source, @target).call
     assert_equal @source.steps.count, result.copied_steps.count
   end
+
+  test "group-scoped skills are reused when target project is in the same group" do
+    same_group_target = Project.create!(
+      name: "FrontendSibling",
+      repo_url: "https://github.com/t/sibling.git",
+      local_path: Rails.root.join("tmp", "test_repos", "sibling").to_s,
+      project_group: project_groups(:frontend),
+      repo_status: "ready"
+    )
+    wf = projects(:seneschal).workflows.create!(name: "Group Wf", trigger_type: "manual")
+    wf.steps.create!(
+      name: "Lint Step",
+      step_type: "skill",
+      skill: skills(:group_skill),
+      position: 1,
+      timeout: 300,
+      max_retries: 0,
+      config: {}
+    )
+    result = WorkflowCopier.new(wf, same_group_target).call
+    assert_empty result.missing_skills
+    assert_equal skills(:group_skill).id, result.workflow.steps.first.skill_id
+  end
+
+  test "reports group-scoped skills missing from a target in a different group" do
+    wf = projects(:seneschal).workflows.create!(name: "Group Wf 2", trigger_type: "manual")
+    wf.steps.create!(
+      name: "Lint Step",
+      step_type: "skill",
+      skill: skills(:group_skill),
+      position: 1,
+      timeout: 300,
+      max_retries: 0,
+      config: {}
+    )
+    result = WorkflowCopier.new(wf, @target).call
+    assert_includes result.missing_skills, "Frontend/lint_check"
+  end
 end

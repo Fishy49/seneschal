@@ -50,7 +50,7 @@ This section walks through the full lifecycle: from first-run setup to running a
   - [Cloning the repository](#cloning-the-repository)
   - [Code maps](#code-maps)
 - [3. Creating skills](#3-creating-skills)
-  - [Shared vs. project-scoped skills](#shared-vs-project-scoped-skills)
+  - [Skill scopes: shared, group, project](#skill-scopes-shared-group-project)
   - [Template variables in prompts](#template-variables-in-prompts)
   - [Produces and consumes](#produces-and-consumes)
   - [Context projects](#context-projects)
@@ -120,16 +120,17 @@ A **Skill** is a reusable Claude CLI prompt template. Think of skills as the bui
 From **Skills → New**, the form has four fields:
 
 - **Name** — short identifier (snake_case works well).
-- **Project** — leave blank for a shared skill, or pick one to scope it.
+- **Scope** — choose Shared, a project group, or a single project (see below).
 - **Description** — what this skill does, for future you.
 - **Body** — the prompt, written in Markdown, with `${variable}` interpolation.
 
-#### Shared vs. project-scoped skills
+#### Skill scopes: shared, group, project
 
-- **Shared** (`project_id` blank) — usable by any project's workflows. Ideal for generic skills like "plan a feature" or "fix failing tests" that aren't repo-specific.
-- **Project-scoped** (`project_id` set) — only appears in skill pickers for workflows in that project. Useful for skills that reference specific conventions, internal tools, or file layouts.
+- **Shared** (`project_id` and `project_group_id` both blank) — usable by any project's workflows. Ideal for generic skills like "plan a feature" or "fix failing tests" that aren't repo-specific.
+- **Group-scoped** (`project_group_id` set) — available to every project that belongs to that project group. Useful for conventions shared across a related set of repos (e.g., a "Frontend" group with a `lint_check` skill that all frontend projects can use).
+- **Project-scoped** (`project_id` set) — only appears in skill pickers for workflows in that project. Useful for skills that reference specific conventions, internal tools, or file layouts of a single repo.
 
-When editing a workflow step of type `skill`, the skill picker shows everything returned by `Skill.for_project(project)` — that's shared skills plus the project's own skills.
+A skill can have only one scope at a time. When editing a workflow step of type `skill`, the skill picker shows everything returned by `Skill.for_project(project)` — that's shared skills, the project's own skills, and any skills scoped to the project's group.
 
 #### Template variables in prompts
 

@@ -4,13 +4,13 @@ class SkillsController < ApplicationController
   def index
     @skills = Skill.includes(:project, :project_group).order(:name)
     @project_groups = ProjectGroup.ordered
-    if params[:group_id].present?
-      if params[:group_id] == "none"
-        @skills = @skills.where(project_group_id: nil)
-      else
-        @skills = @skills.where(project_group_id: params[:group_id])
-      end
-    end
+    return if params[:group_id].blank?
+
+    @skills = if params[:group_id] == "none"
+                @skills.where(project_group_id: nil)
+              else
+                @skills.where(project_group_id: params[:group_id])
+              end
   end
 
   def show; end
@@ -51,12 +51,15 @@ class SkillsController < ApplicationController
 
   def skill_params
     attrs = params.expect(skill: [:name, :description, :body, :scope])
+    return attrs unless attrs.key?(:scope)
+
     scope = attrs.delete(:scope)
-    if scope =~ /\Agroup:(\d+)\z/
-      attrs[:project_group_id] = $1.to_i
+    case scope
+    when /\Agroup:(\d+)\z/
+      attrs[:project_group_id] = ::Regexp.last_match(1).to_i
       attrs[:project_id] = nil
-    elsif scope =~ /\Aproject:(\d+)\z/
-      attrs[:project_id] = $1.to_i
+    when /\Aproject:(\d+)\z/
+      attrs[:project_id] = ::Regexp.last_match(1).to_i
       attrs[:project_group_id] = nil
     else
       attrs[:project_id] = nil

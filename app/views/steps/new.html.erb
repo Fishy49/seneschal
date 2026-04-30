@@ -1,8 +1,8 @@
 <%= render "shared/project_bar", project: @project, workflow: @workflow %>
 <h1 class="text-2xl font-semibold mb-4">Add Step</h1>
 
-<% templates = StepTemplate.includes(:skill).ordered %>
-<% skills = Skill.for_project(@project).includes(:project).order(:name) %>
+<% templates = StepTemplate.includes(skill: [:project, :project_group]).ordered %>
+<% skills = Skill.for_project(@project).includes(:project, :project_group).order(:name) %>
 <div data-controller="template-panel skill-panel"
      data-template-panel-templates-value="<%= templates.map { |t| [t.id, t.template_data] }.to_h.to_json %>">
   <div class="bg-surface-card border border-edge rounded-lg p-5 step-form-wrapper">

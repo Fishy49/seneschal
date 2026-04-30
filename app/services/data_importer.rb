@@ -182,6 +182,6 @@ class DataImporter
   end
 
   def skill_key(project_name, group_name, skill_name)
-    "#{project_name || 'shared'}:#{group_name || 'nogroup'}:#{skill_name}"
+    "#{project_name || "shared"}:#{group_name || "nogroup"}:#{skill_name}"
   end
 end

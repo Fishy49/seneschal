@@ -2,13 +2,13 @@
 
 <h1 class="text-2xl font-semibold mb-6">Copy "<%= @source_workflow.name %>" to another project</h1>
 
-<% project_scoped_skills = @source_workflow.steps.includes(:skill).filter_map { |s| s.skill if s.skill && !s.skill.shared? }.uniq %>
-<% if project_scoped_skills.any? %>
+<% scoped_skills = @source_workflow.steps.includes(skill: [:project, :project_group]).filter_map { |s| s.skill if s.skill && !s.skill.shared? }.uniq %>
+<% if scoped_skills.any? %>
   <div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-6">
-    <p class="text-sm font-semibold text-warning mb-2">Project-scoped skills detected</p>
-    <p class="text-sm text-content-muted mb-2">The following skills belong to <strong><%= @source_project.name %></strong>. If the target project has a skill with the same name, it will be used; otherwise the step will reference the original skill.</p>
+    <p class="text-sm font-semibold text-warning mb-2">Scoped skills detected</p>
+    <p class="text-sm text-content-muted mb-2">The following skills are not shared. Group-scoped skills resolve automatically when the target project is in the same group; otherwise, if the target project has a skill with the same name, it will be used. If neither applies, the step will reference the original skill.</p>
     <ul class="list-disc list-inside text-sm text-content-muted space-y-1">
-      <% project_scoped_skills.each do |skill| %>
+      <% scoped_skills.each do |skill| %>
         <li><%= skill.display_name %></li>
       <% end %>
     </ul>

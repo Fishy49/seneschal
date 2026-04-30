@@ -1,4 +1,4 @@
-<% skills = Skill.for_project(@project).order(:name) %>
+<% skills = Skill.for_project(@project).includes(:project, :project_group).order(:name) %>
 <% claude_cfg = step.step_type.in?(%w[skill prompt]) ? (step.config || {}) : {} %>
 <% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
 <% ctx_fetch = step.step_type == "context_fetch" ? (step.config || {}) : {} %>
@@ -338,7 +338,7 @@
       <select name="on_fail_skill_id" id="on_fail_skill_id"
               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
         <option value="">Select a skill...</option>
-        <% Skill.for_project(@project).order(:name).each do |s| %>
+        <% Skill.for_project(@project).includes(:project, :project_group).order(:name).each do |s| %>
           <option value="<%= s.id %>" <%= "selected" if on_fail["skill_id"].to_s == s.id.to_s %>><%= s.display_name %></option>
         <% end %>
       </select>

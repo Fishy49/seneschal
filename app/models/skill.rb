@@ -11,7 +11,7 @@ class Skill < ApplicationRecord
   scope :shared, -> { where(project_id: nil, project_group_id: nil) }
   scope :group_scoped, -> { where.not(project_group_id: nil) }
   scope :for_group, ->(group) { where(project_group_id: group.id) }
-  scope :for_project, ->(project) {
+  scope :for_project, lambda { |project|
     base = where(project_id: nil, project_group_id: nil).or(where(project_id: project.id))
     if project.project_group_id.present?
       base.or(where(project_group_id: project.project_group_id))
@@ -55,8 +55,8 @@ class Skill < ApplicationRecord
   private
 
   def scope_is_exclusive
-    if project_id.present? && project_group_id.present?
-      errors.add(:base, "Skill cannot belong to both a project and a project group")
-    end
+    return unless project_id.present? && project_group_id.present?
+
+    errors.add(:base, "Skill cannot belong to both a project and a project group")
   end
 end

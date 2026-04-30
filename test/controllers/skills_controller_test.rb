@@ -117,6 +117,17 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert skill.shared?
   end
 
+  test "PATCH update without scope param preserves existing scope" do
+    skill = skills(:group_skill)
+    patch skill_path(skill), params: {
+      skill: { description: "Updated description" }
+    }
+    skill.reload
+    assert_equal "Updated description", skill.description
+    assert_equal project_groups(:frontend).id, skill.project_group_id
+    assert_nil skill.project_id
+  end
+
   test "DELETE destroy" do
     skill = Skill.create!(name: "disposable", body: "temp")
     assert_difference "Skill.count", -1 do

@@ -29,10 +29,10 @@ class SkillImporter
     description = frontmatter["description"]
 
     existing = if @target.is_a?(ProjectGroup)
-      Skill.find_by(project_group_id: @target.id, name: name)
-    else
-      Skill.find_by(project_id: @target.id, name: name)
-    end
+                 Skill.find_by(project_group_id: @target.id, name: name)
+               else
+                 Skill.find_by(project_id: @target.id, name: name)
+               end
 
     if existing
       @skipped << name
