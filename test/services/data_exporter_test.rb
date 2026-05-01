@@ -68,6 +68,16 @@ class DataExporterTest < ActiveSupport::TestCase
     assert_equal 1, parsed["seneschal_export"]["version"]
   end
 
+  test "exports group-scoped skills with project_group_name" do
+    data = DataExporter.new.call
+    skills = data[:seneschal_export][:skills]
+
+    group_skill = skills.find { |s| s[:name] == skills(:group_skill).name }
+    assert_not_nil group_skill
+    assert_nil group_skill[:project_name]
+    assert_equal "Frontend", group_skill[:project_group_name]
+  end
+
   test "exporter includes project_groups and project skip_permissions" do
     projects(:seneschal).update!(project_group: project_groups(:frontend), skip_permissions: true)
     data = DataExporter.new.call

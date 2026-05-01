@@ -24,18 +24,19 @@ class DataExporter
   end
 
   def export_skills
-    Skill.includes(:project).order(:name).map do |skill|
+    Skill.includes(:project, :project_group).order(:name).map do |skill|
       {
         name: skill.name,
         description: skill.description,
         body: skill.body,
-        project_name: skill.project&.name
+        project_name: skill.project&.name,
+        project_group_name: skill.project_group&.name
       }
     end
   end
 
   def export_step_templates
-    StepTemplate.includes(skill: :project).ordered.map do |t|
+    StepTemplate.includes(skill: [:project, :project_group]).ordered.map do |t|
       {
         name: t.name,
         step_type: t.step_type,
@@ -43,6 +44,7 @@ class DataExporter
         config: t.config,
         skill_name: t.skill&.name,
         skill_project_name: t.skill&.project&.name,
+        skill_project_group_name: t.skill&.project_group&.name,
         max_retries: t.max_retries,
         timeout: t.timeout,
         input_context: t.input_context
@@ -88,6 +90,7 @@ class DataExporter
       config: step.config,
       skill_name: step.skill&.name,
       skill_project_name: step.skill&.project&.name,
+      skill_project_group_name: step.skill&.project_group&.name,
       max_retries: step.max_retries,
       timeout: step.timeout,
       input_context: step.input_context

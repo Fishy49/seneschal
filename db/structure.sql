@@ -25,11 +25,6 @@ FOREIGN KEY ("workflow_id")
 );
 CREATE INDEX "index_runs_on_pipeline_task_id" ON "runs" ("pipeline_task_id") /*application='Seneschal'*/;
 CREATE INDEX "index_runs_on_workflow_id" ON "runs" ("workflow_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "skills" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_ca04e2fd46"
-FOREIGN KEY ("project_id")
-  REFERENCES "projects" ("id")
-);
-CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "workflows" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer NOT NULL, "trigger_config" json, "trigger_type" varchar DEFAULT 'manual' NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_382d2c48c7"
 FOREIGN KEY ("project_id")
   REFERENCES "projects" ("id")
@@ -89,7 +84,17 @@ FOREIGN KEY ("project_group_id")
   REFERENCES "project_groups" ("id")
 );
 CREATE INDEX "index_projects_on_project_group_id" ON "projects" ("project_group_id");
+CREATE TABLE IF NOT EXISTS "skills" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer, "updated_at" datetime(6) NOT NULL, "project_group_id" integer, CONSTRAINT "fk_rails_ca04e2fd46"
+FOREIGN KEY ("project_id")
+  REFERENCES "projects" ("id")
+, CONSTRAINT "fk_rails_a36595f8de"
+FOREIGN KEY ("project_group_id")
+  REFERENCES "project_groups" ("id")
+);
+CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id");
+CREATE INDEX "index_skills_on_project_group_id" ON "skills" ("project_group_id");
 INSERT INTO "schema_migrations" (version) VALUES
+('20260430000001'),
 ('20260426000003'),
 ('20260426000002'),
 ('20260426000001'),

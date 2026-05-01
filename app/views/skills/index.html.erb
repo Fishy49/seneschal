@@ -3,7 +3,28 @@
   <%= link_to "New Skill", new_skill_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
 </div>
 
-<% shared, project_specific = @skills.partition(&:shared?) %>
+<% if @project_groups.any? %>
+  <div class="mb-4">
+    <%= form_with url: skills_path, method: :get, data: { turbo: false } do |f| %>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-content-muted">Filter by group:</label>
+        <%= f.select :group_id,
+              options_for_select(
+                [["All skills", ""]] +
+                @project_groups.map { |g| [g.name, g.id] } +
+                [["(ungrouped)", "none"]],
+                params[:group_id]
+              ),
+              {},
+              class: "px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+              onchange: "this.form.submit()" %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% shared, scoped = @skills.partition(&:shared?) %>
+<% group_scoped, project_specific = scoped.partition(&:group_scoped?) %>
 
 <% if shared.any? %>
   <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
@@ -18,6 +39,30 @@
       </thead>
       <tbody>
         <% shared.each do |skill| %>
+          <tr>
+            <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= pluralize(skill.steps.count, "step") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% group_scoped.group_by(&:project_group).each do |group, skills| %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <h2 class="text-lg font-semibold mb-3"><%= group.name %> (Group)</h2>
+    <table class="w-full border-collapse">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% skills.each do |skill| %>
           <tr>
             <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
             <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>

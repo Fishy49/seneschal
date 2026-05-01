@@ -13,10 +13,13 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
   </div>
 
+  <% scope_options = [["Shared (available to all projects)", ""]] +
+       ProjectGroup.ordered.map { |g| ["Group: #{g.name}", "group:#{g.id}"] } +
+       Project.order(:name).map { |p| ["Project: #{p.name}", "project:#{p.id}"] } %>
   <div class="mb-4">
-    <%= f.label :project_id, "Project", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.select :project_id, Project.order(:name).pluck(:name, :id),
-          { include_blank: "Shared (available to all projects)" },
+    <%= f.label :scope, "Scope", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.select :scope, options_for_select(scope_options, skill.scope_value),
+          {},
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
   </div>
 

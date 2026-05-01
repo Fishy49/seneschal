@@ -1,8 +1,13 @@
 class ProjectGroupsController < ApplicationController
-  before_action :set_group, only: [:edit, :update, :destroy]
+  before_action :set_group, only: [:show, :edit, :update, :destroy]
 
   def index
-    @groups = ProjectGroup.ordered.includes(:projects)
+    @groups = ProjectGroup.ordered.includes(:projects, :skills)
+  end
+
+  def show
+    @projects = @group.projects.order(:name)
+    @skills = @group.skills.order(:name)
   end
 
   def new

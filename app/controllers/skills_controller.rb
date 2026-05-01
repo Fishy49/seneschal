@@ -2,7 +2,15 @@ class SkillsController < ApplicationController
   before_action :set_skill, only: [:show, :edit, :update, :destroy]
 
   def index
-    @skills = Skill.includes(:project).order(:name)
+    @skills = Skill.includes(:project, :project_group).order(:name)
+    @project_groups = ProjectGroup.ordered
+    return if params[:group_id].blank?
+
+    @skills = if params[:group_id] == "none"
+                @skills.where(project_group_id: nil)
+              else
+                @skills.where(project_group_id: params[:group_id])
+              end
   end
 
   def show; end
@@ -42,6 +50,21 @@ class SkillsController < ApplicationController
   end
 
   def skill_params
-    params.expect(skill: [:name, :description, :body, :project_id])
+    attrs = params.expect(skill: [:name, :description, :body, :scope])
+    return attrs unless attrs.key?(:scope)
+
+    scope = attrs.delete(:scope)
+    case scope
+    when /\Agroup:(\d+)\z/
+      attrs[:project_group_id] = ::Regexp.last_match(1).to_i
+      attrs[:project_id] = nil
+    when /\Aproject:(\d+)\z/
+      attrs[:project_id] = ::Regexp.last_match(1).to_i
+      attrs[:project_group_id] = nil
+    else
+      attrs[:project_id] = nil
+      attrs[:project_group_id] = nil
+    end
+    attrs
   end
 end

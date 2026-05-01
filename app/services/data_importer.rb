@@ -54,13 +54,15 @@ class DataImporter
     (@data[:skills] || []).each do |attrs|
       next if attrs[:project_name].present?
 
+      group = attrs[:project_group_name].present? ? @group_map[attrs[:project_group_name]] : nil
       skill = Skill.create!(
         name: attrs[:name],
         description: attrs[:description],
         body: attrs[:body],
-        project: nil
+        project: nil,
+        project_group: group
       )
-      @skill_map[skill_key(nil, attrs[:name])] = skill
+      @skill_map[skill_key(nil, attrs[:project_group_name], attrs[:name])] = skill
       @stats[:skills] += 1
     end
   end
@@ -104,7 +106,7 @@ class DataImporter
         body: attrs[:body],
         project: project
       )
-      @skill_map[skill_key(project.name, attrs[:name])] = skill
+      @skill_map[skill_key(project.name, nil, attrs[:name])] = skill
       @stats[:skills] += 1
     end
   end
@@ -126,7 +128,7 @@ class DataImporter
   end
 
   def import_step(workflow, attrs)
-    skill = find_skill(attrs[:skill_project_name], attrs[:skill_name])
+    skill = find_skill(attrs[:skill_project_name], attrs[:skill_project_group_name], attrs[:skill_name])
     workflow.steps.create!(
       name: attrs[:name],
       position: attrs[:position],
@@ -158,7 +160,7 @@ class DataImporter
 
   def import_step_templates
     (@data[:step_templates] || []).each do |attrs|
-      skill = find_skill(attrs[:skill_project_name], attrs[:skill_name])
+      skill = find_skill(attrs[:skill_project_name], attrs[:skill_project_group_name], attrs[:skill_name])
       StepTemplate.create!(
         name: attrs[:name],
         step_type: attrs[:step_type],
@@ -173,13 +175,13 @@ class DataImporter
     end
   end
 
-  def find_skill(project_name, skill_name)
+  def find_skill(project_name, group_name, skill_name)
     return nil unless skill_name
 
-    @skill_map[skill_key(project_name, skill_name)]
+    @skill_map[skill_key(project_name, group_name, skill_name)]
   end
 
-  def skill_key(project_name, skill_name)
-    "#{project_name || "shared"}:#{skill_name}"
+  def skill_key(project_name, group_name, skill_name)
+    "#{project_name || "shared"}:#{group_name || "nogroup"}:#{skill_name}"
   end
 end

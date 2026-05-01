@@ -22,7 +22,7 @@
     </div>
   </div>
   <% if run.status.in?(%w[completed failed stopped]) %>
-    <% project_skills = Skill.for_project(run.workflow.project).order(:name) %>
+    <% project_skills = Skill.for_project(run.workflow.project).includes(:project, :project_group).order(:name) %>
     <details class="mb-4" data-controller="follow-up-form">
       <summary class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors list-none [&::-webkit-details-marker]:hidden">
         Follow Up
