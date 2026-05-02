@@ -68,14 +68,10 @@ class RunsController < ApplicationController
   end
 
   def approve
-    unless @run.awaiting_approval?
-      redirect_to run_path(@run), alert: "Run is not awaiting approval." and return
-    end
+    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
-    unless awaiting
-      redirect_to run_path(@run), alert: "No step awaiting approval." and return
-    end
+    return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
     awaiting.update!(status: "passed", rejection_context: nil)
     @run.update!(status: "running")
@@ -84,14 +80,10 @@ class RunsController < ApplicationController
   end
 
   def reject
-    unless @run.awaiting_approval?
-      redirect_to run_path(@run), alert: "Run is not awaiting approval." and return
-    end
+    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
-    unless awaiting
-      redirect_to run_path(@run), alert: "No step awaiting approval." and return
-    end
+    return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
     context = params[:rejection_context].to_s.strip
     awaiting.update!(rejection_context: context.presence)

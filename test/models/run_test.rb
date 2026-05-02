@@ -27,10 +27,10 @@ class RunTest < ActiveSupport::TestCase
     assert_not runs(:failed_run).active?
   end
 
-  test "active scope returns pending and running" do
+  test "active scope returns active statuses" do
     active = Run.active
     active.each do |r|
-      assert_includes ["pending", "running"], r.status
+      assert_includes ["pending", "running", "awaiting_approval"], r.status
     end
   end
 

@@ -74,24 +74,16 @@ class ExecuteRunJobTest < ActiveJob::TestCase
   end
 
   test "job pauses run in awaiting_approval after manual_approval step passes" do
-    project = projects(:seneschal)
-    tmpdir = Dir.mktmpdir
-    project.update!(repo_status: "ready", local_path: tmpdir)
-
-    workflow = workflows(:deploy)
-    workflow.steps.destroy_all
-
-    step = workflow.steps.create!(
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
       name: "Pause Here", step_type: "command", body: "echo paused",
       position: 1, manual_approval: true, timeout: 30, max_retries: 0, config: {}
     )
-
     run = workflow.runs.create!(status: "pending", context: {}, input: {})
 
-    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: "paused\n", stderr: "", stream_events: nil)
-    StepExecutor.any_instance.stubs(:execute).returns(fake_result)
-
-    ExecuteRunJob.new.perform(run)
+    with_stubbed_step_executor(stdout: "paused\n") do
+      ExecuteRunJob.new.perform(run)
+    end
 
     run.reload
     assert_equal "awaiting_approval", run.status
@@ -99,35 +91,19 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     assert_not_nil awaiting_rs
     assert_equal "paused\n", awaiting_rs.output
   ensure
-    FileUtils.rm_rf(tmpdir) if tmpdir
-    workflow.steps.destroy_all
+    cleanup_workflow_with_ready_project!(workflow)
   end
 
   test "after_approval skips the approved step and processes only later steps" do
-    project = projects(:seneschal)
-    tmpdir = Dir.mktmpdir
-    project.update!(repo_status: "ready", local_path: tmpdir)
-
-    workflow = workflows(:deploy)
-    workflow.steps.destroy_all
-
-    step1 = workflow.steps.create!(
-      name: "First", step_type: "command", body: "echo a",
-      position: 1, manual_approval: true, timeout: 30, max_retries: 0, config: {}
-    )
-    step2 = workflow.steps.create!(
-      name: "Second", step_type: "command", body: "echo b",
-      position: 2, timeout: 30, max_retries: 0, config: {}
-    )
-
+    workflow = setup_workflow_with_ready_project!
+    step1, step2 = create_two_step_workflow(workflow)
     run = workflow.runs.create!(status: "awaiting_approval", started_at: 1.minute.ago, context: {}, input: {})
     run.run_steps.create!(step: step1, status: "passed", attempt: 1, position: 1,
                           started_at: 1.minute.ago, finished_at: 50.seconds.ago, duration: 10.0)
 
-    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: "b\n", stderr: "", stream_events: nil)
-    StepExecutor.any_instance.stubs(:execute).returns(fake_result)
-
-    ExecuteRunJob.new.perform(run, step1.id, after_approval: true)
+    with_stubbed_step_executor(stdout: "b\n") do
+      ExecuteRunJob.new.perform(run, step1.id, after_approval: true)
+    end
 
     run.reload
     assert_equal "completed", run.status
@@ -136,7 +112,96 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     assert_not_nil second_rs
     assert_equal "passed", second_rs.status
   ensure
-    FileUtils.rm_rf(tmpdir) if tmpdir
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "after_approval queue retains pipeline context for subsequent steps" do
+    workflow = setup_workflow_with_ready_project!
+    step1, step2 = create_two_step_workflow(workflow,
+                                            step1_config: { "produces" => ["greeting"] },
+                                            step2_config: { "consumes" => ["greeting"] })
+    run = workflow.runs.create!(status: "awaiting_approval", started_at: 1.minute.ago,
+                                context: { "greeting" => "hello" }, input: {})
+    run.run_steps.create!(step: step1, status: "passed", attempt: 1, position: 1,
+                          started_at: 1.minute.ago, finished_at: 50.seconds.ago, duration: 10.0)
+
+    captured = capture_step_executor_contexts do
+      ExecuteRunJob.new.perform(run, step1.id, after_approval: true)
+    end
+
+    run.reload
+    assert_equal "completed", run.status
+    assert_not captured.key?(step1.id), "step1 should not be re-executed after approval"
+    assert_equal "hello", captured[step2.id]&.fetch("greeting", nil)
+    assert_equal "passed", run.run_steps.find_by(step: step2).status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  private
+
+  def setup_workflow_with_ready_project!
+    project = projects(:seneschal)
+    @_test_tmpdir = Dir.mktmpdir
+    project.update!(repo_status: "ready", local_path: @_test_tmpdir)
+    workflow = workflows(:deploy)
     workflow.steps.destroy_all
+    workflow
+  end
+
+  def cleanup_workflow_with_ready_project!(workflow)
+    FileUtils.rm_rf(@_test_tmpdir) if @_test_tmpdir
+    workflow&.steps&.destroy_all
+  end
+
+  def create_two_step_workflow(workflow, step1_config: {}, step2_config: {})
+    step1 = workflow.steps.create!(
+      name: "First", step_type: "command", body: "echo a",
+      position: 1, manual_approval: true, timeout: 30, max_retries: 0, config: step1_config
+    )
+    step2 = workflow.steps.create!(
+      name: "Second", step_type: "command", body: "echo b",
+      position: 2, timeout: 30, max_retries: 0, config: step2_config
+    )
+    [step1, step2]
+  end
+
+  def with_stubbed_step_executor(stdout: "", &)
+    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
+    factory = ->(*_args, **_kwargs) { fake_executor(fake_result) }
+    stub_step_executor_new(factory, &)
+  end
+
+  def capture_step_executor_contexts(&)
+    captured = {}
+    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: "", stream_events: nil)
+    factory = lambda do |step, context, _repo_path, **_kwargs|
+      captured[step.id] = context
+      fake_executor(fake_result)
+    end
+    stub_step_executor_new(factory, &)
+    captured
+  end
+
+  def fake_executor(result)
+    executor = Object.new
+    executor.define_singleton_method(:execute) { |&_blk| result }
+    executor
+  end
+
+  # Replaces StepExecutor.new with a callable factory for the duration of the
+  # block, then restores the original. Used in lieu of Mocha-style any-instance
+  # stubbing — Minitest 6 dropped Object#stub, and Mocha is not in the Gemfile.
+  def stub_step_executor_new(factory)
+    metaclass = class << StepExecutor; self; end
+    metaclass.send(:alias_method, :__original_new, :new)
+    metaclass.send(:define_method, :new) do |*args, **kwargs|
+      factory.call(*args, **kwargs)
+    end
+    yield
+  ensure
+    metaclass.send(:remove_method, :new)
+    metaclass.send(:alias_method, :new, :__original_new)
+    metaclass.send(:remove_method, :__original_new)
   end
 end
