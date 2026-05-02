@@ -136,6 +136,10 @@ export default class extends Controller {
       this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
     }
 
+    // Manual approval
+    const ma = this.element.querySelector('[name="step[manual_approval]"]')
+    if (ma) ma.checked = !!template.manual_approval
+
     // Pipeline: produces / consumes
     this.field("produces").value = (cfg.produces || []).join(", ")
     const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')

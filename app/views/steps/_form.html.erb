@@ -310,6 +310,15 @@
     </div>
   </div>
 
+  <%# === Manual Approval === %>
+  <div class="mb-4 pt-4 border-t border-edge">
+    <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
+      <%= f.check_box :manual_approval, class: "accent-accent" %>
+      Manual Approval
+    </label>
+    <p class="text-xs text-content-muted mt-1">When this step finishes, the run pauses in <em>Awaiting Approval</em> until an operator approves or rejects it.</p>
+  </div>
+
   <%# === On Fail Action === %>
   <% on_fail = step.config&.dig("on_fail_action") || {} %>
   <div class="mb-4" data-step-form-target="onFailFields">

@@ -27,3 +27,14 @@ script_step:
   max_retries: 2
   timeout: 600
   config: {}
+
+approval_step:
+  name: Awaiting Approval Step
+  workflow: deploy
+  position: 4
+  step_type: command
+  body: "echo 'review me'"
+  max_retries: 0
+  timeout: 60
+  config: {}
+  manual_approval: true

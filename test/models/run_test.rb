@@ -83,4 +83,36 @@ class RunTest < ActiveSupport::TestCase
       run.destroy
     end
   end
+
+  test "awaiting_approval status is valid" do
+    r = Run.new(workflow: workflows(:deploy), status: "awaiting_approval")
+    assert r.valid?
+  end
+
+  test "active? is true for awaiting_approval status" do
+    assert runs(:awaiting_run).active?
+  end
+
+  test "active scope includes awaiting_approval runs" do
+    active = Run.active
+    assert_includes active.map(&:status), "awaiting_approval"
+  end
+
+  test "awaiting_approval? returns true for awaiting_approval run" do
+    assert runs(:awaiting_run).awaiting_approval?
+  end
+
+  test "awaiting_approval? returns false for running run" do
+    assert_not runs(:active_run).awaiting_approval?
+  end
+
+  test "awaiting_run_step returns the awaiting run_step" do
+    run = runs(:awaiting_run)
+    rs = run_steps(:awaiting_step_run_step)
+    assert_equal rs, run.awaiting_run_step
+  end
+
+  test "awaiting_run_step returns nil when none" do
+    assert_nil runs(:active_run).awaiting_run_step
+  end
 end

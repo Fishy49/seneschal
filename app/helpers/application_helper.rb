@@ -5,6 +5,7 @@ module ApplicationHelper
     "pending" => "bg-surface-input text-content-muted",
     "queued" => "bg-info/15 text-info",
     "running" => "bg-accent/15 text-accent",
+    "awaiting_approval" => "bg-warning/15 text-warning",
     "completed" => "bg-success/15 text-success",
     "passed" => "bg-success/15 text-success",
     "failed" => "bg-danger/15 text-danger",
@@ -29,12 +30,19 @@ module ApplicationHelper
 
   def status_badge(status)
     classes = "#{BADGE_BASE} #{STATUS_CLASSES[status] || STATUS_CLASSES["pending"]}"
+    display = status.to_s.tr("_", " ")
     if status.in?(["running", "retrying"])
       dot = content_tag(:span, "", class: "inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse mr-1 align-middle")
-      content_tag(:span, dot + status, class: "#{classes} flex items-center gap-0")
+      content_tag(:span, dot + display, class: "#{classes} flex items-center gap-0")
     else
-      content_tag(:span, status, class: classes)
+      content_tag(:span, display, class: classes)
     end
+  end
+
+  def manual_approval_actions(run)
+    return unless run.awaiting_approval?
+
+    render partial: "runs/approval_actions", locals: { run: run, run_step: run.awaiting_run_step }
   end
 
   def type_badge(type)

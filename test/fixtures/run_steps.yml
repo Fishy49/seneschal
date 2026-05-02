@@ -55,6 +55,18 @@ failed_step:
   duration: 60.0
   claude_session_id: "sess_abc123"
 
+awaiting_step_run_step:
+  run: awaiting_run
+  step: approval_step
+  status: awaiting_approval
+  attempt: 1
+  position: 1
+  exit_code: 0
+  output: "review me"
+  started_at: <%= 10.minutes.ago %>
+  finished_at: <%= 9.minutes.ago %>
+  duration: 60.0
+
 passed_step_with_todos:
   run: todo_run
   step: skill_step

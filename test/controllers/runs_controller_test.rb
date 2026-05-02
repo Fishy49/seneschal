@@ -80,4 +80,48 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/Danger Mode/, response.body)
   end
+
+  test "GET show renders awaiting_approval badge and approve/reject actions" do
+    run = runs(:awaiting_run)
+    run_steps(:awaiting_step_run_step)
+    get run_path(run)
+    assert_response :success
+    assert_match(/awaiting approval/i, response.body)
+    assert_select "form[action=?]", approve_run_path(run)
+    assert_select "form[action=?]", reject_run_path(run)
+  end
+
+  test "POST approve marks run_step passed and enqueues after_approval job" do
+    run = runs(:awaiting_run)
+    rs = run_steps(:awaiting_step_run_step)
+    assert_enqueued_with(job: ExecuteRunJob, args: [run, rs.step_id, { after_approval: true }]) do
+      post approve_run_path(run)
+    end
+    assert_redirected_to run_path(run)
+    assert_equal "passed", rs.reload.status
+    assert_equal "running", run.reload.status
+  end
+
+  test "POST approve rejects non-awaiting_approval run" do
+    post approve_run_path(runs(:active_run))
+    assert_redirected_to run_path(runs(:active_run))
+    assert_equal "running", runs(:active_run).reload.status
+  end
+
+  test "POST reject saves rejection_context and enqueues resume job" do
+    run = runs(:awaiting_run)
+    rs = run_steps(:awaiting_step_run_step)
+    assert_enqueued_with(job: ExecuteRunJob, args: [run, rs.step_id, { resume: true }]) do
+      post reject_run_path(run), params: { rejection_context: "Use a different branch name." }
+    end
+    assert_redirected_to run_path(run)
+    assert_equal "Use a different branch name.", rs.reload.rejection_context
+    assert_equal "awaiting_approval", rs.reload.status
+    assert_equal "running", run.reload.status
+  end
+
+  test "POST reject rejects non-awaiting_approval run" do
+    post reject_run_path(runs(:active_run)), params: { rejection_context: "nope" }
+    assert_redirected_to run_path(runs(:active_run))
+  end
 end

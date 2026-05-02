@@ -1,5 +1,5 @@
 class RunsController < ApplicationController
-  before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up]
+  before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up, :approve, :reject]
 
   def index
     @runs = Run.includes(:pipeline_task, workflow: :project).recent
@@ -65,6 +65,39 @@ class RunsController < ApplicationController
 
     ExecuteRunJob.perform_later(@run, prompt_step.id, resume: true)
     redirect_to run_path(@run), notice: "Follow-up running."
+  end
+
+  def approve
+    unless @run.awaiting_approval?
+      redirect_to run_path(@run), alert: "Run is not awaiting approval." and return
+    end
+
+    awaiting = @run.awaiting_run_step
+    unless awaiting
+      redirect_to run_path(@run), alert: "No step awaiting approval." and return
+    end
+
+    awaiting.update!(status: "passed", rejection_context: nil)
+    @run.update!(status: "running")
+    ExecuteRunJob.perform_later(@run, awaiting.step_id, after_approval: true)
+    redirect_to run_path(@run), notice: "Step approved. Continuing run."
+  end
+
+  def reject
+    unless @run.awaiting_approval?
+      redirect_to run_path(@run), alert: "Run is not awaiting approval." and return
+    end
+
+    awaiting = @run.awaiting_run_step
+    unless awaiting
+      redirect_to run_path(@run), alert: "No step awaiting approval." and return
+    end
+
+    context = params[:rejection_context].to_s.strip
+    awaiting.update!(rejection_context: context.presence)
+    @run.update!(status: "running")
+    ExecuteRunJob.perform_later(@run, awaiting.step_id, resume: true)
+    redirect_to run_path(@run), notice: "Step rejected. Re-running with feedback."
   end
 
   def retry_from

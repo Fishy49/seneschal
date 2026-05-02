@@ -46,6 +46,10 @@ class Step < ApplicationRecord
     ready
   end
 
+  def manual_approval?
+    !!manual_approval
+  end
+
   def prompt_body(context = {})
     case step_type
     when "skill"  then TemplateRenderer.new(skill.body, context).render if skill

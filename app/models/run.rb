@@ -5,15 +5,23 @@ class Run < ApplicationRecord
   has_many :ad_hoc_steps, -> { order(:position) }, class_name: "Step", dependent: :destroy
   has_one :project, through: :workflow
 
-  STATUSES = ["pending", "running", "completed", "failed", "stopped"].freeze
+  STATUSES = ["pending", "running", "awaiting_approval", "completed", "failed", "stopped"].freeze
 
   validates :status, presence: true, inclusion: { in: STATUSES }
 
-  scope :active, -> { where(status: ["pending", "running"]) }
+  scope :active, -> { where(status: ["pending", "running", "awaiting_approval"]) }
   scope :recent, -> { order(created_at: :desc) }
 
   def active?
-    status.in?(["pending", "running"])
+    status.in?(["pending", "running", "awaiting_approval"])
+  end
+
+  def awaiting_approval?
+    status == "awaiting_approval"
+  end
+
+  def awaiting_run_step
+    run_steps.find_by(status: "awaiting_approval")
   end
 
   def duration

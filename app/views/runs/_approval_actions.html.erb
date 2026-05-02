@@ -1,0 +1,26 @@
+<div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-4" data-controller="approval-form">
+  <div class="flex items-center justify-between gap-3 mb-2">
+    <div>
+      <p class="font-medium text-sm">Awaiting Approval</p>
+      <p class="text-xs text-content-muted">Step: <%= run_step&.step&.name %></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <%= button_to "Approve", approve_run_path(run),
+            class: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
+            data: { turbo_confirm: "Approve and continue?" } %>
+      <button type="button" data-action="approval-form#toggleReject"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+        Reject
+      </button>
+    </div>
+  </div>
+  <div data-approval-form-target="rejectForm" style="display:none">
+    <%= form_with url: reject_run_path(run), method: :post do |f| %>
+      <%= f.text_area :rejection_context, rows: 4,
+            placeholder: "Add context the step should use on the next run...",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y mb-2" %>
+      <%= f.submit "Reject and Re-run",
+            class: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors" %>
+    <% end %>
+  </div>
+</div>

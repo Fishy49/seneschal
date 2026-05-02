@@ -50,4 +50,20 @@ class RunStepTest < ActiveSupport::TestCase
     rs = RunStep.new(stream_log: [{ "type" => "system", "model" => "claude" }])
     assert_nil rs.usage_stats
   end
+
+  test "awaiting_approval is a valid status" do
+    rs = RunStep.new(run: runs(:active_run), step: steps(:command_step), status: "awaiting_approval", attempt: 1)
+    assert rs.valid?
+  end
+
+  test "rejection_context can be stored and retrieved" do
+    rs = run_steps(:awaiting_step_run_step)
+    rs.update!(rejection_context: "Use a different branch.")
+    assert_equal "Use a different branch.", rs.reload.rejection_context
+  end
+
+  test "rejection_context can be nil" do
+    rs = run_steps(:passed_step)
+    assert_nil rs.rejection_context
+  end
 end

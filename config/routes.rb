@@ -93,6 +93,8 @@ Rails.application.routes.draw do
       post :resume
       post :retry_from
       post :follow_up
+      post :approve
+      post :reject
     end
   end
 
