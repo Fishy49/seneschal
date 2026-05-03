@@ -117,31 +117,17 @@ class ExecuteRunJobTest < ActiveJob::TestCase
 
   test "json_validator failure triggers run failure" do
     workflow = setup_workflow_with_ready_project!
-    producing_stdout = "```output\npayload: |\n  {\"age\":42}\n```"
     producer_step = workflow.steps.create!(
-      name: "Producer", step_type: "command", body: "echo payload",
-      position: 1, timeout: 30, max_retries: 0,
-      config: { "produces" => ["payload"] }
+      name: "Producer", step_type: "prompt", body: "produce payload",
+      position: 1, timeout: 30, max_retries: 0, config: { "produces" => ["payload"] }
     )
     validator_step = workflow.steps.create!(
-      name: "Validator", step_type: "json_validator",
-      position: 2, timeout: 30, max_retries: 0,
+      name: "Validator", step_type: "json_validator", position: 2, timeout: 30, max_retries: 0,
       config: { "json_schema_id" => json_schemas(:person_schema).id, "source_variable" => "payload" }
     )
-
     run = workflow.runs.create!(status: "pending", context: {}, input: {})
 
-    # Stub only the producer step; let the validator run with the real executor
-    fake_producer_result = StepExecutor::Result.new(exit_code: 0, stdout: producing_stdout, stderr: "", stream_events: nil)
-    factory = lambda do |step, context, repo_path, **kwargs|
-      if step.id == producer_step.id
-        fake_executor(fake_producer_result)
-      else
-        StepExecutor.__original_new(step, context, repo_path, **kwargs)
-      end
-    end
-
-    stub_step_executor_new(factory) do
+    stub_step_executor_for_step(producer_step, stdout: "```output\npayload: |\n  {\"age\":42}\n```") do
       ExecuteRunJob.new.perform(run)
     end
 
@@ -209,6 +195,17 @@ class ExecuteRunJobTest < ActiveJob::TestCase
   def with_stubbed_step_executor(stdout: "", &)
     fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
     factory = ->(*_args, **_kwargs) { fake_executor(fake_result) }
+    stub_step_executor_new(factory, &)
+  end
+
+  # Stubs only the named step's executor, falling through to the real executor for any other step.
+  def stub_step_executor_for_step(stubbed_step, stdout: "", &)
+    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
+    factory = lambda do |step, context, repo_path, **kwargs|
+      next fake_executor(fake_result) if step.id == stubbed_step.id
+
+      StepExecutor.__original_new(step, context, repo_path, **kwargs)
+    end
     stub_step_executor_new(factory, &)
   end
 

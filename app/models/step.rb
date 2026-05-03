@@ -4,9 +4,11 @@ class Step < ApplicationRecord
   belongs_to :skill, optional: true
   has_many :run_steps, dependent: :destroy
 
+  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "json_validator"].freeze
+
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }
-  validates :step_type, presence: true, inclusion: { in: ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "json_validator"] }
+  validates :step_type, presence: true, inclusion: { in: STEP_TYPES }
   validates :max_retries, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :timeout, numericality: { only_integer: true, greater_than: 0 }
   validates :skill, presence: true, if: -> { step_type == "skill" }

@@ -220,7 +220,7 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     steps(:skill_step).update!(config: { "produces" => ["custom_var"] })
     get produces_suggestions_project_workflow_steps_path(@project, @workflow)
     assert_response :success
-    data = JSON.parse(response.body)
+    data = response.parsed_body
     Step::GLOBAL_VARIABLES.each do |gv|
       assert_includes data["suggestions"], gv
     end

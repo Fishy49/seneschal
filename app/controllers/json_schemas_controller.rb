@@ -3,6 +3,9 @@ class JsonSchemasController < ApplicationController
 
   def index
     @schemas = JsonSchema.order(:name)
+    @usage_counts = Step.where("json_extract(config, '$.json_schema_id') IS NOT NULL")
+                        .group("json_extract(config, '$.json_schema_id')")
+                        .count
   end
 
   def show; end
@@ -31,7 +34,7 @@ class JsonSchemasController < ApplicationController
   end
 
   def destroy
-    if Step.where("config LIKE ?", "%\"json_schema_id\":#{@schema.id}%").exists?
+    if @schema.referencing_steps.exists?
       redirect_to json_schemas_path, alert: "Cannot delete schema '#{@schema.name}' — it is referenced by one or more steps."
     else
       @schema.destroy

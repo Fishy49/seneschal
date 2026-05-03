@@ -152,7 +152,14 @@ export default class extends Controller {
     if (ma) ma.checked = !!template.manual_approval
 
     // Pipeline: produces / consumes
-    this.field("produces").value = (cfg.produces || []).join(", ")
+    const producesTags = cfg.produces || []
+    const producesWrapper = this.element.querySelector('[data-controller~="produces-input"]')
+    const producesCtrl = producesWrapper && this.application.getControllerForElementAndIdentifier(producesWrapper, "produces-input")
+    if (producesCtrl) {
+      producesCtrl.setTags(producesTags)
+    } else {
+      this.field("produces").value = producesTags.join(",")
+    }
     const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')
     const consumes = cfg.consumes || []
     consumeCheckboxes.forEach(cb => { cb.checked = consumes.includes(cb.value) })

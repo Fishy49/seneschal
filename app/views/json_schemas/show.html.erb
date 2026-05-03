@@ -17,10 +17,10 @@
 
 <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
   <h2 class="text-lg font-semibold mb-3">Schema Body</h2>
-  <pre class="overflow-x-auto"><code class="language-json"><%= JSON.pretty_generate(JSON.parse(@schema.body)) rescue @schema.body %></code></pre>
+  <pre class="overflow-x-auto"><code class="language-json"><%= @schema.parsed_body ? JSON.pretty_generate(@schema.parsed_body) : @schema.body %></code></pre>
 </div>
 
-<% referencing_steps = Step.where("config LIKE ?", "%\"json_schema_id\":#{@schema.id}%").includes(workflow: :project) %>
+<% referencing_steps = @schema.referencing_steps.includes(workflow: :project) %>
 <% if referencing_steps.any? %>
   <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
     <h2 class="text-lg font-semibold mb-3">Used in Steps</h2>

@@ -27,7 +27,7 @@ class JsonSchemaTest < ActiveSupport::TestCase
   test "body must be valid JSON" do
     s = JsonSchema.new(name: "bad", body: "{not json}")
     assert_not s.valid?
-    assert s.errors[:body].any? { |e| e.include?("is not valid JSON") }
+    assert(s.errors[:body].any? { |e| e.include?("is not valid JSON") })
   end
 
   test "body must be valid JSON Schema" do
@@ -64,6 +64,6 @@ class JsonSchemaTest < ActiveSupport::TestCase
   test "validate_value errors mention missing required property" do
     s = json_schemas(:person_schema)
     result = s.validate_value({})
-    assert result[:errors].any? { |e| e.include?("name") || e.include?("required") }
+    assert(result[:errors].any? { |e| e.include?("name") || e.include?("required") })
   end
 end

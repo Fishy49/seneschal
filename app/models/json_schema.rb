@@ -4,6 +4,10 @@ class JsonSchema < ApplicationRecord
   validate :body_is_valid_json
   validate :body_is_valid_schema
 
+  def referencing_steps
+    Step.where("json_extract(config, '$.json_schema_id') = ?", id)
+  end
+
   def parsed_body
     @parsed_body ||= JSON.parse(body)
   rescue JSON::ParserError

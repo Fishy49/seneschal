@@ -242,9 +242,9 @@ class StepExecutorTest < ActiveSupport::TestCase
     step = workflows(:deploy).steps.create!(
       name: "v", step_type: "json_validator",
       position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => 999999, "source_variable" => "payload" }
+      config: { "json_schema_id" => 999_999, "source_variable" => "payload" }
     )
-    executor = StepExecutor.new(step, { "payload" => '{}' }, @ready.local_path)
+    executor = StepExecutor.new(step, { "payload" => "{}" }, @ready.local_path)
     result = executor.execute
     assert_not result.passed?
     assert_includes result.stderr, "JSON Schema not found"

@@ -61,17 +61,31 @@ export default class extends Controller {
     this.syncHidden()
   }
 
+  setTags(newTags) {
+    this.tags = [...new Set((newTags || []).map(t => String(t).trim()).filter(Boolean))]
+    this.render()
+    this.syncHidden()
+  }
+
   render() {
-    this.tagListTarget.innerHTML = this.tags.map((tag, i) => `
-      <li data-tag="${tag}"
-          class="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-input border border-edge rounded text-xs font-mono transition-colors">
-        ${tag}
-        <button type="button"
-                data-action="produces-input#remove"
-                data-produces-input-index-param="${i}"
-                class="text-content-muted hover:text-danger leading-none bg-transparent border-none cursor-pointer p-0 ml-0.5">&times;</button>
-      </li>
-    `).join("")
+    this.tagListTarget.replaceChildren(...this.tags.map((tag, i) => this.buildChip(tag, i)))
+  }
+
+  buildChip(tag, index) {
+    const li = document.createElement("li")
+    li.dataset.tag = tag
+    li.className = "inline-flex items-center gap-1 px-2 py-0.5 bg-surface-input border border-edge rounded text-xs font-mono transition-colors"
+    li.appendChild(document.createTextNode(tag))
+
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.dataset.action = "produces-input#remove"
+    btn.dataset.producesInputIndexParam = index
+    btn.className = "text-content-muted hover:text-danger leading-none bg-transparent border-none cursor-pointer p-0 ml-0.5"
+    btn.innerHTML = "&times;"
+    li.appendChild(btn)
+
+    return li
   }
 
   syncHidden() {
