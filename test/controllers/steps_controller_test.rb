@@ -172,4 +172,76 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil template
     assert template.manual_approval
   end
+
+  test "POST create skill step with json_schema_id persists it in config" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Schema Skill",
+          step_type: "skill",
+          skill_id: skills(:shared_skill).id,
+          position: 50,
+          timeout: 60,
+          max_retries: 0
+        },
+        json_schema_id: schema.id.to_s
+      }
+    end
+    assert_equal schema.id, Step.last.config["json_schema_id"]
+  end
+
+  test "POST create json_validator step auto-includes source variable in consumes" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Validator",
+          step_type: "json_validator",
+          position: 99,
+          timeout: 30,
+          max_retries: 0
+        },
+        json_validator_schema_id: schema.id.to_s,
+        json_validator_source_variable: "payload"
+      }
+    end
+    assert_includes Step.last.config["consumes"], "payload"
+  end
+
+  test "GET edit renders produces-input controller" do
+    get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
+    assert_response :success
+    assert_match "data-controller=\"produces-input\"", response.body
+    assert_select "input[type=hidden][name=produces]"
+  end
+
+  test "GET produces_suggestions returns global variables and existing produces" do
+    steps(:skill_step).update!(config: { "produces" => ["custom_var"] })
+    get produces_suggestions_project_workflow_steps_path(@project, @workflow)
+    assert_response :success
+    data = JSON.parse(response.body)
+    Step::GLOBAL_VARIABLES.each do |gv|
+      assert_includes data["suggestions"], gv
+    end
+    assert_includes data["suggestions"], "custom_var"
+  end
+
+  test "POST create persists produces as array" do
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Producer",
+          step_type: "command",
+          body: "echo hi",
+          position: 60,
+          timeout: 30,
+          max_retries: 0
+        },
+        produces: "alpha,beta"
+      }
+    end
+    assert_equal ["alpha", "beta"], Step.last.config["produces"]
+    assert_equal ["alpha", "beta"], Step.last.produces
+  end
 end

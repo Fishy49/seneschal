@@ -170,4 +170,83 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_includes cmd, "--permission-mode"
     assert_not_includes cmd, "--dangerously-skip-permissions"
   end
+
+  test "append_schema_instructions includes schema body" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: step.config.merge("json_schema_id" => schema.id))
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+
+    result = executor.send(:append_schema_instructions, "skill body")
+
+    assert result.start_with?("skill body")
+    assert_includes result, "Required JSON Output Schema"
+    assert_includes result, "person"
+    assert_includes result, '"type"'
+    assert_includes result, '"object"'
+  end
+
+  test "json_validator passes when value matches schema" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => '{"name":"Rick","age":42}' }, @ready.local_path)
+    result = executor.execute
+    assert result.passed?, result.stderr
+    assert_includes result.stdout, "Validated 'payload'"
+  end
+
+  test "json_validator fails when value does not match schema" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => '{"age":42}' }, @ready.local_path)
+    result = executor.execute
+    assert_equal 1, result.exit_code
+    assert_includes result.stderr, "name"
+  end
+
+  test "json_validator fails when value is not valid JSON" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => "not json" }, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "is not valid JSON"
+  end
+
+  test "json_validator fails when source variable not in context" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "missing_var" }
+    )
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "missing_var"
+  end
+
+  test "json_validator fails when schema not found" do
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => 999999, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => '{}' }, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "JSON Schema not found"
+  end
 end

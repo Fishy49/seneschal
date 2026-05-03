@@ -59,6 +59,7 @@ Rails.application.routes.draw do
         collection do
           patch :reorder
           get :available_variables
+          get :produces_suggestions
         end
         member do
           patch :move
@@ -68,6 +69,7 @@ Rails.application.routes.draw do
   end
 
   resources :skills
+  resources :json_schemas
   resources :project_groups
   resources :step_templates, path: "templates", only: [:index, :destroy]
 

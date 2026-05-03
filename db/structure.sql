@@ -106,7 +106,10 @@ FOREIGN KEY ("project_group_id")
 );
 CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id");
 CREATE INDEX "index_skills_on_project_group_id" ON "skills" ("project_group_id");
+CREATE TABLE IF NOT EXISTS "json_schemas" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "description" text, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
+CREATE UNIQUE INDEX "index_json_schemas_on_name" ON "json_schemas" ("name");
 INSERT INTO "schema_migrations" (version) VALUES
+('20260502000003'),
 ('20260502000002'),
 ('20260502000001'),
 ('20260430000001'),

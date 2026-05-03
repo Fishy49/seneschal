@@ -30,6 +30,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
     when "context_fetch" then execute_context_fetch(&)
+    when "json_validator" then execute_json_validator(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end
@@ -46,6 +47,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     prompt = append_produces_instructions(prompt) if @step.produces.any?
+    prompt = append_schema_instructions(prompt) if @step.json_schema
     prompt = append_context_projects(prompt) if context_project_paths.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
@@ -54,6 +56,32 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       execute_skill_streaming(cmd, &)
     else
       run_command(cmd)
+    end
+  end
+
+  def execute_json_validator(&)
+    schema = @step.json_schema
+    return Result.new(exit_code: 1, stdout: "", stderr: "JSON Schema not found") unless schema
+
+    source_var = @step.validator_source_variable
+    unless @context.key?(source_var) || @context.key?(source_var.to_s)
+      return Result.new(exit_code: 1, stdout: "", stderr: "Source variable '#{source_var}' not found in context")
+    end
+
+    raw = @context[source_var] || @context[source_var.to_s]
+
+    begin
+      value = JSON.parse(raw.to_s)
+    rescue JSON::ParserError => e
+      return Result.new(exit_code: 1, stdout: "", stderr: "Value for '#{source_var}' is not valid JSON: #{e.message}")
+    end
+
+    result = JsonSchemaValidator.new(schema).validate(value)
+
+    if result[:valid]
+      Result.new(exit_code: 0, stdout: "Validated '#{source_var}' against schema '#{schema.name}'", stderr: "")
+    else
+      Result.new(exit_code: 1, stdout: "", stderr: result[:errors].join("\n"))
     end
   end
 
@@ -440,6 +468,21 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       #{lines}
     CONTEXT
+  end
+
+  def append_schema_instructions(prompt)
+    schema = @step.json_schema
+    prompt + <<~INSTRUCTIONS
+
+      ## Required JSON Output Schema
+
+      This step requires output to conform to the JSON Schema named "#{schema.name}".
+      Emit your result as valid JSON matching this schema inside the appropriate output variable.
+
+      ```json
+      #{schema.body}
+      ```
+    INSTRUCTIONS
   end
 
   def append_produces_instructions(prompt)

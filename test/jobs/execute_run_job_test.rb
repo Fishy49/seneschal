@@ -115,6 +115,46 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "json_validator failure triggers run failure" do
+    workflow = setup_workflow_with_ready_project!
+    producing_stdout = "```output\npayload: |\n  {\"age\":42}\n```"
+    producer_step = workflow.steps.create!(
+      name: "Producer", step_type: "command", body: "echo payload",
+      position: 1, timeout: 30, max_retries: 0,
+      config: { "produces" => ["payload"] }
+    )
+    validator_step = workflow.steps.create!(
+      name: "Validator", step_type: "json_validator",
+      position: 2, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => json_schemas(:person_schema).id, "source_variable" => "payload" }
+    )
+
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    # Stub only the producer step; let the validator run with the real executor
+    fake_producer_result = StepExecutor::Result.new(exit_code: 0, stdout: producing_stdout, stderr: "", stream_events: nil)
+    factory = lambda do |step, context, repo_path, **kwargs|
+      if step.id == producer_step.id
+        fake_executor(fake_producer_result)
+      else
+        StepExecutor.__original_new(step, context, repo_path, **kwargs)
+      end
+    end
+
+    stub_step_executor_new(factory) do
+      ExecuteRunJob.new.perform(run)
+    end
+
+    run.reload
+    assert_equal "failed", run.status
+    validator_rs = run.run_steps.find_by(step: validator_step)
+    assert_not_nil validator_rs
+    assert_equal "failed", validator_rs.status
+    assert_includes validator_rs.error_output.to_s, "name"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
