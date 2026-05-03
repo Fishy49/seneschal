@@ -83,13 +83,14 @@ class StepsController < ApplicationController
       skill_id: step.skill_id,
       max_retries: step.max_retries,
       timeout: step.timeout,
-      input_context: step.input_context
+      input_context: step.input_context,
+      manual_approval: step.manual_approval
     )
   end
 
   def step_params
     permitted = params.expect(step: [:name, :position, :step_type, :max_retries, :timeout, :config, :skill_id, :body,
-                                     :input_context]).to_h
+                                     :input_context, :manual_approval]).to_h
 
     raw = request.params
     permitted[:config] = build_step_config(permitted[:step_type], raw)

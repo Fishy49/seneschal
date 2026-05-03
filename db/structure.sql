@@ -7,7 +7,7 @@ FOREIGN KEY ("workflow_id")
 );
 CREATE INDEX "index_pipeline_tasks_on_project_id" ON "pipeline_tasks" ("project_id") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_workflow_id" ON "pipeline_tasks" ("workflow_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "run_steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "attempt" integer DEFAULT 1 NOT NULL, "created_at" datetime(6) NOT NULL, "duration" float, "error_output" text, "exit_code" integer, "finished_at" datetime(6), "output" text, "run_id" integer NOT NULL, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "step_id" integer NOT NULL, "updated_at" datetime(6) NOT NULL, "position" integer /*application='Seneschal'*/, "resolved_input_context" text /*application='Seneschal'*/, "stream_log" json /*application='Seneschal'*/, "claude_session_id" varchar /*application='Seneschal'*/, "parent_run_step_id" integer /*application='Seneschal'*/, CONSTRAINT "fk_rails_154ec68049"
+CREATE TABLE IF NOT EXISTS "run_steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "attempt" integer DEFAULT 1 NOT NULL, "created_at" datetime(6) NOT NULL, "duration" float, "error_output" text, "exit_code" integer, "finished_at" datetime(6), "output" text, "run_id" integer NOT NULL, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "step_id" integer NOT NULL, "updated_at" datetime(6) NOT NULL, "position" integer /*application='Seneschal'*/, "resolved_input_context" text /*application='Seneschal'*/, "stream_log" json /*application='Seneschal'*/, "claude_session_id" varchar /*application='Seneschal'*/, "parent_run_step_id" integer /*application='Seneschal'*/, "rejection_context" text, CONSTRAINT "fk_rails_154ec68049"
 FOREIGN KEY ("run_id")
   REFERENCES "runs" ("id")
 , CONSTRAINT "fk_rails_58f100d30f"
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS 'code_map_search_content'(id INTEGER PRIMARY KEY, c0,
 CREATE TABLE IF NOT EXISTS 'code_map_search_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 CREATE TABLE IF NOT EXISTS 'code_map_search_config'(k PRIMARY KEY, v) WITHOUT ROWID;
 CREATE INDEX "index_run_steps_on_parent_run_step_id" ON "run_steps" ("parent_run_step_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text, "config" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "max_retries" integer DEFAULT 0 NOT NULL, "name" varchar NOT NULL, "position" integer NOT NULL, "skill_id" integer, "step_type" varchar NOT NULL, "timeout" integer DEFAULT 600 NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer, "input_context" text, "run_id" integer, CONSTRAINT "fk_rails_294a432e06"
+CREATE TABLE IF NOT EXISTS "steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text, "config" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "max_retries" integer DEFAULT 0 NOT NULL, "name" varchar NOT NULL, "position" integer NOT NULL, "skill_id" integer, "step_type" varchar NOT NULL, "timeout" integer DEFAULT 600 NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer, "input_context" text, "run_id" integer, "manual_approval" boolean DEFAULT FALSE NOT NULL, CONSTRAINT "fk_rails_294a432e06"
 FOREIGN KEY ("run_id")
   REFERENCES "runs" ("id")
 , CONSTRAINT "fk_rails_db4a595a96"
@@ -70,13 +70,26 @@ FOREIGN KEY ("skill_id")
 CREATE INDEX "index_steps_on_skill_id" ON "steps" ("skill_id") /*application='Seneschal'*/;
 CREATE INDEX "index_steps_on_workflow_id" ON "steps" ("workflow_id") /*application='Seneschal'*/;
 CREATE INDEX "index_steps_on_run_id" ON "steps" ("run_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "step_templates" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "step_type" varchar NOT NULL, "body" text, "config" json DEFAULT '{}' NOT NULL, "skill_id" integer, "max_retries" integer DEFAULT 0 NOT NULL, "timeout" integer DEFAULT 600 NOT NULL, "input_context" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_4a070dc96b"
+CREATE TABLE IF NOT EXISTS "step_templates" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "step_type" varchar NOT NULL, "body" text, "config" json DEFAULT '{}' NOT NULL, "skill_id" integer, "max_retries" integer DEFAULT 0 NOT NULL, "timeout" integer DEFAULT 600 NOT NULL, "input_context" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, "manual_approval" boolean DEFAULT FALSE NOT NULL, CONSTRAINT "fk_rails_4a070dc96b"
 FOREIGN KEY ("skill_id")
   REFERENCES "skills" ("id")
 );
 CREATE INDEX "index_step_templates_on_skill_id" ON "step_templates" ("skill_id") /*application='Seneschal'*/;
 CREATE UNIQUE INDEX "index_step_templates_on_name" ON "step_templates" ("name") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_trigger_type" ON "pipeline_tasks" ("trigger_type");
+CREATE TABLE IF NOT EXISTS "assistant_conversations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer NOT NULL, "project_id" integer, "claude_session_id" varchar, "status" varchar DEFAULT 'idle', "last_page_path" varchar, "title" varchar, "turbo_token" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_e0922243f0"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+, CONSTRAINT "fk_rails_8051ba0da6"
+FOREIGN KEY ("project_id")
+  REFERENCES "projects" ("id")
+);
+CREATE INDEX "index_assistant_conversations_on_user_id_and_updated_at" ON "assistant_conversations" ("user_id", "updated_at");
+CREATE TABLE IF NOT EXISTS "assistant_messages" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "assistant_conversation_id" integer NOT NULL, "role" varchar, "content" text, "choices" json DEFAULT '[]', "events" json DEFAULT '[]', "turbo_token" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_86abdd5953"
+FOREIGN KEY ("assistant_conversation_id")
+  REFERENCES "assistant_conversations" ("id")
+);
+CREATE INDEX "idx_on_assistant_conversation_id_created_at_852c40592e" ON "assistant_messages" ("assistant_conversation_id", "created_at");
 CREATE TABLE IF NOT EXISTS "project_groups" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "description" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
 CREATE UNIQUE INDEX "index_project_groups_on_name" ON "project_groups" ("name");
 CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL, "markdown_context" text, "project_group_id" integer, "skip_permissions" boolean DEFAULT FALSE NOT NULL, CONSTRAINT "fk_rails_1ce32c7182"
@@ -94,11 +107,15 @@ FOREIGN KEY ("project_group_id")
 CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id");
 CREATE INDEX "index_skills_on_project_group_id" ON "skills" ("project_group_id");
 INSERT INTO "schema_migrations" (version) VALUES
+('20260502000002'),
+('20260502000001'),
 ('20260430000001'),
 ('20260426000003'),
 ('20260426000002'),
 ('20260426000001'),
 ('20260425000001'),
+('20260420000002'),
+('20260420000001'),
 ('20260419025604'),
 ('20260417141730'),
 ('20260413044358'),

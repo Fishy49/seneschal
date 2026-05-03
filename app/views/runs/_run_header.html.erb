@@ -21,6 +21,9 @@
       <% end %>
     </div>
   </div>
+  <% if run.awaiting_approval? %>
+    <%= render "runs/approval_actions", run: run, run_step: run.awaiting_run_step %>
+  <% end %>
   <% if run.status.in?(%w[completed failed stopped]) %>
     <% project_skills = Skill.for_project(run.workflow.project).includes(:project, :project_group).order(:name) %>
     <details class="mb-4" data-controller="follow-up-form">

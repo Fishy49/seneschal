@@ -3,7 +3,7 @@ require "open3"
 class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   queue_as :default
 
-  def perform(run, resume_from_step_id = nil, resume: false)
+  def perform(run, resume_from_step_id = nil, resume: false, after_approval: false)
     project = run.workflow.project
     unless project.repo_ready?
       run.update!(status: "failed", finished_at: Time.current,
@@ -31,10 +31,14 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     all_steps = workflow_steps + ad_hoc_steps
     queue = all_steps.map { |s| [s, nil] }
 
-    if resume && resume_from_step_id.present?
+    if after_approval && resume_from_step_id.present?
       position = run.run_steps.maximum(:position) || 0
       queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
-      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: "failed").last
+      queue.shift if queue.any? # skip the just-approved step itself
+    elsif resume && resume_from_step_id.present?
+      position = run.run_steps.maximum(:position) || 0
+      queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
+      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: ["failed", "awaiting_approval"]).last
       queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       position = 0
@@ -60,8 +64,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
       if queued_run_step_id
         run_step = run.run_steps.find(queued_run_step_id)
+        resolved_context = append_rejection_context(resolved_context, run_step.rejection_context)
         run_step.update!(status: "running", started_at: Time.current,
-                         position: position, resolved_input_context: resolved_context)
+                         position: position, resolved_input_context: resolved_context,
+                         rejection_context: nil, output: nil, error_output: nil,
+                         finished_at: nil, duration: nil, exit_code: nil, stream_log: nil)
       else
         run_step = run.run_steps.create!(step: step, status: "running", attempt: 1,
                                          position: position, started_at: Time.current,
@@ -79,6 +86,14 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
         missing = step.produces - extracted.keys
         if missing.empty?
+          if step.manual_approval?
+            run_step.update!(status: "awaiting_approval")
+            run.update!(status: "awaiting_approval")
+            broadcast_step(run, run_step)
+            broadcast_run(run)
+            return
+          end
+
           broadcast_step(run, run_step)
           next
         end
@@ -319,6 +334,13 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   end
 
   # --- Execution ---
+
+  def append_rejection_context(base, rejection)
+    return base if rejection.blank?
+
+    note = "\n\n--- Operator rejection feedback (re-run) ---\n#{rejection}"
+    [base.to_s, note].join.strip.presence
+  end
 
   def resolve_input_context(step, context)
     return nil if step.input_context.blank?

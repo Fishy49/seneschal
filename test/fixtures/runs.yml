@@ -37,3 +37,10 @@ todo_run:
   finished_at: <%= 90.minutes.ago %>
   context: {}
   input: {}
+
+awaiting_run:
+  workflow: deploy
+  status: awaiting_approval
+  started_at: <%= 10.minutes.ago %>
+  context: {}
+  input: {}

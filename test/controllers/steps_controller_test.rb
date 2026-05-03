@@ -120,4 +120,56 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-controller*='template-panel']"
   end
+
+  test "manual_approval flag persists on create" do
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Approve me",
+          step_type: "command",
+          body: "echo hi",
+          position: 20,
+          timeout: 60,
+          max_retries: 0,
+          manual_approval: "1"
+        }
+      }
+    end
+    assert_redirected_to project_workflow_path(@project, @workflow)
+    assert Step.find_by(name: "Approve me").manual_approval
+  end
+
+  test "manual_approval flag persists on update" do
+    patch project_workflow_step_path(@project, @workflow, steps(:command_step)), params: {
+      step: { manual_approval: "1" }
+    }
+    assert steps(:command_step).reload.manual_approval
+  end
+
+  test "GET edit shows manual_approval checkbox" do
+    get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
+    assert_response :success
+    assert_select "input[type=checkbox][name='step[manual_approval]']"
+  end
+
+  test "manual_approval is carried into save_as_template" do
+    assert_difference "StepTemplate.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Approval Template Step",
+          step_type: "command",
+          body: "echo ok",
+          position: 21,
+          timeout: 60,
+          max_retries: 0,
+          manual_approval: "1"
+        },
+        save_as_template: "1",
+        template_name: "Approval Template"
+      }
+    end
+    template = StepTemplate.find_by(name: "Approval Template")
+    assert_not_nil template
+    assert template.manual_approval
+  end
 end

@@ -114,4 +114,14 @@ class StepTest < ActiveSupport::TestCase
     s.update!(config: s.config.merge("context_projects" => [9_999_999]))
     assert_equal [], s.ready_context_projects
   end
+
+  test "manual_approval? returns false by default" do
+    s = steps(:skill_step)
+    assert_not s.manual_approval?
+  end
+
+  test "manual_approval? returns true when set" do
+    s = steps(:approval_step)
+    assert s.manual_approval?
+  end
 end

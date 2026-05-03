@@ -18,7 +18,8 @@ class StepTemplate < ApplicationRecord
       skill_name: skill&.display_name,
       max_retries: max_retries,
       timeout: timeout,
-      input_context: input_context
+      input_context: input_context,
+      manual_approval: manual_approval
     }
   end
 end
