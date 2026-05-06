@@ -3,6 +3,8 @@
 <% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
 <% ctx_fetch = step.step_type == "context_fetch" ? (step.config || {}) : {} %>
 <% templates = StepTemplate.ordered %>
+<% schema_mode = step.step_type.in?(%w[skill prompt]) && claude_cfg["json_schema_id"].present? %>
+<% schema_output_var = schema_mode ? step.produces.first : "" %>
 <%= form_with model: [@project, @workflow, step],
       data: { controller: "step-form",
               step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json,
@@ -132,13 +134,15 @@
 
     <div class="mb-4">
       <label for="json_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">Output Schema (optional)</label>
-      <select name="json_schema_id" id="json_schema_id" class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      <select name="json_schema_id" id="json_schema_id"
+              data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
+              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
         <option value="">None</option>
         <% JsonSchema.order(:name).each do |s| %>
           <option value="<%= s.id %>" <%= "selected" if claude_cfg["json_schema_id"].to_i == s.id %>><%= s.name %></option>
         <% end %>
       </select>
-      <p class="text-xs text-content-muted mt-1">When set, a "Required JSON Output Schema" section is appended to the prompt so Claude knows what JSON structure to produce.</p>
+      <p class="text-xs text-content-muted mt-1">When set, the step's only output is a single variable holding JSON that conforms to this schema. The Produces field below collapses to a single output name.</p>
     </div>
 
     <% other_projects  = Project.where.not(id: @project.id).order(:name) %>
@@ -262,10 +266,7 @@
   </div>
 
   <%# === Pipeline variables (available to JSON validator datalist and consumes checkboxes) === %>
-  <% available_vars = Step::GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global" } } %>
-  <% @workflow.steps.where("position < ?", step.position.to_i).order(:position).each do |s| %>
-    <% s.produces.each { |v| available_vars << { "name" => v, "source" => s.name } } %>
-  <% end %>
+  <% available_vars = Step.available_variables_for(@workflow, step.position.to_i) %>
 
   <%# === JSON Validator fields === %>
   <div data-step-form-target="jsonValidatorFields" style="<%= 'display:none' unless step.step_type == 'json_validator' %>">
@@ -299,11 +300,12 @@
 
   <%# === Pipeline: Produces / Consumes === %>
   <div class="grid grid-cols-2 gap-4">
-    <div class="mb-4">
+    <div data-step-form-target="producesMultiFields" style="<%= 'display:none' if schema_mode %>">
       <label class="block text-sm font-medium text-content-muted mb-1.5">Produces</label>
       <div data-controller="produces-input"
+           data-step-form-target="producesInputWrapper"
            data-produces-input-suggestions-url-value="<%= produces_suggestions_project_workflow_steps_path(@project, @workflow) %>"
-           data-produces-input-initial-value="<%= step.produces.join(",") %>">
+           data-produces-input-initial-value="<%= schema_mode ? "" : step.produces.join(",") %>">
         <ul data-produces-input-target="tagList" class="flex flex-wrap gap-1 mb-1.5 min-h-[1.5rem]"></ul>
         <div class="flex gap-1.5">
           <input type="text" data-produces-input-target="newInput"
@@ -315,9 +317,19 @@
                   class="px-3 py-1.5 bg-surface-input border border-edge text-content-muted rounded-lg text-sm hover:bg-edge hover:text-content transition-colors cursor-pointer">Add</button>
         </div>
         <datalist id="produces_input_suggestions" data-produces-input-target="datalist"></datalist>
-        <input type="hidden" name="produces" data-produces-input-target="hiddenInput" value="<%= step.produces.join(",") %>">
+        <input type="hidden" name="produces" data-produces-input-target="hiddenInput" value="<%= schema_mode ? "" : step.produces.join(",") %>">
       </div>
       <p class="text-xs text-content-muted mt-1">Variable names this step outputs. For AI steps, Claude is instructed to produce these in a <code class="bg-surface-input px-1 rounded">```output</code> block. For scripts, use <code class="bg-surface-input px-1 rounded">::set-output name=value</code>.</p>
+    </div>
+
+    <div data-step-form-target="schemaOutputFields" style="<%= 'display:none' unless schema_mode %>">
+      <label for="schema_output_variable" class="block text-sm font-medium text-content-muted mb-1.5">Output Variable</label>
+      <input type="text" name="schema_output_variable" id="schema_output_variable"
+             value="<%= schema_output_var %>"
+             data-step-form-target="schemaOutputInput"
+             placeholder="result"
+             class="w-full px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+      <p class="text-xs text-content-muted mt-1">Claude emits the JSON conforming to the selected schema as the value of this single output variable.</p>
     </div>
 
     <div class="mb-4">
@@ -337,7 +349,7 @@
       <% else %>
         <p class="text-xs text-content-muted py-2">No variables available at this position. Global variables are always accessible.</p>
       <% end %>
-      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
+      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. Dotted entries (e.g. <code class="bg-surface-input px-1 rounded">review.summary</code>) pull a sub-section from an upstream step's JSON-schema output. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
     </div>
   </div>
 

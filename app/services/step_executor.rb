@@ -46,8 +46,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
-    prompt = append_produces_instructions(prompt) if @step.produces.any?
-    prompt = append_schema_instructions(prompt) if @step.json_schema
+    if @step.json_schema
+      prompt = append_schema_instructions(prompt)
+    elsif @step.produces.any?
+      prompt = append_produces_instructions(prompt)
+    end
     prompt = append_context_projects(prompt) if context_project_paths.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
@@ -433,10 +436,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def prepend_consumes_context(prompt)
     blocks = @step.consumes.filter_map do |name|
-      value = @context[name] || @context[name.to_s] || @context[name.to_sym]
-      next if value.nil? || value.to_s.strip.empty?
+      value = JsonPathResolver.lookup(@context, name)
+      formatted = JsonPathResolver.format(value)
+      next if formatted.strip.empty?
 
-      "<#{name}>\n#{value}\n</#{name}>"
+      "<#{name}>\n#{formatted}\n</#{name}>"
     end
     return prompt if blocks.empty?
 
@@ -472,12 +476,21 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def append_schema_instructions(prompt)
     schema = @step.json_schema
+    output_var = @step.produces.first.presence || "result"
     prompt + <<~INSTRUCTIONS
 
       ## Required JSON Output Schema
 
-      This step requires output to conform to the JSON Schema named "#{schema.name}".
-      Emit your result as valid JSON matching this schema inside the appropriate output variable.
+      This step's only output is a single variable named `#{output_var}` whose value must be valid JSON conforming to the schema "#{schema.name}".
+
+      Emit it at the very end of your response using the multiline output block format:
+
+      ```output
+      #{output_var}: |
+        { ...JSON conforming to the schema... }
+      ```
+
+      The schema:
 
       ```json
       #{schema.body}
@@ -517,8 +530,10 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   end
 
   def interpolate_string(str)
-    str.to_s.gsub(/\$\{(\w+)\}/) do
-      @context[::Regexp.last_match(1)] || @context[::Regexp.last_match(1).to_sym] || "${#{::Regexp.last_match(1)}}"
+    str.to_s.gsub(/\$\{([\w.]+)\}/) do
+      path = ::Regexp.last_match(1)
+      value = JsonPathResolver.lookup(@context, path)
+      value.nil? ? "${#{path}}" : JsonPathResolver.format(value)
     end
   end
 

@@ -18,6 +18,35 @@ class Step < ApplicationRecord
 
   GLOBAL_VARIABLES = ["task_title", "task_body", "task_kind", "repo_owner", "repo_name", "context_files"].freeze
 
+  # Variables visible at a given position in a workflow: globals + each prior
+  # step's outputs, plus schema-derived sub-paths for any prior step that has
+  # a JSON Schema attached. Each entry is a hash of
+  # { "name" => path_or_var, "source" => human_label }.
+  def self.available_variables_for(workflow, position)
+    vars = GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global" } }
+    workflow.steps.where(position: ...position.to_i).order(:position).each do |s|
+      outputs = s.output_variables
+      outputs.each { |v| vars << { "name" => v, "source" => s.name } }
+      next unless s.json_schema && (root = outputs.first)
+
+      JsonPathResolver.paths_for_schema(s.json_schema.body, prefix: root).each do |path|
+        vars << { "name" => path, "source" => s.name }
+      end
+    end
+    vars
+  end
+
+  # The variable names this step writes into the run context when it succeeds.
+  def output_variables
+    case step_type
+    when "context_fetch"
+      key = config["context_key"]
+      key.present? ? [key] : []
+    else
+      produces
+    end
+  end
+
   def produces
     config["produces"] || []
   end

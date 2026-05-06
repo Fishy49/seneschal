@@ -6,6 +6,7 @@ export default class extends Controller {
     "jsonValidatorFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
+    "schemaSelect", "schemaOutputFields", "schemaOutputInput", "producesMultiFields", "producesInputWrapper",
     "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
     "saveTemplateCheck", "saveTemplateFields"
   ]
@@ -16,6 +17,7 @@ export default class extends Controller {
     this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
+    this.applySchemaMode({ wipeOnEnter: false })
   }
 
   toggle() {
@@ -38,6 +40,48 @@ export default class extends Controller {
     if (this.hasJsonValidatorFieldsTarget) {
       this.jsonValidatorFieldsTarget.style.display = type === "json_validator" ? "" : "none"
     }
+    this.applySchemaMode({ wipeOnEnter: false })
+  }
+
+  schemaChanged() {
+    this.applySchemaMode({ wipeOnEnter: true })
+  }
+
+  applySchemaMode({ wipeOnEnter }) {
+    if (!this.hasSchemaOutputFieldsTarget || !this.hasProducesMultiFieldsTarget) return
+
+    const type = this.typeSelectTarget.value
+    const isClaudeStep = type === "skill" || type === "prompt"
+    const schemaId = this.hasSchemaSelectTarget ? this.schemaSelectTarget.value : ""
+    const inSchemaMode = isClaudeStep && !!schemaId
+
+    this.schemaOutputFieldsTarget.style.display = inSchemaMode ? "" : "none"
+    this.producesMultiFieldsTarget.style.display = inSchemaMode ? "none" : ""
+
+    if (inSchemaMode) {
+      if (wipeOnEnter) this.wipeProducesTags()
+      if (this.hasSchemaOutputInputTarget && !this.schemaOutputInputTarget.value) {
+        const opt = this.schemaSelectTarget.selectedOptions[0]
+        if (opt) this.schemaOutputInputTarget.value = this.slugify(opt.textContent)
+      }
+    }
+  }
+
+  wipeProducesTags() {
+    if (!this.hasProducesInputWrapperTarget) return
+    const ctrl = this.application.getControllerForElementAndIdentifier(
+      this.producesInputWrapperTarget, "produces-input"
+    )
+    if (ctrl) ctrl.setTags([])
+  }
+
+  slugify(name) {
+    return String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
   }
 
   ciModeChanged() {
@@ -153,12 +197,20 @@ export default class extends Controller {
 
     // Pipeline: produces / consumes
     const producesTags = cfg.produces || []
+    const isClaudeStep = template.step_type === "skill" || template.step_type === "prompt"
+    const templateInSchemaMode = isClaudeStep && !!cfg.json_schema_id
     const producesWrapper = this.element.querySelector('[data-controller~="produces-input"]')
     const producesCtrl = producesWrapper && this.application.getControllerForElementAndIdentifier(producesWrapper, "produces-input")
-    if (producesCtrl) {
-      producesCtrl.setTags(producesTags)
+    if (templateInSchemaMode) {
+      if (producesCtrl) producesCtrl.setTags([])
+      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = producesTags[0] || ""
     } else {
-      this.field("produces").value = producesTags.join(",")
+      if (producesCtrl) {
+        producesCtrl.setTags(producesTags)
+      } else {
+        this.field("produces").value = producesTags.join(",")
+      }
+      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = ""
     }
     const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')
     const consumes = cfg.consumes || []

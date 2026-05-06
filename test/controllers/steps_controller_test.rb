@@ -227,6 +227,51 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_includes data["suggestions"], "custom_var"
   end
 
+  test "POST create skill step with schema and schema_output_variable persists produces as single-element array" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Schema Skill",
+          step_type: "skill",
+          skill_id: skills(:shared_skill).id,
+          position: 51,
+          timeout: 60,
+          max_retries: 0
+        },
+        json_schema_id: schema.id.to_s,
+        schema_output_variable: "person_payload",
+        produces: "alpha,beta"
+      }
+    end
+    step = Step.last
+    assert_equal schema.id, step.config["json_schema_id"]
+    assert_equal ["person_payload"], step.config["produces"]
+  end
+
+  test "PATCH update wipes existing produces when json_schema_id is set" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: { "produces" => ["alpha", "beta"] })
+
+    patch project_workflow_step_path(@project, @workflow, step), params: {
+      step: {
+        name: step.name,
+        step_type: "skill",
+        skill_id: step.skill_id,
+        position: step.position,
+        timeout: step.timeout,
+        max_retries: step.max_retries
+      },
+      json_schema_id: schema.id.to_s,
+      schema_output_variable: "person_payload",
+      produces: "alpha,beta"
+    }
+
+    step.reload
+    assert_equal ["person_payload"], step.config["produces"]
+  end
+
   test "POST create persists produces as array" do
     assert_difference "Step.count", 1 do
       post project_workflow_steps_path(@project, @workflow), params: {

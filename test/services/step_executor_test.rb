@@ -77,6 +77,32 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_equal "skill body", prompt
   end
 
+  test "prepend_consumes_context resolves dotted sub-paths from JSON producer" do
+    @step.update!(config: @step.config.merge("consumes" => ["review.summary", "review.meta.author"]))
+    context = { "review" => '{"summary":"looks good","meta":{"author":"rick"}}' }
+    executor = StepExecutor.new(@step, context, @ready.local_path)
+
+    prompt = executor.send(:prepend_consumes_context, "skill body")
+
+    assert_includes prompt, "<review.summary>\nlooks good\n</review.summary>"
+    assert_includes prompt, "<review.meta.author>\nrick\n</review.meta.author>"
+  end
+
+  test "interpolate_string resolves dotted JSON paths in ${var.path}" do
+    context = { "review" => '{"summary":"ok","meta":{"author":"rick"}}' }
+    executor = StepExecutor.new(@step, context, @ready.local_path)
+
+    result = executor.send(:interpolate_string, "summary=${review.summary}, by=${review.meta.author}")
+
+    assert_equal "summary=ok, by=rick", result
+  end
+
+  test "interpolate_string leaves unresolved placeholders unchanged" do
+    executor = StepExecutor.new(@step, { "review" => '{"summary":"ok"}' }, @ready.local_path)
+    result = executor.send(:interpolate_string, "missing=${review.nope}")
+    assert_equal "missing=${review.nope}", result
+  end
+
   test "execute_skill prepends project markdown_context to prompt" do
     executor = StepExecutor.new(@step, {}, @ready.local_path)
     prompt = executor.send(:prepend_project_context, "skill body here")
@@ -184,6 +210,18 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_includes result, "person"
     assert_includes result, '"type"'
     assert_includes result, '"object"'
+  end
+
+  test "append_schema_instructions names the produces output variable" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: step.config.merge("json_schema_id" => schema.id, "produces" => ["person_payload"]))
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+
+    result = executor.send(:append_schema_instructions, "skill body")
+
+    assert_includes result, "person_payload"
+    assert_includes result, "```output"
   end
 
   test "json_validator passes when value matches schema" do

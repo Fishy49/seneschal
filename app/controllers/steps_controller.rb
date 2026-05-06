@@ -34,15 +34,8 @@ class StepsController < ApplicationController
   end
 
   def available_variables
-    position = params[:position].to_i
-    vars = Step::GLOBAL_VARIABLES.map { |v| { name: v, source: "global" } }
-
-    @workflow.steps.where(position: ...position).order(:position).each do |s|
-      s.produces.each do |var_name|
-        vars << { name: var_name, source: s.name }
-      end
-    end
-
+    vars = Step.available_variables_for(@workflow, params[:position].to_i)
+               .map { |v| { name: v["name"], source: v["source"] } }
     render json: { variables: vars }
   end
 
@@ -101,7 +94,12 @@ class StepsController < ApplicationController
     permitted[:config] = build_step_config(permitted[:step_type], raw)
 
     # Pipeline: produces and consumes
-    produces = raw["produces"].to_s.split(",").map(&:strip).compact_blank
+    produces =
+      if claude_schema_mode?(permitted)
+        [raw["schema_output_variable"].to_s.strip].compact_blank
+      else
+        raw["produces"].to_s.split(",").map(&:strip).compact_blank
+      end
     consumes = Array(raw["consumes"]).compact_blank
     if permitted[:step_type] == "json_validator" && raw["json_validator_source_variable"].present?
       consumes << raw["json_validator_source_variable"].to_s.strip
@@ -120,6 +118,11 @@ class StepsController < ApplicationController
     end
 
     permitted
+  end
+
+  def claude_schema_mode?(permitted)
+    permitted[:step_type].to_s.in?(["skill", "prompt"]) &&
+      permitted[:config]["json_schema_id"].present?
   end
 
   def build_step_config(step_type, raw)

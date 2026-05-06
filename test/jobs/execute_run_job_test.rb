@@ -141,6 +141,23 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "scope_context keeps parent variable when consumes references a sub-path" do
+    workflow = setup_workflow_with_ready_project!
+    _step1, step2 = create_two_step_workflow(workflow,
+                                             step1_config: { "produces" => ["review"] },
+                                             step2_config: { "consumes" => ["review.summary"] })
+    run = workflow.runs.create!(status: "running",
+                                context: { "review" => '{"summary":"ok"}', "unrelated" => "drop me" },
+                                input: {})
+
+    scoped = ExecuteRunJob.new.send(:scope_context, step2, run.context)
+
+    assert_equal '{"summary":"ok"}', scoped["review"]
+    assert_not scoped.key?("unrelated")
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
