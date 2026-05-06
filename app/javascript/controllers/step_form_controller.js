@@ -6,6 +6,7 @@ export default class extends Controller {
     "jsonValidatorFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
+    "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
     "schemaSelect", "schemaOutputFields", "schemaOutputInput", "producesMultiFields", "producesInputWrapper",
     "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
     "saveTemplateCheck", "saveTemplateFields"
@@ -17,6 +18,7 @@ export default class extends Controller {
     this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
+    if (this.hasFetchMethodTarget) this.fetchMethodChanged()
     this.applySchemaMode({ wipeOnEnter: false })
   }
 
@@ -82,6 +84,35 @@ export default class extends Controller {
       .replace(/[^\w]+/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_|_$/g, "")
+  }
+
+  fetchMethodChanged() {
+    if (!this.hasFetchMethodTarget) return
+    const method = this.fetchMethodTarget.value
+    if (this.hasFetchUrlFieldsTarget) this.fetchUrlFieldsTarget.style.display = method === "url" ? "" : "none"
+    if (this.hasFetchProjectFileFieldsTarget) this.fetchProjectFileFieldsTarget.style.display = method === "project_file" ? "" : "none"
+    this.updateFetchSchemaVisibility()
+  }
+
+  setProjectFile(path) {
+    if (!this.hasFetchPathTarget) return
+    this.fetchPathTarget.value = path || ""
+    if (this.hasFetchPathDisplayTarget) {
+      if (path) {
+        this.fetchPathDisplayTarget.textContent = path
+      } else {
+        this.fetchPathDisplayTarget.innerHTML = '<span class="text-content-muted">No file selected</span>'
+      }
+    }
+    this.updateFetchSchemaVisibility()
+  }
+
+  updateFetchSchemaVisibility() {
+    if (!this.hasFetchSchemaFieldsTarget) return
+    const method = this.hasFetchMethodTarget ? this.fetchMethodTarget.value : ""
+    const path = this.hasFetchPathTarget ? this.fetchPathTarget.value.toLowerCase() : ""
+    const visible = method === "project_file" && path.endsWith(".json")
+    this.fetchSchemaFieldsTarget.style.display = visible ? "" : "none"
   }
 
   ciModeChanged() {
@@ -221,6 +252,9 @@ export default class extends Controller {
       this.field("fetch_method").value = cfg.method || "url"
       this.field("fetch_url").value = cfg.url || ""
       this.field("fetch_context_key").value = cfg.context_key || ""
+      this.field("fetch_json_schema_id").value = cfg.json_schema_id || ""
+      this.setProjectFile(cfg.path || "")
+      if (this.hasFetchMethodTarget) this.fetchMethodChanged()
     }
 
     // CI Check config

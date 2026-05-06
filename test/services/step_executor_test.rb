@@ -276,6 +276,63 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_includes result.stderr, "missing_var"
   end
 
+  test "context_fetch project_file reads file from project repo" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "config.json"), '{"flag":true}')
+      project = projects(:seneschal)
+      project.update!(local_path: dir)
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 70, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "config.json", "context_key" => "cfg" }
+      )
+
+      result = StepExecutor.new(step, {}, dir).execute
+      assert result.passed?, result.stderr
+      assert_equal '{"flag":true}', result.stdout
+    end
+  end
+
+  test "context_fetch project_file errors when file is missing" do
+    Dir.mktmpdir do |dir|
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 71, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "missing.json", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, {}, dir).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "File not found"
+    end
+  end
+
+  test "context_fetch project_file rejects path traversal" do
+    Dir.mktmpdir do |dir|
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 72, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "../etc/passwd", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, {}, dir).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "escapes the project directory"
+    end
+  end
+
+  test "context_fetch project_file interpolates ${var} in path" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "settings.json"), "{}")
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 73, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "${file}", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, { "file" => "settings.json" }, dir).execute
+      assert result.passed?, result.stderr
+      assert_equal "{}", result.stdout
+    end
+  end
+
   test "json_validator fails when schema not found" do
     step = workflows(:deploy).steps.create!(
       name: "v", step_type: "json_validator",

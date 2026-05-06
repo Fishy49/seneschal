@@ -3,7 +3,7 @@
 
 <% templates = StepTemplate.includes(skill: [:project, :project_group]).ordered %>
 <% skills = Skill.for_project(@project).includes(:project, :project_group).order(:name) %>
-<div data-controller="template-panel skill-panel"
+<div data-controller="template-panel skill-panel file-panel"
      data-template-panel-templates-value="<%= templates.map { |t| [t.id, t.template_data] }.to_h.to_json %>">
   <div class="bg-surface-card border border-edge rounded-lg p-5 step-form-wrapper">
     <%= render "form", step: @step %>
@@ -66,4 +66,5 @@
   <% end %>
 
   <%= render "steps/skill_panel", skills: skills %>
+  <%= render "steps/file_panel", project: @project %>
 </div>

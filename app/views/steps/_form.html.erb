@@ -236,17 +236,22 @@
   </div>
 
   <%# === Context Fetch fields === %>
+  <% fetch_method = ctx_fetch["method"].presence || "url" %>
+  <% fetch_path = ctx_fetch["path"].to_s %>
+  <% fetch_path_is_json = fetch_path.downcase.end_with?(".json") %>
   <div data-step-form-target="contextFetchFields" style="<%= 'display:none' unless step.step_type == 'context_fetch' %>">
     <div class="mb-4">
       <label for="fetch_method" class="block text-sm font-medium text-content-muted mb-1.5">Method</label>
       <select name="fetch_method" id="fetch_method"
+              data-step-form-target="fetchMethod" data-action="step-form#fetchMethodChanged"
               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        <option value="url" <%= "selected" unless ctx_fetch["method"] && ctx_fetch["method"] != "url" %>>URL</option>
+        <option value="url" <%= "selected" if fetch_method == "url" %>>URL</option>
+        <option value="project_file" <%= "selected" if fetch_method == "project_file" %>>Project File</option>
       </select>
-      <p class="text-sm text-content-muted mt-2">How to fetch context. GitHub repo URLs automatically resolve to the README.</p>
+      <p class="text-sm text-content-muted mt-2">How to fetch context. URLs support GitHub auto-resolve; Project File reads from the project's working tree.</p>
     </div>
 
-    <div class="mb-4">
+    <div data-step-form-target="fetchUrlFields" style="<%= 'display:none' unless fetch_method == 'url' %>" class="mb-4">
       <label for="fetch_url" class="block text-sm font-medium text-content-muted mb-1.5">URL</label>
       <input type="text" name="fetch_url" id="fetch_url"
              value="<%= ctx_fetch["url"] %>"
@@ -255,13 +260,40 @@
       <p class="text-sm text-content-muted mt-2">Supports <code class="text-xs bg-surface-input px-1 py-0.5 rounded">${variable}</code> interpolation. GitHub repo URLs fetch the README; blob URLs fetch the file.</p>
     </div>
 
+    <div data-step-form-target="fetchProjectFileFields" style="<%= 'display:none' unless fetch_method == 'project_file' %>" class="mb-4">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Project File</label>
+      <div class="flex items-center gap-3">
+        <button type="button" data-action="file-panel#open"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm text-content-muted hover:text-content hover:bg-edge transition-colors cursor-pointer">
+          Select File
+        </button>
+        <code data-step-form-target="fetchPathDisplay" class="text-xs text-content font-mono break-all">
+          <% if fetch_path.present? %><%= fetch_path %><% else %><span class="text-content-muted">No file selected</span><% end %>
+        </code>
+      </div>
+      <input type="hidden" name="fetch_path" data-step-form-target="fetchPath" value="<%= fetch_path %>">
+      <p class="text-sm text-content-muted mt-2">Reads the file from the project's working tree at run time. Requires a generated code map for picking files.</p>
+
+      <div data-step-form-target="fetchSchemaFields" style="<%= 'display:none' unless fetch_path_is_json %>" class="mt-3">
+        <label for="fetch_json_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">JSON Schema (optional)</label>
+        <select name="fetch_json_schema_id" id="fetch_json_schema_id"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="">None</option>
+          <% JsonSchema.order(:name).each do |s| %>
+            <option value="<%= s.id %>" <%= "selected" if ctx_fetch["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+          <% end %>
+        </select>
+        <p class="text-xs text-content-muted mt-1">When set, downstream steps can reference sub-paths of this file's JSON (e.g. <code class="bg-surface-input px-1 rounded">config.feature_flags</code>).</p>
+      </div>
+    </div>
+
     <div class="mb-4">
       <label for="fetch_context_key" class="block text-sm font-medium text-content-muted mb-1.5">Context Key</label>
       <input type="text" name="fetch_context_key" id="fetch_context_key"
              value="<%= ctx_fetch["context_key"] %>"
              placeholder="e.g. project_readme"
              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-      <p class="text-sm text-content-muted mt-2">Store the fetched content in run context under this key for use by later steps</p>
+      <p class="text-sm text-content-muted mt-2">Store the fetched content in run context under this key for use by later steps.</p>
     </div>
   </div>
 

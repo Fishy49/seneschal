@@ -170,11 +170,19 @@ class StepsController < ApplicationController
   end
 
   def build_context_fetch_config(raw)
-    {
-      "method" => raw["fetch_method"].presence || "url",
-      "url" => raw["fetch_url"].presence,
+    method = raw["fetch_method"].presence || "url"
+    cfg = {
+      "method" => method,
       "context_key" => raw["fetch_context_key"].presence,
       "capture_output" => raw["fetch_context_key"].presence
-    }.compact
+    }
+    case method
+    when "url"
+      cfg["url"] = raw["fetch_url"].presence
+    when "project_file"
+      cfg["path"] = raw["fetch_path"].presence
+      cfg["json_schema_id"] = raw["fetch_json_schema_id"].to_i if raw["fetch_json_schema_id"].present?
+    end
+    cfg.compact
   end
 end

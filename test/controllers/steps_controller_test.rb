@@ -272,6 +272,31 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_equal ["person_payload"], step.config["produces"]
   end
 
+  test "POST create context_fetch step with project_file persists path and json_schema_id" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Read settings",
+          step_type: "context_fetch",
+          position: 80,
+          timeout: 30,
+          max_retries: 0
+        },
+        fetch_method: "project_file",
+        fetch_path: "config/feature_flags.json",
+        fetch_context_key: "flags",
+        fetch_json_schema_id: schema.id.to_s
+      }
+    end
+    cfg = Step.last.config
+    assert_equal "project_file", cfg["method"]
+    assert_equal "config/feature_flags.json", cfg["path"]
+    assert_equal "flags", cfg["context_key"]
+    assert_equal schema.id, cfg["json_schema_id"]
+    assert_nil cfg["url"]
+  end
+
   test "POST create persists produces as array" do
     assert_difference "Step.count", 1 do
       post project_workflow_steps_path(@project, @workflow), params: {
