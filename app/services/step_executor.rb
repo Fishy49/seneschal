@@ -30,6 +30,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
     when "context_fetch" then execute_context_fetch(&)
+    when "json_validator" then execute_json_validator(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end
@@ -45,7 +46,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
-    prompt = append_produces_instructions(prompt) if @step.produces.any?
+    if @step.json_schema
+      prompt = append_schema_instructions(prompt)
+    elsif @step.produces.any?
+      prompt = append_produces_instructions(prompt)
+    end
     prompt = append_context_projects(prompt) if context_project_paths.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
@@ -54,6 +59,32 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       execute_skill_streaming(cmd, &)
     else
       run_command(cmd)
+    end
+  end
+
+  def execute_json_validator(&)
+    schema = @step.json_schema
+    return Result.new(exit_code: 1, stdout: "", stderr: "JSON Schema not found") unless schema
+
+    source_var = @step.validator_source_variable
+    unless @context.key?(source_var) || @context.key?(source_var.to_s)
+      return Result.new(exit_code: 1, stdout: "", stderr: "Source variable '#{source_var}' not found in context")
+    end
+
+    raw = @context[source_var] || @context[source_var.to_s]
+
+    begin
+      value = JSON.parse(raw.to_s)
+    rescue JSON::ParserError => e
+      return Result.new(exit_code: 1, stdout: "", stderr: "Value for '#{source_var}' is not valid JSON: #{e.message}")
+    end
+
+    result = JsonSchemaValidator.new(schema).validate(value)
+
+    if result[:valid]
+      Result.new(exit_code: 0, stdout: "Validated '#{source_var}' against schema '#{schema.name}'", stderr: "")
+    else
+      Result.new(exit_code: 1, stdout: "", stderr: result[:errors].join("\n"))
     end
   end
 
@@ -405,10 +436,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def prepend_consumes_context(prompt)
     blocks = @step.consumes.filter_map do |name|
-      value = @context[name] || @context[name.to_s] || @context[name.to_sym]
-      next if value.nil? || value.to_s.strip.empty?
+      value = JsonPathResolver.lookup(@context, name)
+      formatted = JsonPathResolver.format(value)
+      next if formatted.strip.empty?
 
-      "<#{name}>\n#{value}\n</#{name}>"
+      "<#{name}>\n#{formatted}\n</#{name}>"
     end
     return prompt if blocks.empty?
 
@@ -440,6 +472,30 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       #{lines}
     CONTEXT
+  end
+
+  def append_schema_instructions(prompt)
+    schema = @step.json_schema
+    output_var = @step.produces.first.presence || "result"
+    prompt + <<~INSTRUCTIONS
+
+      ## Required JSON Output Schema
+
+      This step's only output is a single variable named `#{output_var}` whose value must be valid JSON conforming to the schema "#{schema.name}".
+
+      Emit it at the very end of your response using the multiline output block format:
+
+      ```output
+      #{output_var}: |
+        { ...JSON conforming to the schema... }
+      ```
+
+      The schema:
+
+      ```json
+      #{schema.body}
+      ```
+    INSTRUCTIONS
   end
 
   def append_produces_instructions(prompt)
@@ -474,8 +530,10 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   end
 
   def interpolate_string(str)
-    str.to_s.gsub(/\$\{(\w+)\}/) do
-      @context[::Regexp.last_match(1)] || @context[::Regexp.last_match(1).to_sym] || "${#{::Regexp.last_match(1)}}"
+    str.to_s.gsub(/\$\{([\w.]+)\}/) do
+      path = ::Regexp.last_match(1)
+      value = JsonPathResolver.lookup(@context, path)
+      value.nil? ? "${#{path}}" : JsonPathResolver.format(value)
     end
   end
 

@@ -95,6 +95,8 @@
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'pipeline_tasks' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Skills", skills_path,
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'skills' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+        <%= link_to "Schemas", json_schemas_path,
+              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'json_schemas' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Runs", runs_path,
               class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'runs' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
         <%= link_to "Templates", step_templates_path,

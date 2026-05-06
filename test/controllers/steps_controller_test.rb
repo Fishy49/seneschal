@@ -172,4 +172,146 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil template
     assert template.manual_approval
   end
+
+  test "POST create skill step with json_schema_id persists it in config" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Schema Skill",
+          step_type: "skill",
+          skill_id: skills(:shared_skill).id,
+          position: 50,
+          timeout: 60,
+          max_retries: 0
+        },
+        json_schema_id: schema.id.to_s
+      }
+    end
+    assert_equal schema.id, Step.last.config["json_schema_id"]
+  end
+
+  test "POST create json_validator step auto-includes source variable in consumes" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Validator",
+          step_type: "json_validator",
+          position: 99,
+          timeout: 30,
+          max_retries: 0
+        },
+        json_validator_schema_id: schema.id.to_s,
+        json_validator_source_variable: "payload"
+      }
+    end
+    assert_includes Step.last.config["consumes"], "payload"
+  end
+
+  test "GET edit renders produces-input controller" do
+    get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
+    assert_response :success
+    assert_match "data-controller=\"produces-input\"", response.body
+    assert_select "input[type=hidden][name=produces]"
+  end
+
+  test "GET produces_suggestions returns global variables and existing produces" do
+    steps(:skill_step).update!(config: { "produces" => ["custom_var"] })
+    get produces_suggestions_project_workflow_steps_path(@project, @workflow)
+    assert_response :success
+    data = response.parsed_body
+    Step::GLOBAL_VARIABLES.each do |gv|
+      assert_includes data["suggestions"], gv
+    end
+    assert_includes data["suggestions"], "custom_var"
+  end
+
+  test "POST create skill step with schema and schema_output_variable persists produces as single-element array" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Schema Skill",
+          step_type: "skill",
+          skill_id: skills(:shared_skill).id,
+          position: 51,
+          timeout: 60,
+          max_retries: 0
+        },
+        json_schema_id: schema.id.to_s,
+        schema_output_variable: "person_payload",
+        produces: "alpha,beta"
+      }
+    end
+    step = Step.last
+    assert_equal schema.id, step.config["json_schema_id"]
+    assert_equal ["person_payload"], step.config["produces"]
+  end
+
+  test "PATCH update wipes existing produces when json_schema_id is set" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: { "produces" => ["alpha", "beta"] })
+
+    patch project_workflow_step_path(@project, @workflow, step), params: {
+      step: {
+        name: step.name,
+        step_type: "skill",
+        skill_id: step.skill_id,
+        position: step.position,
+        timeout: step.timeout,
+        max_retries: step.max_retries
+      },
+      json_schema_id: schema.id.to_s,
+      schema_output_variable: "person_payload",
+      produces: "alpha,beta"
+    }
+
+    step.reload
+    assert_equal ["person_payload"], step.config["produces"]
+  end
+
+  test "POST create context_fetch step with project_file persists path and json_schema_id" do
+    schema = json_schemas(:person_schema)
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Read settings",
+          step_type: "context_fetch",
+          position: 80,
+          timeout: 30,
+          max_retries: 0
+        },
+        fetch_method: "project_file",
+        fetch_path: "config/feature_flags.json",
+        fetch_context_key: "flags",
+        fetch_json_schema_id: schema.id.to_s
+      }
+    end
+    cfg = Step.last.config
+    assert_equal "project_file", cfg["method"]
+    assert_equal "config/feature_flags.json", cfg["path"]
+    assert_equal "flags", cfg["context_key"]
+    assert_equal schema.id, cfg["json_schema_id"]
+    assert_nil cfg["url"]
+  end
+
+  test "POST create persists produces as array" do
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Producer",
+          step_type: "command",
+          body: "echo hi",
+          position: 60,
+          timeout: 30,
+          max_retries: 0
+        },
+        produces: "alpha,beta"
+      }
+    end
+    assert_equal ["alpha", "beta"], Step.last.config["produces"]
+    assert_equal ["alpha", "beta"], Step.last.produces
+  end
 end

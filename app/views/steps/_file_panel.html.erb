@@ -1,0 +1,49 @@
+<%# File picker panel %>
+<% files = (project.code_map&.tree || []).filter_map { |e| e["path"] || e[:path] }.sort %>
+
+<div data-file-panel-target="backdrop" data-action="click->file-panel#close"
+     class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-200"
+     style="display:none; opacity:0"></div>
+
+<div data-file-panel-target="panel"
+     class="fixed top-0 right-0 h-full w-[560px] bg-surface-card border-l border-edge z-50 shadow-2xl flex flex-col transition-transform duration-200"
+     style="transform:translateX(100%)">
+
+  <div class="flex items-center justify-between px-5 py-4 border-b border-edge">
+    <h2 class="text-lg font-semibold">Select Project File</h2>
+    <button type="button" data-action="file-panel#close"
+            class="p-1 text-content-muted hover:text-content bg-transparent border-none cursor-pointer text-lg">&times;</button>
+  </div>
+
+  <div class="px-5 py-3 border-b border-edge">
+    <input type="text" placeholder="Search files..." autocomplete="off"
+           data-file-panel-target="search" data-action="input->file-panel#filter"
+           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+  </div>
+
+  <div class="flex-1 overflow-y-auto" data-file-panel-target="list">
+    <% if files.empty? %>
+      <div class="px-5 py-6 text-sm text-content-muted">
+        No files indexed for <%= project.name %> yet.
+        <%= link_to "Generate code map", project_code_map_path(project), class: "text-accent hover:underline" %>
+        to enable file selection.
+      </div>
+    <% else %>
+      <ul class="divide-y divide-edge">
+        <% files.each do |path| %>
+          <li data-path="<%= path %>" data-searchable="<%= path.downcase %>">
+            <button type="button" data-action="file-panel#select"
+                    data-file-path="<%= path %>"
+                    class="w-full text-left px-5 py-2 bg-transparent border-none cursor-pointer hover:bg-surface-input">
+              <code class="text-xs text-content"><%= path %></code>
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+
+    <p data-file-panel-target="empty" class="text-sm text-content-muted text-center py-4" style="display:none">
+      No files match your search.
+    </p>
+  </div>
+</div>

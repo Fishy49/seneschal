@@ -124,4 +124,77 @@ class StepTest < ActiveSupport::TestCase
     s = steps(:approval_step)
     assert s.manual_approval?
   end
+
+  test "valid json_validator step" do
+    s = Step.new(
+      name: "v", workflow: workflows(:deploy),
+      step_type: "json_validator", position: 10, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => json_schemas(:person_schema).id, "source_variable" => "person_payload" }
+    )
+    assert s.valid?, s.errors.full_messages.inspect
+  end
+
+  test "json_validator requires json_schema_id and source_variable" do
+    s = Step.new(
+      name: "v", workflow: workflows(:deploy),
+      step_type: "json_validator", position: 10, timeout: 30, max_retries: 0,
+      config: {}
+    )
+    assert_not s.valid?
+    assert_includes s.errors[:base], "JSON validator step requires a json_schema_id"
+    assert_includes s.errors[:base], "JSON validator step requires a source_variable"
+  end
+
+  test "json_schema returns associated schema" do
+    schema = json_schemas(:person_schema)
+    s = steps(:skill_step)
+    s.config = s.config.merge("json_schema_id" => schema.id)
+    assert_equal schema, s.json_schema
+  end
+
+  test "json_schema returns nil when not set" do
+    s = steps(:skill_step)
+    assert_nil s.json_schema
+  end
+
+  test "validator_source_variable returns config value" do
+    s = Step.new(config: { "source_variable" => "payload" })
+    assert_equal "payload", s.validator_source_variable
+  end
+
+  test "available_variables_for includes globals, prior produces, and schema sub-paths" do
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    schema = json_schemas(:person_schema)
+    workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "go",
+      position: 1, timeout: 30, max_retries: 0,
+      config: { "produces" => ["person"], "json_schema_id" => schema.id }
+    )
+
+    vars = Step.available_variables_for(workflow, 2)
+    names = vars.pluck("name")
+
+    Step::GLOBAL_VARIABLES.each { |g| assert_includes names, g }
+    assert_includes names, "person"
+    assert_includes names, "person.name"
+    assert_includes names, "person.age"
+  end
+
+  test "available_variables_for surfaces context_fetch context_key and schema sub-paths" do
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    schema = json_schemas(:person_schema)
+    workflow.steps.create!(
+      name: "Read flags", step_type: "context_fetch",
+      position: 1, timeout: 30, max_retries: 0,
+      config: { "method" => "project_file", "path" => "p.json",
+                "context_key" => "flags", "json_schema_id" => schema.id }
+    )
+
+    names = Step.available_variables_for(workflow, 2).pluck("name")
+    assert_includes names, "flags"
+    assert_includes names, "flags.name"
+    assert_includes names, "flags.age"
+  end
 end

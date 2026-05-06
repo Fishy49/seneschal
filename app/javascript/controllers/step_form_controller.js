@@ -3,8 +3,11 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = [
     "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields",
+    "jsonValidatorFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
+    "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
+    "schemaSelect", "schemaOutputFields", "schemaOutputInput", "producesMultiFields", "producesInputWrapper",
     "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
     "saveTemplateCheck", "saveTemplateFields"
   ]
@@ -15,6 +18,8 @@ export default class extends Controller {
     this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
+    if (this.hasFetchMethodTarget) this.fetchMethodChanged()
+    this.applySchemaMode({ wipeOnEnter: false })
   }
 
   toggle() {
@@ -34,6 +39,80 @@ export default class extends Controller {
     if (this.hasContextFetchFieldsTarget) {
       this.contextFetchFieldsTarget.style.display = type === "context_fetch" ? "" : "none"
     }
+    if (this.hasJsonValidatorFieldsTarget) {
+      this.jsonValidatorFieldsTarget.style.display = type === "json_validator" ? "" : "none"
+    }
+    this.applySchemaMode({ wipeOnEnter: false })
+  }
+
+  schemaChanged() {
+    this.applySchemaMode({ wipeOnEnter: true })
+  }
+
+  applySchemaMode({ wipeOnEnter }) {
+    if (!this.hasSchemaOutputFieldsTarget || !this.hasProducesMultiFieldsTarget) return
+
+    const type = this.typeSelectTarget.value
+    const isClaudeStep = type === "skill" || type === "prompt"
+    const schemaId = this.hasSchemaSelectTarget ? this.schemaSelectTarget.value : ""
+    const inSchemaMode = isClaudeStep && !!schemaId
+
+    this.schemaOutputFieldsTarget.style.display = inSchemaMode ? "" : "none"
+    this.producesMultiFieldsTarget.style.display = inSchemaMode ? "none" : ""
+
+    if (inSchemaMode) {
+      if (wipeOnEnter) this.wipeProducesTags()
+      if (this.hasSchemaOutputInputTarget && !this.schemaOutputInputTarget.value) {
+        const opt = this.schemaSelectTarget.selectedOptions[0]
+        if (opt) this.schemaOutputInputTarget.value = this.slugify(opt.textContent)
+      }
+    }
+  }
+
+  wipeProducesTags() {
+    if (!this.hasProducesInputWrapperTarget) return
+    const ctrl = this.application.getControllerForElementAndIdentifier(
+      this.producesInputWrapperTarget, "produces-input"
+    )
+    if (ctrl) ctrl.setTags([])
+  }
+
+  slugify(name) {
+    return String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+  }
+
+  fetchMethodChanged() {
+    if (!this.hasFetchMethodTarget) return
+    const method = this.fetchMethodTarget.value
+    if (this.hasFetchUrlFieldsTarget) this.fetchUrlFieldsTarget.style.display = method === "url" ? "" : "none"
+    if (this.hasFetchProjectFileFieldsTarget) this.fetchProjectFileFieldsTarget.style.display = method === "project_file" ? "" : "none"
+    this.updateFetchSchemaVisibility()
+  }
+
+  setProjectFile(path) {
+    if (!this.hasFetchPathTarget) return
+    this.fetchPathTarget.value = path || ""
+    if (this.hasFetchPathDisplayTarget) {
+      if (path) {
+        this.fetchPathDisplayTarget.textContent = path
+      } else {
+        this.fetchPathDisplayTarget.innerHTML = '<span class="text-content-muted">No file selected</span>'
+      }
+    }
+    this.updateFetchSchemaVisibility()
+  }
+
+  updateFetchSchemaVisibility() {
+    if (!this.hasFetchSchemaFieldsTarget) return
+    const method = this.hasFetchMethodTarget ? this.fetchMethodTarget.value : ""
+    const path = this.hasFetchPathTarget ? this.fetchPathTarget.value.toLowerCase() : ""
+    const visible = method === "project_file" && path.endsWith(".json")
+    this.fetchSchemaFieldsTarget.style.display = visible ? "" : "none"
   }
 
   ciModeChanged() {
@@ -134,6 +213,13 @@ export default class extends Controller {
       this.field("skill_effort").value = cfg.effort || "medium"
       this.field("skill_max_turns").value = cfg.max_turns || ""
       this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
+      this.field("json_schema_id").value = cfg.json_schema_id || ""
+    }
+
+    // JSON Validator config
+    if (template.step_type === "json_validator") {
+      this.field("json_validator_schema_id").value = cfg.json_schema_id || ""
+      this.field("json_validator_source_variable").value = cfg.source_variable || ""
     }
 
     // Manual approval
@@ -141,7 +227,22 @@ export default class extends Controller {
     if (ma) ma.checked = !!template.manual_approval
 
     // Pipeline: produces / consumes
-    this.field("produces").value = (cfg.produces || []).join(", ")
+    const producesTags = cfg.produces || []
+    const isClaudeStep = template.step_type === "skill" || template.step_type === "prompt"
+    const templateInSchemaMode = isClaudeStep && !!cfg.json_schema_id
+    const producesWrapper = this.element.querySelector('[data-controller~="produces-input"]')
+    const producesCtrl = producesWrapper && this.application.getControllerForElementAndIdentifier(producesWrapper, "produces-input")
+    if (templateInSchemaMode) {
+      if (producesCtrl) producesCtrl.setTags([])
+      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = producesTags[0] || ""
+    } else {
+      if (producesCtrl) {
+        producesCtrl.setTags(producesTags)
+      } else {
+        this.field("produces").value = producesTags.join(",")
+      }
+      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = ""
+    }
     const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')
     const consumes = cfg.consumes || []
     consumeCheckboxes.forEach(cb => { cb.checked = consumes.includes(cb.value) })
@@ -151,6 +252,9 @@ export default class extends Controller {
       this.field("fetch_method").value = cfg.method || "url"
       this.field("fetch_url").value = cfg.url || ""
       this.field("fetch_context_key").value = cfg.context_key || ""
+      this.field("fetch_json_schema_id").value = cfg.json_schema_id || ""
+      this.setProjectFile(cfg.path || "")
+      if (this.hasFetchMethodTarget) this.fetchMethodChanged()
     }
 
     // CI Check config

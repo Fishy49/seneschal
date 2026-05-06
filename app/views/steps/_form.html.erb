@@ -3,6 +3,8 @@
 <% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
 <% ctx_fetch = step.step_type == "context_fetch" ? (step.config || {}) : {} %>
 <% templates = StepTemplate.ordered %>
+<% schema_mode = step.step_type.in?(%w[skill prompt]) && claude_cfg["json_schema_id"].present? %>
+<% schema_output_var = schema_mode ? step.produces.first : "" %>
 <%= form_with model: [@project, @workflow, step],
       data: { controller: "step-form",
               step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json,
@@ -42,7 +44,7 @@
   <div class="mb-4">
     <%= f.label :step_type, "Type", class: "block text-sm font-medium text-content-muted mb-1.5" %>
     <%= f.select :step_type,
-          [["Skill", "skill"], ["Prompt", "prompt"], ["Script", "script"], ["Command", "command"], ["CI Check", "ci_check"], ["Context Fetch", "context_fetch"]],
+          [["Skill", "skill"], ["Prompt", "prompt"], ["Script", "script"], ["Command", "command"], ["CI Check", "ci_check"], ["Context Fetch", "context_fetch"], ["JSON Validator", "json_validator"]],
           {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
           data: { step_form_target: "typeSelect", action: "step-form#toggle" } %>
   </div>
@@ -128,6 +130,19 @@
              placeholder="Leave blank to use global default"
              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
       <p class="text-sm text-content-muted mt-2">Comma-separated list of Claude CLI tools this step can use. Supports patterns like <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>. Leave blank for the global default.</p>
+    </div>
+
+    <div class="mb-4">
+      <label for="json_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">Output Schema (optional)</label>
+      <select name="json_schema_id" id="json_schema_id"
+              data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
+              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+        <option value="">None</option>
+        <% JsonSchema.order(:name).each do |s| %>
+          <option value="<%= s.id %>" <%= "selected" if claude_cfg["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+        <% end %>
+      </select>
+      <p class="text-xs text-content-muted mt-1">When set, the step's only output is a single variable holding JSON that conforms to this schema. The Produces field below collapses to a single output name.</p>
     </div>
 
     <% other_projects  = Project.where.not(id: @project.id).order(:name) %>
@@ -221,17 +236,22 @@
   </div>
 
   <%# === Context Fetch fields === %>
+  <% fetch_method = ctx_fetch["method"].presence || "url" %>
+  <% fetch_path = ctx_fetch["path"].to_s %>
+  <% fetch_path_is_json = fetch_path.downcase.end_with?(".json") %>
   <div data-step-form-target="contextFetchFields" style="<%= 'display:none' unless step.step_type == 'context_fetch' %>">
     <div class="mb-4">
       <label for="fetch_method" class="block text-sm font-medium text-content-muted mb-1.5">Method</label>
       <select name="fetch_method" id="fetch_method"
+              data-step-form-target="fetchMethod" data-action="step-form#fetchMethodChanged"
               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        <option value="url" <%= "selected" unless ctx_fetch["method"] && ctx_fetch["method"] != "url" %>>URL</option>
+        <option value="url" <%= "selected" if fetch_method == "url" %>>URL</option>
+        <option value="project_file" <%= "selected" if fetch_method == "project_file" %>>Project File</option>
       </select>
-      <p class="text-sm text-content-muted mt-2">How to fetch context. GitHub repo URLs automatically resolve to the README.</p>
+      <p class="text-sm text-content-muted mt-2">How to fetch context. URLs support GitHub auto-resolve; Project File reads from the project's working tree.</p>
     </div>
 
-    <div class="mb-4">
+    <div data-step-form-target="fetchUrlFields" style="<%= 'display:none' unless fetch_method == 'url' %>" class="mb-4">
       <label for="fetch_url" class="block text-sm font-medium text-content-muted mb-1.5">URL</label>
       <input type="text" name="fetch_url" id="fetch_url"
              value="<%= ctx_fetch["url"] %>"
@@ -240,30 +260,108 @@
       <p class="text-sm text-content-muted mt-2">Supports <code class="text-xs bg-surface-input px-1 py-0.5 rounded">${variable}</code> interpolation. GitHub repo URLs fetch the README; blob URLs fetch the file.</p>
     </div>
 
+    <div data-step-form-target="fetchProjectFileFields" style="<%= 'display:none' unless fetch_method == 'project_file' %>" class="mb-4">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Project File</label>
+      <div class="flex items-center gap-3">
+        <button type="button" data-action="file-panel#open"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm text-content-muted hover:text-content hover:bg-edge transition-colors cursor-pointer">
+          Select File
+        </button>
+        <code data-step-form-target="fetchPathDisplay" class="text-xs text-content font-mono break-all">
+          <% if fetch_path.present? %><%= fetch_path %><% else %><span class="text-content-muted">No file selected</span><% end %>
+        </code>
+      </div>
+      <input type="hidden" name="fetch_path" data-step-form-target="fetchPath" value="<%= fetch_path %>">
+      <p class="text-sm text-content-muted mt-2">Reads the file from the project's working tree at run time. Requires a generated code map for picking files.</p>
+
+      <div data-step-form-target="fetchSchemaFields" style="<%= 'display:none' unless fetch_path_is_json %>" class="mt-3">
+        <label for="fetch_json_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">JSON Schema (optional)</label>
+        <select name="fetch_json_schema_id" id="fetch_json_schema_id"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="">None</option>
+          <% JsonSchema.order(:name).each do |s| %>
+            <option value="<%= s.id %>" <%= "selected" if ctx_fetch["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+          <% end %>
+        </select>
+        <p class="text-xs text-content-muted mt-1">When set, downstream steps can reference sub-paths of this file's JSON (e.g. <code class="bg-surface-input px-1 rounded">config.feature_flags</code>).</p>
+      </div>
+    </div>
+
     <div class="mb-4">
       <label for="fetch_context_key" class="block text-sm font-medium text-content-muted mb-1.5">Context Key</label>
       <input type="text" name="fetch_context_key" id="fetch_context_key"
              value="<%= ctx_fetch["context_key"] %>"
              placeholder="e.g. project_readme"
              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-      <p class="text-sm text-content-muted mt-2">Store the fetched content in run context under this key for use by later steps</p>
+      <p class="text-sm text-content-muted mt-2">Store the fetched content in run context under this key for use by later steps.</p>
     </div>
   </div>
 
-  <%# === Pipeline: Produces / Consumes === %>
-  <% available_vars = Step::GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global" } } %>
-  <% @workflow.steps.where("position < ?", step.position.to_i).order(:position).each do |s| %>
-    <% s.produces.each { |v| available_vars << { "name" => v, "source" => s.name } } %>
-  <% end %>
+  <%# === Pipeline variables (available to JSON validator datalist and consumes checkboxes) === %>
+  <% available_vars = Step.available_variables_for(@workflow, step.position.to_i) %>
 
+  <%# === JSON Validator fields === %>
+  <div data-step-form-target="jsonValidatorFields" style="<%= 'display:none' unless step.step_type == 'json_validator' %>">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="mb-4">
+        <label for="json_validator_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">Schema</label>
+        <select name="json_validator_schema_id" id="json_validator_schema_id"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="">Select a schema...</option>
+          <% JsonSchema.order(:name).each do |s| %>
+            <option value="<%= s.id %>" <%= "selected" if step.config["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label for="json_validator_source_variable" class="block text-sm font-medium text-content-muted mb-1.5">Source Variable</label>
+        <input type="text" name="json_validator_source_variable" id="json_validator_source_variable"
+               value="<%= step.config["source_variable"] %>"
+               list="json_validator_var_options"
+               placeholder="payload"
+               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+        <datalist id="json_validator_var_options">
+          <% available_vars.each do |var| %>
+            <option value="<%= var["name"] %>">
+          <% end %>
+        </datalist>
+      </div>
+    </div>
+    <p class="text-xs text-content-muted mb-4">The validator reads the named context variable, parses it as JSON, and checks it against the selected schema. A mismatch fails the step.</p>
+  </div>
+
+  <%# === Pipeline: Produces / Consumes === %>
   <div class="grid grid-cols-2 gap-4">
-    <div class="mb-4">
-      <label for="produces" class="block text-sm font-medium text-content-muted mb-1.5">Produces</label>
-      <input type="text" name="produces" id="produces"
-             value="<%= step.produces.join(", ") %>"
-             placeholder="pr_number, pr_url, branch_name"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-      <p class="text-xs text-content-muted mt-1">Comma-separated variable names this step outputs. For AI steps, Claude is instructed to produce these in a <code class="bg-surface-input px-1 rounded">```output</code> block. For scripts, use <code class="bg-surface-input px-1 rounded">::set-output name=value</code>.</p>
+    <div data-step-form-target="producesMultiFields" style="<%= 'display:none' if schema_mode %>">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Produces</label>
+      <div data-controller="produces-input"
+           data-step-form-target="producesInputWrapper"
+           data-produces-input-suggestions-url-value="<%= produces_suggestions_project_workflow_steps_path(@project, @workflow) %>"
+           data-produces-input-initial-value="<%= schema_mode ? "" : step.produces.join(",") %>">
+        <ul data-produces-input-target="tagList" class="flex flex-wrap gap-1 mb-1.5 min-h-[1.5rem]"></ul>
+        <div class="flex gap-1.5">
+          <input type="text" data-produces-input-target="newInput"
+                 list="produces_input_suggestions"
+                 data-action="keydown->produces-input#keydown input->produces-input#input"
+                 placeholder="pr_number"
+                 class="flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+          <button type="button" data-action="produces-input#add"
+                  class="px-3 py-1.5 bg-surface-input border border-edge text-content-muted rounded-lg text-sm hover:bg-edge hover:text-content transition-colors cursor-pointer">Add</button>
+        </div>
+        <datalist id="produces_input_suggestions" data-produces-input-target="datalist"></datalist>
+        <input type="hidden" name="produces" data-produces-input-target="hiddenInput" value="<%= schema_mode ? "" : step.produces.join(",") %>">
+      </div>
+      <p class="text-xs text-content-muted mt-1">Variable names this step outputs. For AI steps, Claude is instructed to produce these in a <code class="bg-surface-input px-1 rounded">```output</code> block. For scripts, use <code class="bg-surface-input px-1 rounded">::set-output name=value</code>.</p>
+    </div>
+
+    <div data-step-form-target="schemaOutputFields" style="<%= 'display:none' unless schema_mode %>">
+      <label for="schema_output_variable" class="block text-sm font-medium text-content-muted mb-1.5">Output Variable</label>
+      <input type="text" name="schema_output_variable" id="schema_output_variable"
+             value="<%= schema_output_var %>"
+             data-step-form-target="schemaOutputInput"
+             placeholder="result"
+             class="w-full px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+      <p class="text-xs text-content-muted mt-1">Claude emits the JSON conforming to the selected schema as the value of this single output variable.</p>
     </div>
 
     <div class="mb-4">
@@ -283,7 +381,7 @@
       <% else %>
         <p class="text-xs text-content-muted py-2">No variables available at this position. Global variables are always accessible.</p>
       <% end %>
-      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
+      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. Dotted entries (e.g. <code class="bg-surface-input px-1 rounded">review.summary</code>) pull a sub-section from an upstream step's JSON-schema output. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
     </div>
   </div>
 

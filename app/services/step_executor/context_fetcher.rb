@@ -11,11 +11,29 @@ class StepExecutor
 
       case method
       when "url" then fetch_url(cfg, &)
+      when "project_file" then fetch_project_file(cfg, &)
       else
         Result.new(exit_code: 1, stdout: "", stderr: "Unknown context_fetch method: #{method}")
       end
     rescue StandardError => e
       Result.new(exit_code: 1, stdout: "", stderr: e.message)
+    end
+
+    def fetch_project_file(cfg)
+      raw_path = interpolate_string(cfg.fetch("path", ""))
+      return Result.new(exit_code: 1, stdout: "", stderr: "No file path provided") if raw_path.blank?
+
+      base = File.expand_path(@repo_path.to_s)
+      resolved = File.expand_path(raw_path, base)
+      unless resolved.start_with?(base + File::SEPARATOR) || resolved == base
+        return Result.new(exit_code: 1, stdout: "", stderr: "Path '#{raw_path}' escapes the project directory")
+      end
+      return Result.new(exit_code: 1, stdout: "", stderr: "File not found: #{raw_path}") unless File.file?(resolved)
+
+      yield({ output: "Reading #{raw_path}..." }) if block_given?
+      content = File.read(resolved)
+      yield({ output: content }) if block_given?
+      Result.new(exit_code: 0, stdout: content, stderr: "")
     end
 
     def fetch_url(cfg)

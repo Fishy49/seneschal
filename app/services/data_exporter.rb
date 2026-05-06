@@ -5,6 +5,7 @@ class DataExporter
         version: 1,
         exported_at: Time.current.iso8601,
         project_groups: export_project_groups,
+        json_schemas: export_json_schemas,
         skills: export_skills,
         step_templates: export_step_templates,
         projects: export_projects
@@ -13,6 +14,12 @@ class DataExporter
   end
 
   private
+
+  def export_json_schemas
+    JsonSchema.order(:name).map do |s|
+      { name: s.name, description: s.description, body: s.body }
+    end
+  end
 
   def export_project_groups
     ProjectGroup.order(:name).map do |group|
@@ -91,6 +98,7 @@ class DataExporter
       skill_name: step.skill&.name,
       skill_project_name: step.skill&.project&.name,
       skill_project_group_name: step.skill&.project_group&.name,
+      json_schema_name: step.json_schema&.name,
       max_retries: step.max_retries,
       timeout: step.timeout,
       input_context: step.input_context

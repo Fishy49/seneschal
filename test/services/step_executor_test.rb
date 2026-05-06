@@ -77,6 +77,32 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_equal "skill body", prompt
   end
 
+  test "prepend_consumes_context resolves dotted sub-paths from JSON producer" do
+    @step.update!(config: @step.config.merge("consumes" => ["review.summary", "review.meta.author"]))
+    context = { "review" => '{"summary":"looks good","meta":{"author":"rick"}}' }
+    executor = StepExecutor.new(@step, context, @ready.local_path)
+
+    prompt = executor.send(:prepend_consumes_context, "skill body")
+
+    assert_includes prompt, "<review.summary>\nlooks good\n</review.summary>"
+    assert_includes prompt, "<review.meta.author>\nrick\n</review.meta.author>"
+  end
+
+  test "interpolate_string resolves dotted JSON paths in ${var.path}" do
+    context = { "review" => '{"summary":"ok","meta":{"author":"rick"}}' }
+    executor = StepExecutor.new(@step, context, @ready.local_path)
+
+    result = executor.send(:interpolate_string, "summary=${review.summary}, by=${review.meta.author}")
+
+    assert_equal "summary=ok, by=rick", result
+  end
+
+  test "interpolate_string leaves unresolved placeholders unchanged" do
+    executor = StepExecutor.new(@step, { "review" => '{"summary":"ok"}' }, @ready.local_path)
+    result = executor.send(:interpolate_string, "missing=${review.nope}")
+    assert_equal "missing=${review.nope}", result
+  end
+
   test "execute_skill prepends project markdown_context to prompt" do
     executor = StepExecutor.new(@step, {}, @ready.local_path)
     prompt = executor.send(:prepend_project_context, "skill body here")
@@ -169,5 +195,153 @@ class StepExecutorTest < ActiveSupport::TestCase
     cmd = executor.send(:build_skill_cmd, "hi")
     assert_includes cmd, "--permission-mode"
     assert_not_includes cmd, "--dangerously-skip-permissions"
+  end
+
+  test "append_schema_instructions includes schema body" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: step.config.merge("json_schema_id" => schema.id))
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+
+    result = executor.send(:append_schema_instructions, "skill body")
+
+    assert result.start_with?("skill body")
+    assert_includes result, "Required JSON Output Schema"
+    assert_includes result, "person"
+    assert_includes result, '"type"'
+    assert_includes result, '"object"'
+  end
+
+  test "append_schema_instructions names the produces output variable" do
+    schema = json_schemas(:person_schema)
+    step = steps(:skill_step)
+    step.update!(config: step.config.merge("json_schema_id" => schema.id, "produces" => ["person_payload"]))
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+
+    result = executor.send(:append_schema_instructions, "skill body")
+
+    assert_includes result, "person_payload"
+    assert_includes result, "```output"
+  end
+
+  test "json_validator passes when value matches schema" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => '{"name":"Rick","age":42}' }, @ready.local_path)
+    result = executor.execute
+    assert result.passed?, result.stderr
+    assert_includes result.stdout, "Validated 'payload'"
+  end
+
+  test "json_validator fails when value does not match schema" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => '{"age":42}' }, @ready.local_path)
+    result = executor.execute
+    assert_equal 1, result.exit_code
+    assert_includes result.stderr, "name"
+  end
+
+  test "json_validator fails when value is not valid JSON" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => "not json" }, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "is not valid JSON"
+  end
+
+  test "json_validator fails when source variable not in context" do
+    schema = json_schemas(:person_schema)
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "source_variable" => "missing_var" }
+    )
+    executor = StepExecutor.new(step, {}, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "missing_var"
+  end
+
+  test "context_fetch project_file reads file from project repo" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "config.json"), '{"flag":true}')
+      project = projects(:seneschal)
+      project.update!(local_path: dir)
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 70, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "config.json", "context_key" => "cfg" }
+      )
+
+      result = StepExecutor.new(step, {}, dir).execute
+      assert result.passed?, result.stderr
+      assert_equal '{"flag":true}', result.stdout
+    end
+  end
+
+  test "context_fetch project_file errors when file is missing" do
+    Dir.mktmpdir do |dir|
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 71, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "missing.json", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, {}, dir).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "File not found"
+    end
+  end
+
+  test "context_fetch project_file rejects path traversal" do
+    Dir.mktmpdir do |dir|
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 72, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "../etc/passwd", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, {}, dir).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "escapes the project directory"
+    end
+  end
+
+  test "context_fetch project_file interpolates ${var} in path" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "settings.json"), "{}")
+      step = workflows(:deploy).steps.create!(
+        name: "fetch", step_type: "context_fetch",
+        position: 73, timeout: 30, max_retries: 0,
+        config: { "method" => "project_file", "path" => "${file}", "context_key" => "cfg" }
+      )
+      result = StepExecutor.new(step, { "file" => "settings.json" }, dir).execute
+      assert result.passed?, result.stderr
+      assert_equal "{}", result.stdout
+    end
+  end
+
+  test "json_validator fails when schema not found" do
+    step = workflows(:deploy).steps.create!(
+      name: "v", step_type: "json_validator",
+      position: 50, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => 999_999, "source_variable" => "payload" }
+    )
+    executor = StepExecutor.new(step, { "payload" => "{}" }, @ready.local_path)
+    result = executor.execute
+    assert_not result.passed?
+    assert_includes result.stderr, "JSON Schema not found"
   end
 end

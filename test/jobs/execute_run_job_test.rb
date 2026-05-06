@@ -115,6 +115,49 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "json_validator failure triggers run failure" do
+    workflow = setup_workflow_with_ready_project!
+    producer_step = workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "produce payload",
+      position: 1, timeout: 30, max_retries: 0, config: { "produces" => ["payload"] }
+    )
+    validator_step = workflow.steps.create!(
+      name: "Validator", step_type: "json_validator", position: 2, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => json_schemas(:person_schema).id, "source_variable" => "payload" }
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    stub_step_executor_for_step(producer_step, stdout: "```output\npayload: |\n  {\"age\":42}\n```") do
+      ExecuteRunJob.new.perform(run)
+    end
+
+    run.reload
+    assert_equal "failed", run.status
+    validator_rs = run.run_steps.find_by(step: validator_step)
+    assert_not_nil validator_rs
+    assert_equal "failed", validator_rs.status
+    assert_includes validator_rs.error_output.to_s, "name"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "scope_context keeps parent variable when consumes references a sub-path" do
+    workflow = setup_workflow_with_ready_project!
+    _step1, step2 = create_two_step_workflow(workflow,
+                                             step1_config: { "produces" => ["review"] },
+                                             step2_config: { "consumes" => ["review.summary"] })
+    run = workflow.runs.create!(status: "running",
+                                context: { "review" => '{"summary":"ok"}', "unrelated" => "drop me" },
+                                input: {})
+
+    scoped = ExecuteRunJob.new.send(:scope_context, step2, run.context)
+
+    assert_equal '{"summary":"ok"}', scoped["review"]
+    assert_not scoped.key?("unrelated")
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
@@ -169,6 +212,17 @@ class ExecuteRunJobTest < ActiveJob::TestCase
   def with_stubbed_step_executor(stdout: "", &)
     fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
     factory = ->(*_args, **_kwargs) { fake_executor(fake_result) }
+    stub_step_executor_new(factory, &)
+  end
+
+  # Stubs only the named step's executor, falling through to the real executor for any other step.
+  def stub_step_executor_for_step(stubbed_step, stdout: "", &)
+    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
+    factory = lambda do |step, context, repo_path, **kwargs|
+      next fake_executor(fake_result) if step.id == stubbed_step.id
+
+      StepExecutor.__original_new(step, context, repo_path, **kwargs)
+    end
     stub_step_executor_new(factory, &)
   end
 
