@@ -1,0 +1,14 @@
+person_schema:
+  name: person
+  description: A person with a name and optional age
+  body: '{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"required":["name"]}'
+
+simple_schema:
+  name: simple
+  description: A simple integer value
+  body: '{"type":"integer"}'
+
+unused_schema:
+  name: unused
+  description: A schema not referenced by any step
+  body: '{"type":"string"}'

@@ -5,6 +5,7 @@ class DataImporter
     @data = data.deep_symbolize_keys[:seneschal_export]
     @skill_map = {}
     @group_map = {}
+    @schema_map = {}
     @stats = Hash.new(0)
   end
 
@@ -13,6 +14,7 @@ class DataImporter
     ActiveRecord::Base.transaction do
       wipe!
       import_project_groups
+      import_json_schemas
       import_skills
       import_projects
       import_step_templates
@@ -37,6 +39,19 @@ class DataImporter
     Skill.delete_all
     Project.delete_all
     ProjectGroup.delete_all
+    JsonSchema.delete_all
+  end
+
+  def import_json_schemas
+    (@data[:json_schemas] || []).each do |attrs|
+      schema = JsonSchema.create!(
+        name: attrs[:name],
+        description: attrs[:description],
+        body: attrs[:body]
+      )
+      @schema_map[attrs[:name]] = schema
+      @stats[:json_schemas] += 1
+    end
   end
 
   def import_project_groups
@@ -129,12 +144,16 @@ class DataImporter
 
   def import_step(workflow, attrs)
     skill = find_skill(attrs[:skill_project_name], attrs[:skill_project_group_name], attrs[:skill_name])
+    config = (attrs[:config] || {}).dup
+    if attrs[:json_schema_name].present? && (schema = @schema_map[attrs[:json_schema_name]])
+      config = config.merge("json_schema_id" => schema.id)
+    end
     workflow.steps.create!(
       name: attrs[:name],
       position: attrs[:position],
       step_type: attrs[:step_type],
       body: attrs[:body],
-      config: attrs[:config] || {},
+      config: config,
       skill: skill,
       max_retries: attrs[:max_retries] || 0,
       timeout: attrs[:timeout] || 600,

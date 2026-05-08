@@ -45,16 +45,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
-    prompt = append_produces_instructions(prompt) if @step.produces.any?
+    if @step.json_schema
+      prompt = append_schema_instructions(prompt)
+    elsif @step.produces.any?
+      prompt = append_produces_instructions(prompt)
+    end
     prompt = append_context_projects(prompt) if context_project_paths.any?
 
     cmd = build_skill_cmd(prompt, stream: block_given?)
+    result = block_given? ? execute_skill_streaming(cmd, &) : run_command(cmd)
 
-    if block_given?
-      execute_skill_streaming(cmd, &)
-    else
-      run_command(cmd)
-    end
+    return result unless result.passed?
+    return result unless @step.json_schema
+
+    validate_with_session_retry(result, &)
   end
 
   def execute_script(&)
@@ -174,14 +178,17 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   # --- Skill command builder ---
 
-  def build_skill_cmd(prompt, stream: false)
+  def build_skill_cmd(prompt, stream: false, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/PerceivedComplexity
+    resume_session_id ||= @resume_session_id
+    resume_message ||= @resume_message
+
     cmd = ["claude"]
 
-    if @resume_session_id
-      cmd += ["--resume", @resume_session_id, "-p"]
+    if resume_session_id
+      cmd += ["--resume", resume_session_id, "-p"]
       cmd += ["--output-format", "stream-json"] if stream
       cmd += ["--verbose"]
-      cmd << (@resume_message || "Your previous session was interrupted. Continue and complete the task.")
+      cmd << (resume_message || "Your previous session was interrupted. Continue and complete the task.")
     else
       cmd += ["-p"]
       cmd += ["--output-format", "stream-json"] if stream
@@ -405,10 +412,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def prepend_consumes_context(prompt)
     blocks = @step.consumes.filter_map do |name|
-      value = @context[name] || @context[name.to_s] || @context[name.to_sym]
-      next if value.nil? || value.to_s.strip.empty?
+      value = JsonPathResolver.lookup(@context, name)
+      formatted = JsonPathResolver.format(value)
+      next if formatted.strip.empty?
 
-      "<#{name}>\n#{value}\n</#{name}>"
+      "<#{name}>\n#{formatted}\n</#{name}>"
     end
     return prompt if blocks.empty?
 
@@ -440,6 +448,125 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       #{lines}
     CONTEXT
+  end
+
+  # When a skill/prompt step has a JSON Schema attached, extract the produced
+  # output and validate it. On failure, resume the same Claude session with
+  # the schema errors as feedback and ask for a corrected re-emission. Loops
+  # up to validation_max_attempts (config default: 3). After exhausting all
+  # attempts the step fails with the accumulated errors.
+  def validate_with_session_retry(initial_result, &)
+    max_attempts = (@step.config["validation_max_attempts"] || 3).to_i
+    return initial_result if max_attempts <= 0
+
+    current = initial_result
+    attempts = 0
+
+    loop do
+      errors = validation_errors_for(current)
+      return current if errors.nil?
+
+      attempts += 1
+      if attempts >= max_attempts
+        return Result.new(
+          exit_code: 1,
+          stdout: current.stdout,
+          stderr: validation_failure_message(errors, attempts),
+          stream_events: current.stream_events
+        )
+      end
+
+      session_id = session_id_from(current)
+      unless session_id
+        return Result.new(
+          exit_code: 1,
+          stdout: current.stdout,
+          stderr: "JSON Schema validation failed and no Claude session id was captured for retry:\n#{errors.map do |e|
+            "  - #{e}"
+          end.join("\n")}",
+          stream_events: current.stream_events
+        )
+      end
+
+      feedback = validation_feedback_message(errors)
+      cmd = build_skill_cmd(nil, stream: block_given?,
+                                 resume_session_id: session_id,
+                                 resume_message: feedback)
+      current = block_given? ? execute_skill_streaming(cmd, &) : run_command(cmd)
+      return current unless current.passed?
+    end
+  end
+
+  def validation_errors_for(result)
+    output_var = @step.produces.first
+    return ["No output variable configured for schema-bound step"] if output_var.to_s.strip.empty?
+
+    extracted = PipelineExtractor.new(@step, result.stdout).extract
+    raw = extracted[output_var]
+    return ["Output variable `#{output_var}` was missing from the response"] if raw.nil? || raw.to_s.strip.empty?
+
+    parsed = parse_json_output(raw)
+    return parsed[:error] if parsed.is_a?(Hash) && parsed[:error]
+
+    validation = JsonSchemaValidator.new(@step.json_schema).validate(parsed)
+    validation[:valid] ? nil : validation[:errors]
+  end
+
+  def parse_json_output(raw)
+    JSON.parse(raw.to_s)
+  rescue JSON::ParserError => e
+    output_var = @step.produces.first
+    { error: ["Output variable `#{output_var}` was not valid JSON: #{e.message}"] }
+  end
+
+  def validation_feedback_message(errors)
+    output_var = @step.produces.first.presence || "result"
+    bullets = errors.map { |e| "- #{e}" }.join("\n")
+    <<~MSG
+      The `#{output_var}` JSON you just emitted did not validate against the schema "#{@step.json_schema.name}":
+
+      #{bullets}
+
+      Please re-emit the corrected `#{output_var}` value in the same `output` block format. Include the full JSON, not a summary or status word.
+    MSG
+  end
+
+  def validation_failure_message(errors, attempts)
+    bullets = errors.map { |e| "  - #{e}" }.join("\n")
+    "JSON Schema validation failed after #{attempts} attempt#{"s" unless attempts == 1}:\n#{bullets}"
+  end
+
+  def session_id_from(result)
+    events = result.stream_events || []
+    events.reverse_each do |event|
+      sid = event["session_id"]
+      return sid if sid
+    end
+    nil
+  end
+
+  def append_schema_instructions(prompt)
+    schema = @step.json_schema
+    output_var = @step.produces.first.presence || "result"
+    prompt + <<~INSTRUCTIONS
+
+      ## Required JSON Output Schema
+
+      This step's only output is a single variable named `#{output_var}` whose value must be valid JSON conforming to the schema "#{schema.name}".
+
+      Emit it at the very end of your response using the multiline output block format:
+
+      ```output
+      #{output_var}: |
+        { ...JSON conforming to the schema... }
+      ```
+
+      The schema:
+
+      ```json
+      #{schema.body}
+      ```
+    INSTRUCTIONS
   end
 
   def append_produces_instructions(prompt)
@@ -474,8 +601,10 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   end
 
   def interpolate_string(str)
-    str.to_s.gsub(/\$\{(\w+)\}/) do
-      @context[::Regexp.last_match(1)] || @context[::Regexp.last_match(1).to_sym] || "${#{::Regexp.last_match(1)}}"
+    str.to_s.gsub(/\$\{([\w.]+)\}/) do
+      path = ::Regexp.last_match(1)
+      value = JsonPathResolver.lookup(@context, path)
+      value.nil? ? "${#{path}}" : JsonPathResolver.format(value)
     end
   end
 

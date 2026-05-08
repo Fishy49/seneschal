@@ -115,6 +115,23 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "scope_context keeps parent variable when consumes references a sub-path" do
+    workflow = setup_workflow_with_ready_project!
+    _step1, step2 = create_two_step_workflow(workflow,
+                                             step1_config: { "produces" => ["review"] },
+                                             step2_config: { "consumes" => ["review.summary"] })
+    run = workflow.runs.create!(status: "running",
+                                context: { "review" => '{"summary":"ok"}', "unrelated" => "drop me" },
+                                input: {})
+
+    scoped = ExecuteRunJob.new.send(:scope_context, step2, run.context)
+
+    assert_equal '{"summary":"ok"}', scoped["review"]
+    assert_not scoped.key?("unrelated")
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
@@ -169,6 +186,17 @@ class ExecuteRunJobTest < ActiveJob::TestCase
   def with_stubbed_step_executor(stdout: "", &)
     fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
     factory = ->(*_args, **_kwargs) { fake_executor(fake_result) }
+    stub_step_executor_new(factory, &)
+  end
+
+  # Stubs only the named step's executor, falling through to the real executor for any other step.
+  def stub_step_executor_for_step(stubbed_step, stdout: "", &)
+    fake_result = StepExecutor::Result.new(exit_code: 0, stdout: stdout, stderr: "", stream_events: nil)
+    factory = lambda do |step, context, repo_path, **kwargs|
+      next fake_executor(fake_result) if step.id == stubbed_step.id
+
+      StepExecutor.__original_new(step, context, repo_path, **kwargs)
+    end
     stub_step_executor_new(factory, &)
   end
 

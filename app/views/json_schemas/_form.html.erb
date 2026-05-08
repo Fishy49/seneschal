@@ -1,0 +1,34 @@
+<%= form_with model: schema do |f| %>
+  <% if schema.errors.any? %>
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+      <% schema.errors.full_messages.each do |msg| %>
+        <p><%= msg %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="mb-4">
+    <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_field :name, placeholder: "person_schema",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+  </div>
+
+  <div class="mb-4">
+    <%= f.label :description, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_area :description, rows: 2, placeholder: "What this schema validates",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y" %>
+  </div>
+
+  <div class="mb-4">
+    <%= f.label :body, "Schema Body (JSON)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <%= f.text_area :body, rows: 16,
+          placeholder: '{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}',
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
+    <p class="text-xs text-content-muted mt-1">JSON Schema (Draft 4/6/7/2019-09/2020-12) that describes the expected structure.</p>
+  </div>
+
+  <div class="flex gap-2">
+    <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+    <%= link_to "Cancel", json_schemas_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+<% end %>

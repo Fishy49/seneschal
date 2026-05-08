@@ -389,7 +389,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   def scope_context(step, full_context)
     return full_context if step.consumes.empty?
 
-    allowed_keys = step.consumes + Step::GLOBAL_VARIABLES
+    consume_roots = step.consumes.map { |name| name.to_s.split(".").first }
+    allowed_keys = consume_roots + step.consumes + Step::GLOBAL_VARIABLES
     full_context.select { |k, _| allowed_keys.include?(k.to_s) }
   end
 

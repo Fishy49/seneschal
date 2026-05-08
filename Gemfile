@@ -37,6 +37,9 @@ gem "bootsnap", require: false
 # Cron expression parser used for per-task scheduled triggers
 gem "fugit", "~> 1.11"
 
+# JSON Schema validation (Draft 4/6/7/2019/2020)
+gem "json_schemer", "~> 2.3"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: [:mri, :windows], require: "debug/prelude"

@@ -34,15 +34,8 @@ class StepsController < ApplicationController
   end
 
   def available_variables
-    position = params[:position].to_i
-    vars = Step::GLOBAL_VARIABLES.map { |v| { name: v, source: "global" } }
-
-    @workflow.steps.where(position: ...position).order(:position).each do |s|
-      s.produces.each do |var_name|
-        vars << { name: var_name, source: s.name }
-      end
-    end
-
+    vars = Step.available_variables_for(@workflow, params[:position].to_i)
+               .map { |v| { name: v["name"], source: v["source"] } }
     render json: { variables: vars }
   end
 
@@ -59,6 +52,11 @@ class StepsController < ApplicationController
     new_position = params[:position].to_i
     @step.update!(position: new_position)
     redirect_to project_workflow_path(@project, @workflow)
+  end
+
+  def produces_suggestions
+    names = (Step::GLOBAL_VARIABLES + Step.pluck(:config).flat_map { |c| Array(c["produces"]) }).compact.uniq.sort
+    render json: { suggestions: names }
   end
 
   private
@@ -96,7 +94,12 @@ class StepsController < ApplicationController
     permitted[:config] = build_step_config(permitted[:step_type], raw)
 
     # Pipeline: produces and consumes
-    produces = raw["produces"].to_s.split(",").map(&:strip).compact_blank
+    produces =
+      if claude_schema_mode?(permitted)
+        [raw["schema_output_variable"].to_s.strip].compact_blank
+      else
+        raw["produces"].to_s.split(",").map(&:strip).compact_blank
+      end
     consumes = Array(raw["consumes"]).compact_blank
     permitted[:config]["produces"] = produces if produces.any?
     permitted[:config]["consumes"] = consumes if consumes.any?
@@ -111,6 +114,11 @@ class StepsController < ApplicationController
     end
 
     permitted
+  end
+
+  def claude_schema_mode?(permitted)
+    permitted[:step_type].to_s.in?(["skill", "prompt"]) &&
+      permitted[:config]["json_schema_id"].present?
   end
 
   def build_step_config(step_type, raw)
@@ -141,6 +149,7 @@ class StepsController < ApplicationController
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
+    config["json_schema_id"] = raw["json_schema_id"].to_i if raw["json_schema_id"].present?
 
     context_ids = Array(raw["skill_context_projects"]).compact_blank.map(&:to_i).uniq
     config["context_projects"] = context_ids if context_ids.any?
@@ -149,11 +158,19 @@ class StepsController < ApplicationController
   end
 
   def build_context_fetch_config(raw)
-    {
-      "method" => raw["fetch_method"].presence || "url",
-      "url" => raw["fetch_url"].presence,
+    method = raw["fetch_method"].presence || "url"
+    cfg = {
+      "method" => method,
       "context_key" => raw["fetch_context_key"].presence,
       "capture_output" => raw["fetch_context_key"].presence
-    }.compact
+    }
+    case method
+    when "url"
+      cfg["url"] = raw["fetch_url"].presence
+    when "project_file"
+      cfg["path"] = raw["fetch_path"].presence
+      cfg["json_schema_id"] = raw["fetch_json_schema_id"].to_i if raw["fetch_json_schema_id"].present?
+    end
+    cfg.compact
   end
 end
