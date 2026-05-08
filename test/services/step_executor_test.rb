@@ -1,6 +1,6 @@
 require "test_helper"
 
-class StepExecutorTest < ActiveSupport::TestCase
+class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/ClassLength
   setup do
     @ready = projects(:seneschal)
     FileUtils.mkdir_p(@ready.local_path)
@@ -224,56 +224,150 @@ class StepExecutorTest < ActiveSupport::TestCase
     assert_includes result, "```output"
   end
 
-  test "json_validator passes when value matches schema" do
+  test "validation_errors_for returns nil when output matches schema" do
     schema = json_schemas(:person_schema)
-    step = workflows(:deploy).steps.create!(
-      name: "v", step_type: "json_validator",
-      position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    result = StepExecutor::Result.new(
+      exit_code: 0, stdout: "Done.\n```output\nperson: |\n  {\"name\":\"Rick\",\"age\":42}\n```\n", stderr: ""
     )
-    executor = StepExecutor.new(step, { "payload" => '{"name":"Rick","age":42}' }, @ready.local_path)
-    result = executor.execute
-    assert result.passed?, result.stderr
-    assert_includes result.stdout, "Validated 'payload'"
+
+    assert_nil executor.send(:validation_errors_for, result)
   end
 
-  test "json_validator fails when value does not match schema" do
+  test "validation_errors_for reports schema errors when output does not conform" do
     schema = json_schemas(:person_schema)
-    step = workflows(:deploy).steps.create!(
-      name: "v", step_type: "json_validator",
-      position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    result = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":42}\n```\n", stderr: ""
     )
-    executor = StepExecutor.new(step, { "payload" => '{"age":42}' }, @ready.local_path)
-    result = executor.execute
-    assert_equal 1, result.exit_code
-    assert_includes result.stderr, "name"
+
+    errors = executor.send(:validation_errors_for, result)
+    assert errors.is_a?(Array)
+    assert errors.any? { |e| e.include?("name") }, errors.inspect
   end
 
-  test "json_validator fails when value is not valid JSON" do
+  test "validation_errors_for reports parse error when output isn't JSON" do
     schema = json_schemas(:person_schema)
-    step = workflows(:deploy).steps.create!(
-      name: "v", step_type: "json_validator",
-      position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    result = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: not json\n```\n", stderr: ""
     )
-    executor = StepExecutor.new(step, { "payload" => "not json" }, @ready.local_path)
-    result = executor.execute
-    assert_not result.passed?
-    assert_includes result.stderr, "is not valid JSON"
+
+    errors = executor.send(:validation_errors_for, result)
+    assert errors.any? { |e| e.include?("not valid JSON") }, errors.inspect
   end
 
-  test "json_validator fails when source variable not in context" do
+  test "validation_errors_for reports missing variable when output block absent" do
     schema = json_schemas(:person_schema)
-    step = workflows(:deploy).steps.create!(
-      name: "v", step_type: "json_validator",
-      position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => schema.id, "source_variable" => "missing_var" }
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    result = StepExecutor::Result.new(exit_code: 0, stdout: "I'm done!", stderr: "")
+
+    errors = executor.send(:validation_errors_for, result)
+    assert errors.any? { |e| e.include?("missing") }, errors.inspect
+  end
+
+  test "validate_with_session_retry returns initial result when output is valid" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    calls = 0
+    executor.define_singleton_method(:run_command) do |*_|
+      calls += 1
+      flunk("should not retry")
+    end
+
+    initial = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: |\n  {\"name\":\"Rick\"}\n```",
+      stderr: "", stream_events: [{ "session_id" => "abc" }]
     )
-    executor = StepExecutor.new(step, {}, @ready.local_path)
-    result = executor.execute
-    assert_not result.passed?
-    assert_includes result.stderr, "missing_var"
+    final = executor.send(:validate_with_session_retry, initial)
+    assert_equal 0, calls
+    assert_equal initial, final
+  end
+
+  test "validate_with_session_retry resumes session with feedback and accepts corrected output" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+
+    captured_cmd = nil
+    executor.define_singleton_method(:run_command) do |cmd, **_kwargs|
+      captured_cmd = cmd
+      StepExecutor::Result.new(
+        exit_code: 0, stdout: "```output\nperson: |\n  {\"name\":\"Rick\",\"age\":42}\n```",
+        stderr: "", stream_events: [{ "session_id" => "sess-1" }]
+      )
+    end
+
+    initial = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":42}\n```",
+      stderr: "", stream_events: [{ "session_id" => "sess-1" }]
+    )
+    final = executor.send(:validate_with_session_retry, initial)
+
+    assert final.passed?, final.stderr
+    assert_includes captured_cmd, "--resume"
+    assert_includes captured_cmd, "sess-1"
+    feedback = captured_cmd.find { |s| s.is_a?(String) && s.include?("did not validate") }
+    assert feedback, "Expected feedback message in resume command: #{captured_cmd.inspect}"
+    assert_includes feedback, "person"
+    assert_includes feedback, "name"
+  end
+
+  test "validate_with_session_retry fails after max attempts with combined errors" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge(
+      "json_schema_id" => schema.id, "produces" => ["person"], "validation_max_attempts" => 2
+    ))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+
+    bad_stdout = "```output\nperson: |\n  {\"age\":1}\n```"
+    executor.define_singleton_method(:run_command) do |_cmd, **_kwargs|
+      StepExecutor::Result.new(
+        exit_code: 0, stdout: bad_stdout, stderr: "", stream_events: [{ "session_id" => "sess" }]
+      )
+    end
+
+    initial = StepExecutor::Result.new(
+      exit_code: 0, stdout: bad_stdout, stderr: "", stream_events: [{ "session_id" => "sess" }]
+    )
+    final = executor.send(:validate_with_session_retry, initial)
+
+    assert_not final.passed?
+    assert_includes final.stderr, "validation failed after 2 attempts"
+    assert_includes final.stderr, "name"
+  end
+
+  test "validate_with_session_retry fails immediately when no session id can be captured" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+
+    initial = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":1}\n```", stderr: "", stream_events: nil
+    )
+    final = executor.send(:validate_with_session_retry, initial)
+
+    assert_not final.passed?
+    assert_includes final.stderr, "no Claude session id"
+  end
+
+  test "validate_with_session_retry skips validation when validation_max_attempts is zero" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge(
+      "json_schema_id" => schema.id, "produces" => ["person"], "validation_max_attempts" => 0
+    ))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    executor.define_singleton_method(:run_command) { |*_| flunk("should not retry") }
+
+    initial = StepExecutor::Result.new(
+      exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":1}\n```", stderr: "", stream_events: nil
+    )
+    assert_equal initial, executor.send(:validate_with_session_retry, initial)
   end
 
   test "context_fetch project_file reads file from project repo" do
@@ -331,17 +425,5 @@ class StepExecutorTest < ActiveSupport::TestCase
       assert result.passed?, result.stderr
       assert_equal "{}", result.stdout
     end
-  end
-
-  test "json_validator fails when schema not found" do
-    step = workflows(:deploy).steps.create!(
-      name: "v", step_type: "json_validator",
-      position: 50, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => 999_999, "source_variable" => "payload" }
-    )
-    executor = StepExecutor.new(step, { "payload" => "{}" }, @ready.local_path)
-    result = executor.execute
-    assert_not result.passed?
-    assert_includes result.stderr, "JSON Schema not found"
   end
 end

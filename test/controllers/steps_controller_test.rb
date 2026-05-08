@@ -191,24 +191,6 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_equal schema.id, Step.last.config["json_schema_id"]
   end
 
-  test "POST create json_validator step auto-includes source variable in consumes" do
-    schema = json_schemas(:person_schema)
-    assert_difference "Step.count", 1 do
-      post project_workflow_steps_path(@project, @workflow), params: {
-        step: {
-          name: "Validator",
-          step_type: "json_validator",
-          position: 99,
-          timeout: 30,
-          max_retries: 0
-        },
-        json_validator_schema_id: schema.id.to_s,
-        json_validator_source_variable: "payload"
-      }
-    end
-    assert_includes Step.last.config["consumes"], "payload"
-  end
-
   test "GET edit renders produces-input controller" do
     get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
     assert_response :success

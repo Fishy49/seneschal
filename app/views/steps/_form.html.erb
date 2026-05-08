@@ -44,7 +44,7 @@
   <div class="mb-4">
     <%= f.label :step_type, "Type", class: "block text-sm font-medium text-content-muted mb-1.5" %>
     <%= f.select :step_type,
-          [["Skill", "skill"], ["Prompt", "prompt"], ["Script", "script"], ["Command", "command"], ["CI Check", "ci_check"], ["Context Fetch", "context_fetch"], ["JSON Validator", "json_validator"]],
+          [["Skill", "skill"], ["Prompt", "prompt"], ["Script", "script"], ["Command", "command"], ["CI Check", "ci_check"], ["Context Fetch", "context_fetch"]],
           {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
           data: { step_form_target: "typeSelect", action: "step-form#toggle" } %>
   </div>
@@ -297,38 +297,8 @@
     </div>
   </div>
 
-  <%# === Pipeline variables (available to JSON validator datalist and consumes checkboxes) === %>
+  <%# === Pipeline variables (consumes checkboxes) === %>
   <% available_vars = Step.available_variables_for(@workflow, step.position.to_i) %>
-
-  <%# === JSON Validator fields === %>
-  <div data-step-form-target="jsonValidatorFields" style="<%= 'display:none' unless step.step_type == 'json_validator' %>">
-    <div class="grid grid-cols-2 gap-4">
-      <div class="mb-4">
-        <label for="json_validator_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">Schema</label>
-        <select name="json_validator_schema_id" id="json_validator_schema_id"
-                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          <option value="">Select a schema...</option>
-          <% JsonSchema.order(:name).each do |s| %>
-            <option value="<%= s.id %>" <%= "selected" if step.config["json_schema_id"].to_i == s.id %>><%= s.name %></option>
-          <% end %>
-        </select>
-      </div>
-      <div class="mb-4">
-        <label for="json_validator_source_variable" class="block text-sm font-medium text-content-muted mb-1.5">Source Variable</label>
-        <input type="text" name="json_validator_source_variable" id="json_validator_source_variable"
-               value="<%= step.config["source_variable"] %>"
-               list="json_validator_var_options"
-               placeholder="payload"
-               class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-        <datalist id="json_validator_var_options">
-          <% available_vars.each do |var| %>
-            <option value="<%= var["name"] %>">
-          <% end %>
-        </datalist>
-      </div>
-    </div>
-    <p class="text-xs text-content-muted mb-4">The validator reads the named context variable, parses it as JSON, and checks it against the selected schema. A mismatch fails the step.</p>
-  </div>
 
   <%# === Pipeline: Produces / Consumes === %>
   <div class="grid grid-cols-2 gap-4">

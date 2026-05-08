@@ -101,10 +101,6 @@ class StepsController < ApplicationController
         raw["produces"].to_s.split(",").map(&:strip).compact_blank
       end
     consumes = Array(raw["consumes"]).compact_blank
-    if permitted[:step_type] == "json_validator" && raw["json_validator_source_variable"].present?
-      consumes << raw["json_validator_source_variable"].to_s.strip
-      consumes.uniq!
-    end
     permitted[:config]["produces"] = produces if produces.any?
     permitted[:config]["consumes"] = consumes if consumes.any?
 
@@ -130,7 +126,6 @@ class StepsController < ApplicationController
     when "ci_check" then build_ci_check_config(raw)
     when "skill", "prompt" then build_skill_config(raw)
     when "context_fetch" then build_context_fetch_config(raw)
-    when "json_validator" then build_json_validator_config(raw)
     else {}
     end
   end
@@ -160,13 +155,6 @@ class StepsController < ApplicationController
     config["context_projects"] = context_ids if context_ids.any?
 
     config
-  end
-
-  def build_json_validator_config(raw)
-    {
-      "json_schema_id" => raw["json_validator_schema_id"].presence&.to_i,
-      "source_variable" => raw["json_validator_source_variable"].to_s.strip.presence
-    }.compact
   end
 
   def build_context_fetch_config(raw)

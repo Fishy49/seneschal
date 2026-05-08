@@ -125,26 +125,6 @@ class StepTest < ActiveSupport::TestCase
     assert s.manual_approval?
   end
 
-  test "valid json_validator step" do
-    s = Step.new(
-      name: "v", workflow: workflows(:deploy),
-      step_type: "json_validator", position: 10, timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => json_schemas(:person_schema).id, "source_variable" => "person_payload" }
-    )
-    assert s.valid?, s.errors.full_messages.inspect
-  end
-
-  test "json_validator requires json_schema_id and source_variable" do
-    s = Step.new(
-      name: "v", workflow: workflows(:deploy),
-      step_type: "json_validator", position: 10, timeout: 30, max_retries: 0,
-      config: {}
-    )
-    assert_not s.valid?
-    assert_includes s.errors[:base], "JSON validator step requires a json_schema_id"
-    assert_includes s.errors[:base], "JSON validator step requires a source_variable"
-  end
-
   test "json_schema returns associated schema" do
     schema = json_schemas(:person_schema)
     s = steps(:skill_step)
@@ -155,11 +135,6 @@ class StepTest < ActiveSupport::TestCase
   test "json_schema returns nil when not set" do
     s = steps(:skill_step)
     assert_nil s.json_schema
-  end
-
-  test "validator_source_variable returns config value" do
-    s = Step.new(config: { "source_variable" => "payload" })
-    assert_equal "payload", s.validator_source_variable
   end
 
   test "available_variables_for includes globals, prior produces, and schema sub-paths" do

@@ -4,7 +4,7 @@ class Step < ApplicationRecord
   belongs_to :skill, optional: true
   has_many :run_steps, dependent: :destroy
 
-  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "json_validator"].freeze
+  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt"].freeze
 
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }
@@ -14,7 +14,6 @@ class Step < ApplicationRecord
   validates :skill, presence: true, if: -> { step_type == "skill" }
   validates :body, presence: true, if: -> { step_type.in?(["script", "command", "prompt"]) }
   validate :workflow_or_run_present
-  validate :json_validator_config_present, if: -> { step_type == "json_validator" }
 
   GLOBAL_VARIABLES = ["task_title", "task_body", "task_kind", "repo_owner", "repo_name", "context_files"].freeze
 
@@ -63,10 +62,6 @@ class Step < ApplicationRecord
     @json_schema ||= JsonSchema.find_by(id: json_schema_id) if json_schema_id.present?
   end
 
-  def validator_source_variable
-    config["source_variable"]
-  end
-
   def context_project_ids
     Array(config["context_projects"]).map(&:to_i).uniq
   end
@@ -107,10 +102,5 @@ class Step < ApplicationRecord
     return if workflow_id.present? || run_id.present?
 
     errors.add(:base, "Step must belong to a workflow or a run")
-  end
-
-  def json_validator_config_present
-    errors.add(:base, "JSON validator step requires a json_schema_id") if config["json_schema_id"].blank?
-    errors.add(:base, "JSON validator step requires a source_variable") if config["source_variable"].blank?
   end
 end

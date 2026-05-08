@@ -24,8 +24,6 @@ class PipelineExtractor
     when "context_fetch"
       key = @step.config["context_key"]
       key.present? ? { key => @stdout } : {}
-    when "json_validator"
-      {}
     else
       {}
     end

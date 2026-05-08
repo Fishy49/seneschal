@@ -3,7 +3,6 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = [
     "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields",
-    "jsonValidatorFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
@@ -38,9 +37,6 @@ export default class extends Controller {
     }
     if (this.hasContextFetchFieldsTarget) {
       this.contextFetchFieldsTarget.style.display = type === "context_fetch" ? "" : "none"
-    }
-    if (this.hasJsonValidatorFieldsTarget) {
-      this.jsonValidatorFieldsTarget.style.display = type === "json_validator" ? "" : "none"
     }
     this.applySchemaMode({ wipeOnEnter: false })
   }
@@ -214,12 +210,6 @@ export default class extends Controller {
       this.field("skill_max_turns").value = cfg.max_turns || ""
       this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
       this.field("json_schema_id").value = cfg.json_schema_id || ""
-    }
-
-    // JSON Validator config
-    if (template.step_type === "json_validator") {
-      this.field("json_validator_schema_id").value = cfg.json_schema_id || ""
-      this.field("json_validator_source_variable").value = cfg.source_variable || ""
     }
 
     // Manual approval

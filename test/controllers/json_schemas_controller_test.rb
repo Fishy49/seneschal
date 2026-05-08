@@ -76,9 +76,9 @@ class JsonSchemasControllerTest < ActionDispatch::IntegrationTest
     schema = json_schemas(:person_schema)
     @workflow = workflows(:deploy)
     @workflow.steps.create!(
-      name: "Validator", step_type: "json_validator", position: 99,
-      timeout: 30, max_retries: 0,
-      config: { "json_schema_id" => schema.id, "source_variable" => "payload" }
+      name: "Schema Skill", step_type: "skill", skill: skills(:shared_skill),
+      position: 99, timeout: 30, max_retries: 0,
+      config: { "json_schema_id" => schema.id, "produces" => ["person"] }
     )
 
     assert_no_difference "JsonSchema.count" do
