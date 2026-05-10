@@ -39,6 +39,26 @@
       </details>
     <% end %>
     <%= render "runs/todo_list", run_step: run_step %>
+    <% query_logs = run_step.context_query_logs.recent_first %>
+    <% if query_logs.any? %>
+      <details class="mt-1">
+        <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">
+          context queries <span class="text-content-muted">(<%= query_logs.size %>, <%= number_to_human_size(query_logs.sum(:returned_bytes)) %> total)</span>
+        </summary>
+        <div class="mt-1 ml-2 space-y-0.5 text-xs font-mono">
+          <% query_logs.each do |q| %>
+            <div class="flex items-baseline gap-2 <%= 'text-danger' if q.error.present? %>">
+              <code class="text-info"><%= q.variable %></code>
+              <code class="text-content-muted"><%= q.expression %></code>
+              <span class="text-content-muted">→ <%= q.error.present? ? "error" : number_to_human_size(q.returned_bytes) %></span>
+              <% if q.error.present? %>
+                <span class="text-danger truncate"><%= q.error %></span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </details>
+    <% end %>
     <% if run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
       <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
       <details class="mt-1" <%= "open" if run_step.status.in?(%w[running retrying]) %>>

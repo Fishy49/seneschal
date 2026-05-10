@@ -156,6 +156,43 @@ class StepTest < ActiveSupport::TestCase
     assert_includes names, "person.age"
   end
 
+  test "available_variables_for marks schema-bound root outputs as queryable" do
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    schema = json_schemas(:person_schema)
+    workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "go",
+      position: 1, timeout: 30, max_retries: 0,
+      config: { "produces" => ["person"], "json_schema_id" => schema.id }
+    )
+
+    vars = Step.available_variables_for(workflow, 2)
+    by_name = vars.index_by { |v| v["name"] }
+
+    assert by_name["person"]["queryable"], "schema-bound root should be queryable"
+    assert_not by_name["person.name"]["queryable"], "sub-paths are not directly queryable"
+    assert_not by_name["task_title"]["queryable"], "globals are not queryable"
+  end
+
+  test "queryable_variable_schemas returns root => schema for schema-bound producers" do
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    schema = json_schemas(:person_schema)
+    workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "go",
+      position: 1, timeout: 30, max_retries: 0,
+      config: { "produces" => ["person"], "json_schema_id" => schema.id }
+    )
+
+    map = Step.queryable_variable_schemas(workflow, 2)
+    assert_equal({ "person" => schema }, map)
+  end
+
+  test "queries reads config queries array" do
+    s = Step.new(config: { "queries" => ["foundation"] })
+    assert_equal ["foundation"], s.queries
+  end
+
   test "available_variables_for surfaces context_fetch context_key and schema sub-paths" do
     workflow = workflows(:deploy)
     workflow.steps.destroy_all

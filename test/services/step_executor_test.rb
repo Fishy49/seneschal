@@ -370,6 +370,64 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_equal initial, executor.send(:validate_with_session_retry, initial)
   end
 
+  test "prepend_queryable_context lists each queryable variable with its schema and wrapper usage" do
+    schema = json_schemas(:person_schema)
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "go", position: 1,
+      timeout: 30, max_retries: 0,
+      config: { "produces" => ["person"], "json_schema_id" => schema.id }
+    )
+    consumer = workflow.steps.create!(
+      name: "Consumer", step_type: "skill", skill: skills(:shared_skill),
+      position: 2, timeout: 30, max_retries: 0,
+      config: { "queries" => ["person"] }
+    )
+    executor = StepExecutor.new(consumer, {}, @ready.local_path)
+    prompt = executor.send(:prepend_queryable_context, "BODY")
+
+    assert_includes prompt, "Queryable Context"
+    assert_includes prompt, "seneschal-context"
+    assert_includes prompt, "person"
+    assert_includes prompt, schema.body
+    assert prompt.end_with?("BODY")
+  end
+
+  test "env_vars include SENESCHAL_* keys when queries are active" do
+    schema = json_schemas(:person_schema)
+    workflow = workflows(:deploy)
+    workflow.steps.destroy_all
+    workflow.steps.create!(
+      name: "Producer", step_type: "prompt", body: "go", position: 1,
+      timeout: 30, max_retries: 0,
+      config: { "produces" => ["person"], "json_schema_id" => schema.id }
+    )
+    consumer = workflow.steps.create!(
+      name: "Consumer", step_type: "skill", skill: skills(:shared_skill),
+      position: 2, timeout: 30, max_retries: 0,
+      config: { "queries" => ["person"] }
+    )
+    run = workflow.runs.create!(status: "running", context: {}, input: {})
+    consumer.update!(run_id: run.id)
+    executor = StepExecutor.new(consumer, {}, @ready.local_path, run_step_id: 7)
+    env = executor.send(:env_vars)
+
+    assert_equal "person", env["SENESCHAL_QUERYABLE_VARS"]
+    assert_equal "7", env["SENESCHAL_RUN_STEP_ID"]
+    assert_equal run.id.to_s, env["SENESCHAL_RUN_ID"]
+    assert env["SENESCHAL_DB_PATH"].present?
+    assert_includes env["PATH"], Rails.root.join("bin").to_s
+  end
+
+  test "env_vars stay clean when no queries are configured" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    assert_not env.key?("SENESCHAL_QUERYABLE_VARS")
+    assert_not env.key?("SENESCHAL_DB_PATH")
+  end
+
   test "context_fetch project_file reads file from project repo" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "config.json"), '{"flag":true}')

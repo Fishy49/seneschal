@@ -14,13 +14,14 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
-  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/ParameterLists
+  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil, resume_message: nil, run_step_id: nil) # rubocop:disable Metrics/ParameterLists
     @step = step
     @context = context
     @repo_path = repo_path
     @resolved_input_context = resolved_input_context
     @resume_session_id = resume_session_id
     @resume_message = resume_message
+    @run_step_id = run_step_id
   end
 
   def execute(&)
@@ -37,12 +38,13 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&)
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
     prompt = prepend_project_context(prompt)
     prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
+    prompt = prepend_queryable_context(prompt) if @step.queries.any? && queryable_schemas.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     if @step.json_schema
@@ -178,7 +180,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   # --- Skill command builder ---
 
-  def build_skill_cmd(prompt, stream: false, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/PerceivedComplexity
+  def build_skill_cmd(prompt, stream: false, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/PerceivedComplexity,Metrics/CyclomaticComplexity
     resume_session_id ||= @resume_session_id
     resume_message ||= @resume_message
 
@@ -213,6 +215,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       allowed = @step.config["allowed_tools"].presence ||
                 Setting["default_allowed_tools"].presence ||
                 DEFAULT_ALLOWED_TOOLS
+      allowed = "#{allowed},Bash(seneschal-context:*)" if active_queryable_schemas.any?
       cmd += ["--allowedTools", allowed]
     end
 
@@ -381,7 +384,30 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       "REPO_PATH" => @repo_path
     )
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
+    vars.merge!(queryable_env_vars) if active_queryable_schemas.any?
     vars
+  end
+
+  def queryable_env_vars
+    {
+      "PATH" => "#{Rails.root.join("bin")}:#{ENV.fetch("PATH", "")}",
+      "SENESCHAL_DB_PATH" => ActiveRecord::Base.connection_db_config.database.to_s,
+      "SENESCHAL_RUN_ID" => @step.run_id.to_s,
+      "SENESCHAL_RUN_STEP_ID" => @run_step_id.to_s,
+      "SENESCHAL_QUERYABLE_VARS" => active_queryable_schemas.keys.join(",")
+    }
+  end
+
+  def queryable_schemas
+    @queryable_schemas ||= begin
+      workflow = @step.workflow || @step.run&.workflow
+      next_position = @step.position || (workflow ? (workflow.steps.maximum(:position) || 0) + 1 : 1)
+      workflow ? Step.queryable_variable_schemas(workflow, next_position) : {}
+    end
+  end
+
+  def active_queryable_schemas
+    @active_queryable_schemas ||= queryable_schemas.slice(*@step.queries)
   end
 
   def project_for_step
@@ -447,6 +473,46 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       You also have read access to the following Seneschal project directories for reference. Use them when helpful, but remember the primary working directory is the repo you were launched in.
 
       #{lines}
+    CONTEXT
+  end
+
+  # When the step has any consumes marked as queryable, prepend a section
+  # listing each queryable variable + its schema, plus instructions for the
+  # `seneschal-context` CLI. The actual JSON values stay out of the prompt;
+  # the step calls the wrapper with jq expressions when it needs data.
+  def prepend_queryable_context(prompt)
+    blocks = active_queryable_schemas.map do |var, schema|
+      <<~BLOCK
+        ### `#{var}` — schema "#{schema.name}"
+
+        ```json
+        #{schema.body}
+        ```
+      BLOCK
+    end
+
+    <<~CONTEXT + prompt
+      ## Queryable Context
+
+      The variables below are available to this step but their full JSON values are NOT loaded into this prompt. Use the `seneschal-context` CLI tool to pull only what you need:
+
+      ```
+      seneschal-context <variable> <jq-expression>
+      ```
+
+      Examples:
+      - `seneschal-context #{active_queryable_schemas.keys.first} '.title'` — fetch a top-level field
+      - `seneschal-context #{active_queryable_schemas.keys.first} 'keys'` — list top-level keys
+      - `seneschal-context #{active_queryable_schemas.keys.first} '.items | length'` — count an array
+      - `seneschal-context #{active_queryable_schemas.keys.first} '.items[] | select(.kind == "x") | .name'` — filter and project
+
+      Output is whatever jq prints (scalars unquoted-or-quoted by jq, arrays/objects pretty-printed). Each call is logged for the operator to review, so prefer narrow queries over broad dumps.
+
+      Available variables and their schemas:
+
+      #{blocks.join("\n")}
+      ---
+
     CONTEXT
   end
 
