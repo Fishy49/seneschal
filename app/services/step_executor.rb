@@ -391,11 +391,23 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   def queryable_env_vars
     {
       "PATH" => "#{Rails.root.join("bin")}:#{ENV.fetch("PATH", "")}",
-      "SENESCHAL_DB_PATH" => ActiveRecord::Base.connection_db_config.database.to_s,
-      "SENESCHAL_RUN_ID" => @step.run_id.to_s,
+      "SENESCHAL_DB_PATH" => absolute_db_path,
+      "SENESCHAL_RUN_ID" => resolved_run_id.to_s,
       "SENESCHAL_RUN_STEP_ID" => @run_step_id.to_s,
       "SENESCHAL_QUERYABLE_VARS" => active_queryable_schemas.keys.join(",")
     }
+  end
+
+  def absolute_db_path
+    raw = ActiveRecord::Base.connection_db_config.database.to_s
+    Pathname.new(raw).absolute? ? raw : Rails.root.join(raw).to_s
+  end
+
+  def resolved_run_id
+    return @step.run_id if @step.run_id
+    return @resolved_run_id if defined?(@resolved_run_id)
+
+    @resolved_run_id = @run_step_id ? RunStep.where(id: @run_step_id).pick(:run_id) : nil
   end
 
   def queryable_schemas
