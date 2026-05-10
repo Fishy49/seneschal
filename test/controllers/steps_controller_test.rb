@@ -279,6 +279,24 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_nil cfg["url"]
   end
 
+  test "POST create persists queries from form into config" do
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Querying step",
+          step_type: "skill",
+          skill_id: skills(:shared_skill).id,
+          position: 90,
+          timeout: 60,
+          max_retries: 0
+        },
+        queries: ["foundation"]
+      }
+    end
+    assert_equal ["foundation"], Step.last.config["queries"]
+    assert_equal ["foundation"], Step.last.queries
+  end
+
   test "POST create persists produces as array" do
     assert_difference "Step.count", 1 do
       post project_workflow_steps_path(@project, @workflow), params: {

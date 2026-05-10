@@ -20,19 +20,36 @@ class Step < ApplicationRecord
   # Variables visible at a given position in a workflow: globals + each prior
   # step's outputs, plus schema-derived sub-paths for any prior step that has
   # a JSON Schema attached. Each entry is a hash of
-  # { "name" => path_or_var, "source" => human_label }.
+  # { "name" => path_or_var, "source" => human_label, "queryable" => bool }.
+  # `queryable` is true only for the root output of a schema-bound producer —
+  # those vars can be consumed in either inject mode or query mode.
   def self.available_variables_for(workflow, position)
-    vars = GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global" } }
+    vars = GLOBAL_VARIABLES.map { |v| { "name" => v, "source" => "global", "queryable" => false } }
     workflow.steps.where(position: ...position.to_i).order(:position).each do |s|
       outputs = s.output_variables
-      outputs.each { |v| vars << { "name" => v, "source" => s.name } }
-      next unless s.json_schema && (root = outputs.first)
+      root = outputs.first
+      outputs.each do |v|
+        vars << { "name" => v, "source" => s.name, "queryable" => (s.json_schema && v == root).present? }
+      end
+      next unless s.json_schema && root
 
       JsonPathResolver.paths_for_schema(s.json_schema.body, prefix: root).each do |path|
-        vars << { "name" => path, "source" => s.name }
+        vars << { "name" => path, "source" => s.name, "queryable" => false }
       end
     end
     vars
+  end
+
+  # Map of queryable variable name => the producer step's JsonSchema. Used by
+  # the executor to build the prompt menu and by the form to know which rows
+  # should expose a Query toggle.
+  def self.queryable_variable_schemas(workflow, position)
+    workflow.steps.where(position: ...position.to_i).order(:position).each_with_object({}) do |s, acc|
+      next unless s.json_schema
+
+      root = s.output_variables.first
+      acc[root] = s.json_schema if root
+    end
   end
 
   # The variable names this step writes into the run context when it succeeds.
@@ -52,6 +69,10 @@ class Step < ApplicationRecord
 
   def consumes
     config["consumes"] || []
+  end
+
+  def queries
+    config["queries"] || []
   end
 
   def json_schema_id

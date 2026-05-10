@@ -168,7 +168,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       broadcast_run(run)
 
       scoped = scope_context(recovery_step, run.context)
-      executor = StepExecutor.new(recovery_step, scoped, repo_path)
+      executor = StepExecutor.new(recovery_step, scoped, repo_path, run_step_id: child_run_step.id)
       recovery_result = executor.execute { |update| broadcast_child_progress(child_run_step, update) }
 
       if recovery_result.passed?
@@ -204,7 +204,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
     resolved_context = resolve_input_context(step, run.context)
     scoped = scope_context(step, run.context)
-    executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context)
+    executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context, run_step_id: parent_run_step.id)
     result = executor.execute { |update| broadcast_child_progress(parent_run_step, update) }
 
     if result.passed?
@@ -271,7 +271,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       scoped = scope_context(prev_step, run.context)
       executor = StepExecutor.new(prev_step, scoped, repo_path,
                                   resume_session_id: prev_run_step.claude_session_id,
-                                  resume_message: resume_msg)
+                                  resume_message: resume_msg,
+                                  run_step_id: child_run_step.id)
       resume_result = executor.execute { |update| broadcast_child_progress(child_run_step, update) }
 
       if resume_result.passed?
@@ -359,7 +360,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
     executor = StepExecutor.new(step, scoped, repo_path,
                                 resolved_input_context: resolved_context,
-                                resume_session_id: resume_sid)
+                                resume_session_id: resume_sid,
+                                run_step_id: run_step.id)
 
     on_progress = lambda { |update|
       attrs = { updated_at: Time.current }

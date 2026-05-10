@@ -337,21 +337,32 @@
     <div class="mb-4">
       <label class="block text-sm font-medium text-content-muted mb-1.5">Consumes</label>
       <% if available_vars.any? %>
-        <div class="max-h-36 overflow-y-auto bg-surface-input border border-edge rounded-lg px-3 py-2 space-y-1">
-          <% available_vars.each do |var| %>
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <div class="max-h-44 overflow-y-auto bg-surface-input border border-edge rounded-lg px-3 py-2">
+          <div class="grid grid-cols-[auto_auto_1fr_auto] gap-x-3 gap-y-1 items-center text-xs">
+            <span class="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Inject</span>
+            <span class="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Query</span>
+            <span class="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Variable</span>
+            <span class="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Source</span>
+            <% available_vars.each do |var| %>
               <input type="checkbox" name="consumes[]" value="<%= var["name"] %>"
                      <%= "checked" if step.consumes.include?(var["name"]) %>
-                     class="accent-accent">
+                     class="accent-accent justify-self-center">
+              <% if var["queryable"] %>
+                <input type="checkbox" name="queries[]" value="<%= var["name"] %>"
+                       <%= "checked" if step.queries.include?(var["name"]) %>
+                       class="accent-accent justify-self-center">
+              <% else %>
+                <span class="text-content-muted/30 justify-self-center">—</span>
+              <% end %>
               <code class="text-xs"><%= var["name"] %></code>
               <span class="text-xs text-content-muted"><%= var["source"] %></span>
-            </label>
-          <% end %>
+            <% end %>
+          </div>
         </div>
       <% else %>
         <p class="text-xs text-content-muted py-2">No variables available at this position. Global variables are always accessible.</p>
       <% end %>
-      <p class="text-xs text-content-muted mt-1">Variables this step needs. For skill steps, selected variables are automatically injected into the prompt so reusable skills don't need workflow-specific <code class="bg-surface-input px-1 rounded">${var}</code> placeholders. Dotted entries (e.g. <code class="bg-surface-input px-1 rounded">review.summary</code>) pull a sub-section from an upstream step's JSON-schema output. When set, the step only sees these + globals. Leave empty to receive all variables.</p>
+      <p class="text-xs text-content-muted mt-1"><strong>Inject</strong> loads the variable's value into the prompt up front (good for small values). <strong>Query</strong> exposes the variable through a <code class="bg-surface-input px-1 rounded">seneschal-context</code> CLI tool the step can call with jq expressions to pull only what it needs (good for large JSON-schema'd structures). Dotted entries like <code class="bg-surface-input px-1 rounded">review.summary</code> inject a sub-path of an upstream JSON value.</p>
     </div>
   </div>
 

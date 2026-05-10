@@ -101,8 +101,10 @@ class StepsController < ApplicationController
         raw["produces"].to_s.split(",").map(&:strip).compact_blank
       end
     consumes = Array(raw["consumes"]).compact_blank
+    queries = Array(raw["queries"]).compact_blank
     permitted[:config]["produces"] = produces if produces.any?
     permitted[:config]["consumes"] = consumes if consumes.any?
+    permitted[:config]["queries"] = queries if queries.any?
 
     # On-fail recovery action
     if raw["on_fail_type"].present?

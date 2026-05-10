@@ -1,0 +1,118 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Tool exposed to skill/prompt steps so they can pull just the parts of large
+# JSON-shaped run-context variables they need, instead of having the whole
+# value injected into the prompt up front.
+#
+# Reads the SQLite database directly (no Rails boot, no HTTP), pipes the
+# variable's JSON value through jq with the supplied filter expression, and
+# logs the query against the spawning run_step so it shows up in the UI.
+#
+# Usage:
+#   seneschal-context <variable> <jq-expression>
+#
+# Examples:
+#   seneschal-context foundation '.title'
+#   seneschal-context foundation '.metadata.author'
+#   seneschal-context foundation 'keys'
+#   seneschal-context foundation '.risks | length'
+#   seneschal-context foundation '.risks[] | select(.severity == "high") | .description'
+#
+# Required env (set by StepExecutor when the step has any queryable vars):
+#   SENESCHAL_DB_PATH         absolute path to the SQLite database file
+#   SENESCHAL_RUN_ID          id of the parent run
+#   SENESCHAL_RUN_STEP_ID     id of the run_step running this query
+#   SENESCHAL_QUERYABLE_VARS  comma-separated list of variable names this
+#                             step is allowed to query
+
+require "json"
+require "open3"
+require "sqlite3"
+require "time"
+
+def die(msg)
+  warn "seneschal-context: #{msg}"
+  exit 1
+end
+
+def log_query(db_path:, run_step_id:, variable:, expression:, bytes:, error:) # rubocop:disable Metrics/ParameterLists
+  now = Time.now.utc.iso8601
+  sql = "INSERT INTO context_query_logs " \
+        "(run_step_id, variable, expression, returned_bytes, error, created_at, updated_at) " \
+        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+  SQLite3::Database.new(db_path) do |db|
+    db.execute(sql, [run_step_id.to_i, variable.to_s, expression.to_s, bytes.to_i, error, now, now])
+  end
+rescue StandardError
+  # logging is best-effort; never crash the wrapper because of it
+end
+
+variable, expression = ARGV
+die "usage: seneschal-context <variable> <jq-expression>" unless variable && expression
+
+db_path     = ENV.fetch("SENESCHAL_DB_PATH", nil)     or die "SENESCHAL_DB_PATH not set"
+run_id      = ENV.fetch("SENESCHAL_RUN_ID", nil)      or die "SENESCHAL_RUN_ID not set"
+run_step_id = ENV.fetch("SENESCHAL_RUN_STEP_ID", nil) or die "SENESCHAL_RUN_STEP_ID not set"
+allowed     = ENV.fetch("SENESCHAL_QUERYABLE_VARS", "").split(",").map(&:strip).reject(&:empty?)
+
+unless allowed.include?(variable)
+  msg = "variable #{variable.inspect} is not queryable from this step (allowed: #{allowed.join(", ")})"
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  die msg
+end
+
+context_json = nil
+begin
+  SQLite3::Database.new(db_path, readonly: true) do |db|
+    context_json = db.get_first_value("SELECT context FROM runs WHERE id = ?", [run_id.to_i])
+  end
+rescue StandardError => e
+  msg = "db read failed: #{e.message}"
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  die msg
+end
+
+unless context_json
+  msg = "run #{run_id} not found"
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  die msg
+end
+
+begin
+  context = JSON.parse(context_json)
+rescue JSON::ParserError => e
+  msg = "run context could not be parsed: #{e.message}"
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  die msg
+end
+
+raw = context[variable]
+if raw.nil?
+  msg = "variable #{variable.inspect} not found in run context"
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  die msg
+end
+
+# Normalize the variable's value to a JSON string for jq's stdin. If the value
+# is already a parsed Hash/Array (because the producer stored it as a real
+# JSON object) we re-serialize; if it's a raw JSON string we hand it through.
+input_json =
+  case raw
+  when Hash, Array then JSON.generate(raw)
+  else
+    JSON.parse(raw.to_s) # validate it's parseable
+    raw.to_s
+  end
+
+stdout, stderr, status = Open3.capture3("jq", expression, stdin_data: input_json)
+
+if status.success?
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: stdout.bytesize, error: nil)
+  print stdout
+else
+  msg = stderr.strip.empty? ? "jq exited #{status.exitstatus}" : stderr.strip
+  log_query(db_path: db_path, run_step_id: run_step_id, variable: variable, expression: expression, bytes: 0, error: msg)
+  warn "seneschal-context: #{msg}"
+  exit 1
+end
