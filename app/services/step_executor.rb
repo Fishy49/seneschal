@@ -3,18 +3,17 @@ require "open3"
 class StepExecutor # rubocop:disable Metrics/ClassLength
   include ContextFetcher
 
-  Result = Data.define(:exit_code, :stdout, :stderr, :stream_events) do
-    def initialize(exit_code:, stdout:, stderr:, stream_events: nil)
-      super
-    end
-
-    def passed? = exit_code.zero?
-  end
+  # Backwards-compatible alias. Result lives in Runners::Result now so all
+  # runners share one struct; consumers (ExecuteRunJob, tests) can continue
+  # to reference StepExecutor::Result.
+  Result = Runners::Result
 
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
-  def initialize(step, context, repo_path, resolved_input_context: nil, resume_session_id: nil, resume_message: nil, run_step_id: nil) # rubocop:disable Metrics/ParameterLists
+  def initialize(step, context, repo_path, # rubocop:disable Metrics/ParameterLists
+                 resolved_input_context: nil, resume_session_id: nil,
+                 resume_message: nil, run_step_id: nil, runner: nil)
     @step = step
     @context = context
     @repo_path = repo_path
@@ -22,6 +21,17 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     @resume_session_id = resume_session_id
     @resume_message = resume_message
     @run_step_id = run_step_id
+    @runner = runner
+  end
+
+  # The agent runner this executor dispatches skill/prompt steps through.
+  # Resolved from Step.config["runner"] (per-step override) or Setting["default_runner"].
+  def runner
+    @runner ||= Runners.lookup(runner_name)
+  end
+
+  def runner_name
+    @step.config["runner"].presence || Runners.default_name
   end
 
   def execute(&)
@@ -38,7 +48,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
+  def execute_skill(&)
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
@@ -54,8 +64,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     end
     prompt = append_context_projects(prompt) if context_project_paths.any?
 
-    cmd = build_skill_cmd(prompt, stream: block_given?)
-    result = block_given? ? execute_skill_streaming(cmd, &) : run_command(cmd)
+    result = runner.execute(**runner_call_kwargs(prompt: prompt, stream: block_given?), &)
 
     return result unless result.passed?
     return result unless @step.json_schema
@@ -96,57 +105,8 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   end
 
   # --- Streaming execution ---
-
-  def execute_skill_streaming(cmd)
-    events = []
-    result_text = +""
-    stderr_acc = +""
-    session_id = nil
-
-    Open3.popen3(env_vars, *cmd, chdir: @repo_path) do |stdin, stdout, stderr, wait_thr|
-      stdin.close
-      stderr_thread = Thread.new { stderr_acc = stderr.read }
-
-      last_broadcast = monotonic_now
-
-      stdout.each_line do |line|
-        line = line.strip
-        next if line.empty?
-
-        event = begin; JSON.parse(line); rescue StandardError; next; end
-        events << event
-
-        # Capture session_id from the earliest event that has one
-        session_id ||= event["session_id"]
-
-        # Extract text from result or assistant text blocks
-        case event["type"]
-        when "result"
-          result_text = event["result"].to_s
-          session_id ||= event["session_id"]
-        when "assistant"
-          (event.dig("message", "content") || []).each do |block|
-            result_text = block["text"] if block["type"] == "text"
-          end
-        end
-
-        if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-          yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
-          last_broadcast = monotonic_now
-        end
-      end
-
-      stderr_thread.join
-      exit_code = wait_thr.value.exitstatus || 1
-
-      # Final broadcast
-      yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
-
-      Result.new(exit_code: exit_code, stdout: result_text, stderr: stderr_acc, stream_events: events)
-    end
-  rescue StandardError => e
-    Result.new(exit_code: 1, stdout: "", stderr: e.message)
-  end
+  # Skill/prompt streaming lives in Runners::ClaudeCLI; bash streaming for
+  # script/command steps stays here.
 
   def run_command_streaming(cmd, chdir: nil)
     stdout_acc = +""
@@ -178,50 +138,37 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end
 
-  # --- Skill command builder ---
+  # --- Runner dispatch ---
 
-  def build_skill_cmd(prompt, stream: false, resume_session_id: nil, resume_message: nil) # rubocop:disable Metrics/PerceivedComplexity,Metrics/CyclomaticComplexity
+  # Build the kwargs hash passed to `runner.execute`. Centralizes per-step
+  # configuration (model, effort, allowed_tools, add_dirs, permission mode)
+  # so all runner implementations see a consistent contract.
+  def runner_call_kwargs(prompt:, stream:, resume_session_id: nil, resume_message: nil)
     resume_session_id ||= @resume_session_id
     resume_message ||= @resume_message
 
-    cmd = ["claude"]
+    {
+      prompt: prompt,
+      cwd: @repo_path,
+      env: env_vars,
+      resume_session_id: resume_session_id,
+      resume_message: resume_message,
+      model: @step.config["model"].presence,
+      max_turns: @step.config["max_turns"].presence,
+      effort: @step.config["effort"].presence || "medium",
+      allowed_tools: resolved_allowed_tools,
+      dangerously_skip_permissions: project_for_step&.skip_permissions? || false,
+      permission_mode: "dontAsk",
+      add_dirs: context_project_paths,
+      stream: stream
+    }
+  end
 
-    if resume_session_id
-      cmd += ["--resume", resume_session_id, "-p"]
-      cmd += ["--output-format", "stream-json"] if stream
-      cmd += ["--verbose"]
-      cmd << (resume_message || "Your previous session was interrupted. Continue and complete the task.")
-    else
-      cmd += ["-p"]
-      cmd += ["--output-format", "stream-json"] if stream
-      cmd += ["--verbose"]
-      cmd << prompt
-    end
-
-    model = @step.config["model"]
-    cmd += ["--model", model] if model.present?
-
-    max_turns = @step.config["max_turns"]
-    cmd += ["--max-turns", max_turns.to_s] if max_turns.present?
-
-    effort = @step.config["effort"].presence || "medium"
-    cmd += ["--effort", effort]
-
-    if project_for_step&.skip_permissions?
-      cmd += ["--dangerously-skip-permissions"]
-    else
-      cmd += ["--permission-mode", "dontAsk"]
-
-      allowed = @step.config["allowed_tools"].presence ||
-                Setting["default_allowed_tools"].presence ||
-                DEFAULT_ALLOWED_TOOLS
-      allowed = "#{allowed},Bash(seneschal-context:*)" if active_queryable_schemas.any?
-      cmd += ["--allowedTools", allowed]
-    end
-
-    context_project_paths.each { |path| cmd += ["--add-dir", path] }
-
-    cmd
+  def resolved_allowed_tools
+    base = @step.config["allowed_tools"].presence ||
+           Setting["default_allowed_tools"].presence ||
+           DEFAULT_ALLOWED_TOOLS
+    active_queryable_schemas.any? ? "#{base},Bash(seneschal-context:*)" : base
   end
 
   # --- Non-streaming execution ---
@@ -567,10 +514,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       end
 
       feedback = validation_feedback_message(errors)
-      cmd = build_skill_cmd(nil, stream: block_given?,
-                                 resume_session_id: session_id,
-                                 resume_message: feedback)
-      current = block_given? ? execute_skill_streaming(cmd, &) : run_command(cmd)
+      current = runner.execute(
+        **runner_call_kwargs(prompt: nil, stream: block_given?,
+                             resume_session_id: session_id, resume_message: feedback),
+        &
+      )
       return current unless current.passed?
     end
   end
@@ -615,6 +563,8 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   end
 
   def session_id_from(result)
+    return result.session_id if result.respond_to?(:session_id) && result.session_id.present?
+
     events = result.stream_events || []
     events.reverse_each do |event|
       sid = event["session_id"]
