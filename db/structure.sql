@@ -97,15 +97,6 @@ FOREIGN KEY ("project_group_id")
   REFERENCES "project_groups" ("id")
 );
 CREATE INDEX "index_projects_on_project_group_id" ON "projects" ("project_group_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "skills" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer, "updated_at" datetime(6) NOT NULL, "project_group_id" integer, CONSTRAINT "fk_rails_ca04e2fd46"
-FOREIGN KEY ("project_id")
-  REFERENCES "projects" ("id")
-, CONSTRAINT "fk_rails_a36595f8de"
-FOREIGN KEY ("project_group_id")
-  REFERENCES "project_groups" ("id")
-);
-CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id") /*application='Seneschal'*/;
-CREATE INDEX "index_skills_on_project_group_id" ON "skills" ("project_group_id") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "json_schemas" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "description" text, "body" text NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
 CREATE UNIQUE INDEX "index_json_schemas_on_name" ON "json_schemas" ("name") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "context_query_logs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run_step_id" integer NOT NULL, "variable" varchar NOT NULL, "expression" text NOT NULL, "returned_bytes" integer DEFAULT 0 NOT NULL, "error" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_f1b0dc9f71"
@@ -114,7 +105,18 @@ FOREIGN KEY ("run_step_id")
  ON DELETE CASCADE);
 CREATE INDEX "index_context_query_logs_on_run_step_id" ON "context_query_logs" ("run_step_id") /*application='Seneschal'*/;
 CREATE INDEX "index_runs_on_worktree_retained_true" ON "runs" ("worktree_retained") WHERE worktree_retained = 1 /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "skills" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "body" text, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer, "updated_at" datetime(6) NOT NULL, "project_group_id" integer, "source_kind" varchar, "relative_path" varchar, "content_hash" varchar, "cached_metadata" json DEFAULT '{}' NOT NULL, CONSTRAINT "fk_rails_a36595f8de"
+FOREIGN KEY ("project_group_id")
+  REFERENCES "project_groups" ("id")
+, CONSTRAINT "fk_rails_ca04e2fd46"
+FOREIGN KEY ("project_id")
+  REFERENCES "projects" ("id")
+);
+CREATE INDEX "index_skills_on_project_id" ON "skills" ("project_id") /*application='Seneschal'*/;
+CREATE INDEX "index_skills_on_project_group_id" ON "skills" ("project_group_id") /*application='Seneschal'*/;
+CREATE INDEX "index_skills_on_source_kind_and_relative_path" ON "skills" ("source_kind", "relative_path") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260512000002'),
 ('20260512000001'),
 ('20260510031720'),
 ('20260502000003'),
