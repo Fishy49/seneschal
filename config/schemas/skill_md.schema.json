@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seneschal.dev/schemas/skill_md.schema.json",
+  "title": "Agent Skill frontmatter",
+  "description": "YAML frontmatter schema for an agentskills.io SKILL.md file. Tolerant of additional properties so third-party skills don't trip validation.",
+  "type": "object",
+  "required": ["name", "description"],
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Kebab-case skill identifier. Should match the containing directory's name."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When-to-use prose. This is how the agent decides whether to load the skill at activation time, so prefer concrete triggers over vague language."
+    },
+    "allowed-tools": {
+      "description": "Tools this skill is allowed to invoke. Either a comma-separated string (Claude Code style) or an array of strings.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "version": {
+      "type": "string",
+      "description": "Optional semver tag for the skill."
+    },
+    "license": {
+      "type": "string"
+    }
+  }
+}
