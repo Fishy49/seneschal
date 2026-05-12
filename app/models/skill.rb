@@ -1,11 +1,14 @@
 class Skill < ApplicationRecord
+  SOURCE_KINDS = SkillLoader::SOURCE_KINDS
+
   belongs_to :project, optional: true
   belongs_to :project_group, optional: true
   has_many :steps, dependent: :nullify
   has_many :step_templates, dependent: :nullify
 
   validates :name, presence: true, uniqueness: { scope: [:project_id, :project_group_id] }
-  validates :body, presence: true
+  validates :body, presence: true, unless: :filesystem_backed?
+  validates :source_kind, inclusion: { in: SOURCE_KINDS }, allow_nil: true
   validate :scope_is_exclusive
 
   scope :shared, -> { where(project_id: nil, project_group_id: nil) }
@@ -50,6 +53,87 @@ class Skill < ApplicationRecord
     else
       ""
     end
+  end
+
+  # --- Filesystem-backed (agentskills.io SKILL.md) ---
+
+  def filesystem_backed?
+    relative_path.present? && source_kind.present?
+  end
+
+  # Absolute path to the skill directory on disk. Returns nil if this skill is
+  # legacy DB-backed, if project_group-scoped (no disk projection yet), or if
+  # the owning project hasn't been cloned.
+  def absolute_path
+    return nil unless filesystem_backed?
+
+    case source_kind
+    when "global"
+      File.join(SkillLoader.global_root, relative_path)
+    when "project"
+      return nil if project&.local_path.blank?
+
+      File.join(project.local_path, ".claude", "skills", relative_path)
+    when "project_seneschal"
+      return nil if project&.local_path.blank?
+
+      File.join(project.local_path, ".seneschal", "skills", relative_path)
+    end
+  end
+
+  def skill_md_path
+    abs = absolute_path
+    abs && File.join(abs, "SKILL.md")
+  end
+
+  def scripts_dir
+    abs = absolute_path
+    abs && File.join(abs, "scripts")
+  end
+
+  def references_dir
+    abs = absolute_path
+    abs && File.join(abs, "references")
+  end
+
+  # Parsed SKILL.md (frontmatter + body). Memoized; call `reload` to clear or
+  # re-instantiate the record to pick up disk changes between reads.
+  def parsed_skill_md
+    @parsed_skill_md ||= SkillMdParser.parse(File.read(skill_md_path))
+  end
+
+  def frontmatter
+    return cached_metadata if cached_metadata.present? && !@parsed_skill_md
+    return {} unless filesystem_backed?
+
+    parsed_skill_md.frontmatter
+  end
+
+  # Returns the body content used as the prompt template. For filesystem-backed
+  # skills it's the post-frontmatter portion of SKILL.md; for legacy DB skills
+  # it's the body column. Callers (Step#prompt_body, TemplateRenderer) don't
+  # need to care which backing is in use.
+  def body
+    return super unless filesystem_backed?
+    return super unless File.exist?(skill_md_path.to_s)
+
+    parsed_skill_md.body
+  end
+
+  # Sha256 of the SKILL.md contents. nil for legacy DB skills.
+  def compute_content_hash
+    return nil unless filesystem_backed? && File.exist?(skill_md_path.to_s)
+
+    Digest::SHA256.file(skill_md_path).hexdigest
+  end
+
+  def refresh_cached_metadata! # rubocop:disable Naming/PredicateMethod
+    return false unless filesystem_backed? && File.exist?(skill_md_path.to_s)
+
+    @parsed_skill_md = nil
+    fresh = parsed_skill_md
+    update!(cached_metadata: fresh.frontmatter, content_hash: compute_content_hash)
+    true
   end
 
   private
