@@ -25,6 +25,9 @@ production:
   worktree_reaper:
     class: WorktreeReaperJob
     schedule: at 4am every day
+  sync_skill_repos:
+    class: SyncAllSkillReposJob
+    schedule: every 6 hours
 
 development:
   run_recovery:
@@ -39,3 +42,6 @@ development:
   worktree_reaper:
     class: WorktreeReaperJob
     schedule: at 4am every day
+  sync_skill_repos:
+    class: SyncAllSkillReposJob
+    schedule: every 6 hours
