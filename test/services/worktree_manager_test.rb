@@ -156,7 +156,70 @@ class WorktreeManagerTest < ActiveSupport::TestCase
     assert_equal WorktreeManager::DEFAULT_RETENTION_DAYS, WorktreeManager.retention_days
   end
 
+  test "allocate branches off origin/HEAD even when local_path is on a feature branch" do
+    # Build a fake remote so origin/HEAD is set, then check the clone out on a
+    # feature branch with bogus content. The worktree should contain main's
+    # content, not the feature branch's.
+    remote = File.join(@tmpdir, "remote.git")
+    in_dir(@tmpdir, "git", "init", "--bare", "-q", "-b", "main", remote)
+
+    clone = File.join(@tmpdir, "clone")
+    in_dir(@tmpdir, "git", "clone", "-q", remote, clone)
+    in_dir(clone, "git", "config", "user.email", "test@example.com")
+    in_dir(clone, "git", "config", "user.name", "Test")
+    File.write(File.join(clone, "MAIN.md"), "main content")
+    in_dir(clone, "git", "add", "MAIN.md")
+    in_dir(clone, "git", "commit", "-q", "-m", "main commit")
+    in_dir(clone, "git", "push", "-q", "origin", "main")
+    # remote now has main; clone is at main HEAD; origin/HEAD points at origin/main
+
+    # Switch clone to a feature branch with extra junk content
+    in_dir(clone, "git", "checkout", "-q", "-b", "feature/junk")
+    File.write(File.join(clone, "JUNK.md"), "junk content")
+    in_dir(clone, "git", "add", "JUNK.md")
+    in_dir(clone, "git", "commit", "-q", "-m", "junk")
+
+    @project.update!(local_path: clone)
+    run = create_run
+    path = WorktreeManager.allocate(run)
+
+    assert File.exist?(File.join(path, "MAIN.md")), "worktree should contain main content"
+    assert_not File.exist?(File.join(path, "JUNK.md")), "worktree should NOT contain feature-branch content"
+  end
+
+  test "detect_start_point falls back to HEAD when there is no remote" do
+    # The setup repo has no remote configured; origin/HEAD isn't set and
+    # origin/main / origin/master don't resolve either.
+    assert_equal "HEAD", WorktreeManager.detect_start_point(@project)
+  end
+
+  test "detect_start_point returns origin/main when the remote ref exists" do
+    remote = File.join(@tmpdir, "remote.git")
+    in_dir(@tmpdir, "git", "init", "--bare", "-q", "-b", "main", remote)
+
+    # Seed the remote with a commit so a subsequent clone gets origin refs
+    seed = File.join(@tmpdir, "seed")
+    in_dir(@tmpdir, "git", "clone", "-q", remote, seed)
+    in_dir(seed, "git", "config", "user.email", "test@example.com")
+    in_dir(seed, "git", "config", "user.name", "Test")
+    File.write(File.join(seed, "README.md"), "hi")
+    in_dir(seed, "git", "add", "README.md")
+    in_dir(seed, "git", "commit", "-q", "-m", "init")
+    in_dir(seed, "git", "push", "-q", "origin", "main")
+
+    clone = File.join(@tmpdir, "clone-for-detect")
+    in_dir(@tmpdir, "git", "clone", "-q", remote, clone)
+    @project.update!(local_path: clone)
+
+    assert_equal "origin/main", WorktreeManager.detect_start_point(@project)
+  end
+
   private
+
+  def in_dir(dir, *cmd)
+    _, _, status = Open3.capture3(*cmd, chdir: dir)
+    raise "git command failed in #{dir}: #{cmd.inspect}" unless status.success?
+  end
 
   def create_run
     @workflow.runs.create!(status: "pending", context: {}, input: {})

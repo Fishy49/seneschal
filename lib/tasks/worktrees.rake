@@ -1,7 +1,10 @@
 namespace :seneschal do
   namespace :projects do
-    desc "Reset each ready project's local_path to a clean default-branch checkout " \
-         "so worktrees branch off a known-good state. Run once before enabling worktrees."
+    desc "Reset each ready project's local_path to a clean default-branch checkout. " \
+         "Optional: WorktreeManager.allocate branches off origin/HEAD directly, so it " \
+         "doesn't care what state local_path is in. Useful as a cleanup tool for hosts " \
+         "that ran the legacy single-tree model and want local_path normalized for the " \
+         "out-of-band consumers (CLAUDE.md reading, code maps, context_projects)."
     task prepare_for_worktrees: :environment do
       require "open3"
 

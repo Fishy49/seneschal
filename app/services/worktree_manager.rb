@@ -30,15 +30,53 @@ class WorktreeManager
       target = path_for(run)
       FileUtils.mkdir_p(File.dirname(target))
 
+      # Best-effort fetch so origin/HEAD reflects the remote's current default
+      # branch tip. We deliberately branch the new worktree off the remote ref
+      # (not the local working-tree HEAD) so allocate is independent of whatever
+      # state project.local_path is currently checked out on. No operator-run
+      # prep step required.
+      _, fetch_err, fetch_status = Open3.capture3(
+        "git", "-C", project.local_path, "fetch", "--prune", "origin"
+      )
+      unless fetch_status.success?
+        Rails.logger.info(
+          "WorktreeManager: fetch failed for project #{project.id} " \
+          "(#{fetch_err.strip}); using local refs only"
+        )
+      end
+
+      start_point = detect_start_point(project)
       branch = branch_for(run)
+
       _stdout, stderr, status = Open3.capture3(
         "git", "-C", project.local_path,
-        "worktree", "add", target, "-b", branch
+        "worktree", "add", target, "-b", branch, start_point
       )
       raise WorktreeError, "git worktree add failed: #{stderr.strip}" unless status.success?
 
       run.update!(worktree_path: target, worktree_retained: false)
       target
+    end
+
+    # Resolve the commit-ish to branch the new worktree off of. Prefers the
+    # remote's default branch (origin/HEAD) so legacy state in project.local_path
+    # is irrelevant. Falls back to common conventions and finally to local HEAD
+    # so tests against bare local repos (no remote) still work.
+    def detect_start_point(project)
+      stdout, _stderr, status = Open3.capture3(
+        "git", "-C", project.local_path,
+        "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
+      )
+      return stdout.strip if status.success? && stdout.present?
+
+      ["origin/main", "origin/master"].each do |ref|
+        _, _, check = Open3.capture3(
+          "git", "-C", project.local_path, "rev-parse", "--verify", "--quiet", ref
+        )
+        return ref if check.success?
+      end
+
+      "HEAD"
     end
 
     # Reuse an existing worktree if one is already allocated and present on
