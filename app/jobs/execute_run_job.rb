@@ -21,9 +21,23 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     )
     run.update!(error_message: nil, finished_at: nil) if resume
     broadcast_run(run)
-    repo_path = project.local_path
 
-    system("git", "-C", repo_path, "pull", "--ff-only")
+    # Refresh the canonical clone before branching a worktree off it.
+    _, pull_err, pull_status = Open3.capture3(
+      "git", "-C", project.local_path, "pull", "--ff-only"
+    )
+    Rails.logger.info("ExecuteRunJob: pull --ff-only failed on #{project.local_path}: #{pull_err.strip}") unless pull_status.success?
+
+    begin
+      repo_path = WorktreeManager.ensure_for(run)
+    rescue WorktreeManager::WorktreeError => e
+      run.update!(status: "failed", finished_at: Time.current,
+                  error_message: "Worktree allocation failed: #{e.message}")
+      sync_task_status(run)
+      broadcast_run(run)
+      return
+    end
+    broadcast_run(run)
 
     # Build the execution queue from workflow steps + any run-scoped ad-hoc steps.
     workflow_steps = run.workflow.steps.to_a
@@ -56,7 +70,10 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     while queue.any?
       step, queued_run_step_id = queue.shift
       run.reload
-      return if run.status == "stopped"
+      if run.status == "stopped"
+        WorktreeManager.retain(run)
+        return
+      end
       return if run.system_flags["job_token"] != @job_token
 
       position += 1
@@ -118,12 +135,14 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       end
 
       run.update!(status: "failed", finished_at: Time.current, error_message: "Step '#{step.name}' failed")
+      WorktreeManager.retain(run)
       sync_task_status(run)
       broadcast_run(run)
       return
     end
 
     run.update!(status: "completed", finished_at: Time.current)
+    WorktreeManager.cleanup(run)
     sync_task_status(run)
     broadcast_run(run)
   end

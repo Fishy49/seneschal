@@ -132,6 +132,73 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "successful run allocates a worktree, executes against it, and cleans up on completion" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "noop", step_type: "command", body: "echo hi",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    captured_paths = []
+    factory = lambda do |_step, _ctx, repo_path, **_kw|
+      captured_paths << repo_path
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "hi\n", stderr: "", stream_events: nil))
+    end
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    assert_equal "completed", run.status
+    assert_equal 1, captured_paths.size
+    assert captured_paths.first.start_with?(@_test_worktree_root), "step ran inside the worktree"
+    assert_nil run.worktree_path, "worktree_path is cleared on cleanup"
+    assert_not run.worktree_retained?
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "failed run retains the worktree for forensics" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "broken", step_type: "command", body: "exit 1",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    bad = StepExecutor::Result.new(exit_code: 1, stdout: "", stderr: "boom", stream_events: nil)
+    factory = ->(*_a, **_k) { fake_executor(bad) }
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    assert_equal "failed", run.status
+    assert run.worktree_path.present?, "worktree_path stays so the operator can inspect it"
+    assert run.worktree_retained?
+    assert File.directory?(run.worktree_path)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "worktree allocation failure fails the run cleanly" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "noop", step_type: "command", body: "echo hi",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    # Force allocation to fail by pointing local_path at a non-git directory
+    workflow.project.update!(local_path: Dir.mktmpdir, repo_status: "ready")
+    # repo_status stays ready, but git won't recognize it — allocate raises
+
+    ExecuteRunJob.new.perform(run)
+
+    run.reload
+    assert_equal "failed", run.status
+    assert_includes run.error_message, "Worktree allocation failed"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
@@ -160,14 +227,29 @@ class ExecuteRunJobTest < ActiveJob::TestCase
   def setup_workflow_with_ready_project!
     project = projects(:seneschal)
     @_test_tmpdir = Dir.mktmpdir
+    @_test_worktree_root = Dir.mktmpdir
+
+    # WorktreeManager.ensure_for needs a real git repo at local_path; init one
+    # with a single commit on main so branches can be created off HEAD.
+    system("git", "-C", @_test_tmpdir, "init", "-q", "-b", "main")
+    system("git", "-C", @_test_tmpdir, "config", "user.email", "test@example.com")
+    system("git", "-C", @_test_tmpdir, "config", "user.name", "Test")
+    File.write(File.join(@_test_tmpdir, "README.md"), "test repo")
+    system("git", "-C", @_test_tmpdir, "add", "README.md")
+    system("git", "-C", @_test_tmpdir, "commit", "-q", "-m", "init")
+
     project.update!(repo_status: "ready", local_path: @_test_tmpdir)
+    Setting["worktree_root"] = @_test_worktree_root
+
     workflow = workflows(:deploy)
     workflow.steps.destroy_all
     workflow
   end
 
   def cleanup_workflow_with_ready_project!(workflow)
+    Setting.find_by(key: "worktree_root")&.destroy
     FileUtils.rm_rf(@_test_tmpdir) if @_test_tmpdir
+    FileUtils.rm_rf(@_test_worktree_root) if @_test_worktree_root
     workflow&.steps&.destroy_all
   end
 
