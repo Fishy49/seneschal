@@ -3,13 +3,17 @@ class Skill < ApplicationRecord
 
   belongs_to :project, optional: true
   belongs_to :project_group, optional: true
+  belongs_to :skill_repo, optional: true
   has_many :steps, dependent: :nullify
   has_many :step_templates, dependent: :nullify
 
-  validates :name, presence: true, uniqueness: { scope: [:project_id, :project_group_id] }
+  validates :name, presence: true, uniqueness: { scope: [:project_id, :project_group_id, :skill_repo_id] }
   validates :body, presence: true, unless: :filesystem_backed?
   validates :source_kind, inclusion: { in: SOURCE_KINDS }, allow_nil: true
   validate :scope_is_exclusive
+
+  scope :active, -> { where(archived_at: nil) }
+  scope :archived, -> { where.not(archived_at: nil) }
 
   scope :shared, -> { where(project_id: nil, project_group_id: nil) }
   scope :group_scoped, -> { where.not(project_group_id: nil) }
@@ -36,13 +40,19 @@ class Skill < ApplicationRecord
   end
 
   def display_name
-    if shared?
+    if skill_repo
+      "#{skill_repo.name}/#{name}"
+    elsif shared?
       name
     elsif group_scoped?
       "#{project_group.name}/#{name}"
     else
       "#{project.name}/#{name}"
     end
+  end
+
+  def archived?
+    archived_at.present?
   end
 
   def scope_value
@@ -63,13 +73,22 @@ class Skill < ApplicationRecord
 
   # Absolute path to the skill directory on disk. Returns nil if this skill is
   # legacy DB-backed, if project_group-scoped (no disk projection yet), or if
-  # the owning project hasn't been cloned.
+  # the owning project / SkillRepo isn't available. For "global" skills the
+  # path is resolved across SkillLoader.global_roots in priority order.
   def absolute_path
     return nil unless filesystem_backed?
 
     case source_kind
     when "global"
-      File.join(SkillLoader.global_root, relative_path)
+      SkillLoader.global_roots.each do |root|
+        candidate = File.join(root, relative_path)
+        return candidate if File.directory?(candidate)
+      end
+      File.join(SkillLoader.global_roots.first, relative_path)
+    when "skill_repo"
+      return nil if skill_repo&.local_path.blank?
+
+      File.join(skill_repo.local_path, relative_path)
     when "project"
       return nil if project&.local_path.blank?
 
