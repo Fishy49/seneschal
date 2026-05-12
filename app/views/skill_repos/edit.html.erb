@@ -1,0 +1,10 @@
+<div class="max-w-2xl">
+  <div class="mb-4">
+    <p class="text-sm text-content-muted"><%= link_to "← #{@skill_repo.name}", skill_repo_path(@skill_repo) %></p>
+    <h1 class="text-2xl font-semibold mt-1">Edit Skill Repo</h1>
+  </div>
+
+  <div class="bg-surface-card border border-edge rounded-lg p-5">
+    <%= render "form", skill_repo: @skill_repo %>
+  </div>
+</div>
