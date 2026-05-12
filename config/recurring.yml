@@ -22,6 +22,9 @@ production:
   branch_watch_poll:
     class: BranchWatchPollJob
     schedule: every 15 minutes
+  worktree_reaper:
+    class: WorktreeReaperJob
+    schedule: at 4am every day
 
 development:
   run_recovery:
@@ -33,3 +36,6 @@ development:
   branch_watch_poll:
     class: BranchWatchPollJob
     schedule: every 15 minutes
+  worktree_reaper:
+    class: WorktreeReaperJob
+    schedule: at 4am every day
