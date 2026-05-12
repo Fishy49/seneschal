@@ -38,7 +38,7 @@ class SkillReposController < ApplicationController
 
   def destroy
     Skill.where(skill_repo_id: @skill_repo.id).destroy_all
-    FileUtils.rm_rf(@skill_repo.local_path) if File.directory?(@skill_repo.local_path)
+    @skill_repo.destroy_local_clone!
     @skill_repo.destroy
     redirect_to skill_repos_path, notice: "Repo removed."
   end

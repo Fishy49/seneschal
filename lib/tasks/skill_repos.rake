@@ -70,7 +70,7 @@ namespace :seneschal do
 
       repo = SkillRepo.find_by(name: name) || abort("no SkillRepo named #{name.inspect}")
       Skill.where(skill_repo_id: repo.id).destroy_all
-      FileUtils.rm_rf(repo.local_path) if File.directory?(repo.local_path)
+      repo.destroy_local_clone!
       repo.destroy!
       puts "removed #{name}"
     end

@@ -50,13 +50,16 @@ class SkillRepoSyncer
   end
 
   def pull
+    # Fetch only the configured branch (passed as a separate argv element so
+    # nothing user-supplied is interpolated into a shell-style command arg),
+    # then reset to FETCH_HEAD which is a fixed string and known-fresh.
     _, fetch_err, fetch_status = Open3.capture3(
-      "git", "-C", @repo.local_path, "fetch", "--prune", "origin"
+      "git", "-C", @repo.local_path, "fetch", "--prune", "origin", @repo.branch
     )
     raise "git fetch failed: #{fetch_err.strip}" unless fetch_status.success?
 
     _, reset_err, reset_status = Open3.capture3(
-      "git", "-C", @repo.local_path, "reset", "--hard", "origin/#{@repo.branch}"
+      "git", "-C", @repo.local_path, "reset", "--hard", "FETCH_HEAD"
     )
     raise "git reset failed: #{reset_err.strip}" unless reset_status.success?
   end

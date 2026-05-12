@@ -34,4 +34,59 @@ class SkillRepoTest < ActiveSupport::TestCase
     repo = SkillRepo.new(name: "x", repo_url: "x", local_path: "/nope")
     assert_not repo.cloned?
   end
+
+  test "branch validation accepts ordinary git branch names" do
+    repo = SkillRepo.new(name: "v", repo_url: "u", branch: "feature/cool-thing_2")
+    assert repo.valid?, repo.errors.full_messages.inspect
+  end
+
+  test "branch validation rejects leading dashes (argv-injection guard)" do
+    repo = SkillRepo.new(name: "v", repo_url: "u", branch: "--upload-pack=evil")
+    assert_not repo.valid?
+    assert repo.errors[:branch].any?
+  end
+
+  test "branch validation rejects shell metacharacters" do
+    ["foo bar", "foo;rm", "foo$evil", "foo`evil`", "foo&evil"].each do |bad|
+      repo = SkillRepo.new(name: "v", repo_url: "u", branch: bad)
+      assert_not repo.valid?, "expected #{bad.inspect} to be rejected"
+    end
+  end
+
+  test "branch validation rejects path-traversal segments" do
+    repo = SkillRepo.new(name: "v", repo_url: "u", branch: "feature/../../etc")
+    assert_not repo.valid?
+    assert repo.errors[:branch].any?
+  end
+
+  test "branch validation rejects overlong input" do
+    repo = SkillRepo.new(name: "v", repo_url: "u", branch: "a" * 201)
+    assert_not repo.valid?
+  end
+
+  test "safe_local_path? accepts paths inside skill_repo_root" do
+    Setting["skill_repo_root"] = "/tmp/sk_root"
+    repo = SkillRepo.new(name: "x", repo_url: "u", local_path: "/tmp/sk_root/x")
+    assert repo.safe_local_path?
+  ensure
+    Setting.find_by(key: "skill_repo_root")&.destroy
+  end
+
+  test "safe_local_path? rejects paths outside skill_repo_root" do
+    Setting["skill_repo_root"] = "/tmp/sk_root"
+    ["/", "/etc", "/tmp/sk_root", "/tmp/sk_root/../etc", "/tmp/other"].each do |bad|
+      repo = SkillRepo.new(name: "x", repo_url: "u", local_path: bad)
+      assert_not repo.safe_local_path?, "expected #{bad.inspect} to be refused"
+    end
+  ensure
+    Setting.find_by(key: "skill_repo_root")&.destroy
+  end
+
+  test "destroy_local_clone! is a no-op when the path is outside the root" do
+    Setting["skill_repo_root"] = "/tmp/sk_root"
+    repo = SkillRepo.new(name: "x", repo_url: "u", local_path: "/tmp/other_dangerous")
+    assert_not repo.destroy_local_clone!
+  ensure
+    Setting.find_by(key: "skill_repo_root")&.destroy
+  end
 end
