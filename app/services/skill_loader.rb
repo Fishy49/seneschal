@@ -18,7 +18,7 @@ class SkillLoader
   end
 
   def self.global_root
-    Rails.root.join("skills").to_s
+    Setting["skills_global_root"].presence || Rails.root.join("skills").to_s
   end
 
   def initialize(name, project: nil)
