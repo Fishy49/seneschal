@@ -13,6 +13,12 @@ namespace :seneschal do
           puts "skip   #{project.name}: local_path missing (#{project.local_path})"
           next
         end
+        # Defensive: `git -C <path>` walks UP if <path> isn't a git repo,
+        # potentially acting on a parent repo by accident. Require .git/.
+        unless File.exist?(File.join(project.local_path, ".git"))
+          puts "skip   #{project.name}: no .git at #{project.local_path}"
+          next
+        end
 
         default_branch, _stderr, status = Open3.capture3(
           "git", "-C", project.local_path,
