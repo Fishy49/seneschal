@@ -109,4 +109,27 @@ class SkillFilesystemTest < ActiveSupport::TestCase
     assert_equal File.join(@tmpdir, ".claude/skills/x/scripts"), skill.scripts_dir
     assert_equal File.join(@tmpdir, ".claude/skills/x/references"), skill.references_dir
   end
+
+  test "body falls back to the DB column when filesystem-backed file is missing" do
+    skill = Skill.new(name: "ghost", project: @project, body: "fallback body",
+                      source_kind: "project", relative_path: "ghost")
+    assert skill.filesystem_backed?
+    assert_nil skill.parsed_skill_md
+    assert_equal "fallback body", skill.body
+  end
+
+  test "parsed_skill_md is memoized — disk reads happen at most once per instance" do
+    dir = File.join(@tmpdir, ".claude/skills/memo")
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "SKILL.md"), "---\nname: memo\ndescription: m\n---\nv1\n")
+
+    skill = Skill.new(name: "memo", project: @project,
+                      source_kind: "project", relative_path: "memo")
+
+    first = skill.body
+    File.write(File.join(dir, "SKILL.md"), "---\nname: memo\ndescription: m\n---\nv2\n")
+    second = skill.body
+    assert_equal first, second, "expected memoization to hide the on-disk edit"
+    assert_equal "v1\n", first
+  end
 end

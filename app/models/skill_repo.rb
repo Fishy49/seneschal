@@ -7,8 +7,26 @@ class SkillRepo < ApplicationRecord
   # intentionally accept less than git allows.
   BRANCH_FORMAT = %r{\A[A-Za-z0-9_][A-Za-z0-9._/-]*\z}
 
+  # Schemes accepted for `git clone`. Deliberately excludes git's `ext::` and
+  # other helper schemes that can execute arbitrary commands — modern git
+  # restricts those by default but we don't want them anywhere near argv.
+  ALLOWED_URL_SCHEMES = ["http", "https", "ssh", "git", "file"].freeze
+
+  # scp-like git remote URL: `[user@]host:path/to/repo.git`. Host must be
+  # bare hostname/IP — no shell metacharacters — and the path has to start
+  # with an alphanumeric so a leading `-` can't sneak through.
+  SCP_LIKE_URL = %r{
+    \A
+    (?:[A-Za-z0-9_][A-Za-z0-9_.-]*@)?
+    [A-Za-z0-9][A-Za-z0-9.-]*
+    :
+    [A-Za-z0-9][A-Za-z0-9._/-]*
+    \z
+  }x
+
   validates :name, presence: true, uniqueness: true
   validates :repo_url, presence: true
+  validate :repo_url_has_safe_form
   validates :local_path, presence: true
   validates :branch, presence: true,
                      format: { with: BRANCH_FORMAT,
@@ -87,5 +105,27 @@ class SkillRepo < ApplicationRecord
 
   def default_local_path
     self.local_path = self.class.compute_local_path(name) if local_path.blank? && name.present?
+  end
+
+  # Reject anything `git clone` would treat unsafely. Accepts the standard
+  # url:// schemes, scp-like git remotes, and absolute filesystem paths;
+  # everything else (including git's `ext::` helper and relative paths) is
+  # refused before it ever reaches argv.
+  def repo_url_has_safe_form
+    return if repo_url.blank?
+    return if repo_url.match?(SCP_LIKE_URL)
+    return if repo_url.start_with?("/")
+
+    scheme = URI.parse(repo_url).scheme
+    return if scheme.present? && ALLOWED_URL_SCHEMES.include?(scheme.downcase)
+
+    errors.add(:repo_url, repo_url_error_message)
+  rescue URI::InvalidURIError
+    errors.add(:repo_url, "is not a valid URL")
+  end
+
+  def repo_url_error_message
+    "must be one of #{ALLOWED_URL_SCHEMES.map { |s| "#{s}://" }.join(", ")}, " \
+      "an absolute path starting with /, or scp-like user@host:path"
   end
 end

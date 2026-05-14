@@ -58,6 +58,17 @@ class WorktreeManager
       target
     end
 
+    # Default branch as a bare name (e.g. "main"), derived from origin/HEAD
+    # when available. Returns nil if no remote info exists — callers should
+    # decide on their own fallback (typically "main"). Used by callers that
+    # want to `git checkout <name>` rather than branch off a remote ref.
+    def default_branch_name(project)
+      start = detect_start_point(project)
+      return nil if start == "HEAD"
+
+      start.delete_prefix("origin/")
+    end
+
     # Resolve the commit-ish to branch the new worktree off of. Prefers the
     # remote's default branch (origin/HEAD) so legacy state in project.local_path
     # is irrelevant. Falls back to common conventions and finally to local HEAD
@@ -95,8 +106,11 @@ class WorktreeManager
 
       project = run.workflow.project
       remove_worktree(project.local_path, run.worktree_path) if File.directory?(run.worktree_path)
-      delete_branch(project.local_path, branch_for(run))
+      # Prune stale worktree metadata before deleting the branch. If
+      # remove_worktree fell back to rm_rf the metadata still says the branch
+      # is checked out, and `branch -D` would refuse.
       Open3.capture3("git", "-C", project.local_path, "worktree", "prune")
+      delete_branch(project.local_path, branch_for(run))
       run.update!(worktree_path: nil, worktree_retained: false)
     end
 

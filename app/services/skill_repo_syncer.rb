@@ -15,6 +15,11 @@ require "fileutils"
 class SkillRepoSyncer
   Result = Data.define(:status, :imported, :archived, :error)
 
+  # Cap per-skill .install-notes captures so an oversized file in some
+  # upstream repo doesn't bloat the install_notes JSON column or the
+  # rendered show page.
+  MAX_INSTALL_NOTES_BYTES = 10_000
+
   def initialize(skill_repo)
     @repo = skill_repo
   end
@@ -70,6 +75,8 @@ class SkillRepoSyncer
       parsed = SkillMdParser.parse(File.read(path))
       name = parsed.frontmatter["name"].presence || slug
 
+      warn_on_invalid_frontmatter(slug, parsed.frontmatter)
+
       skill = Skill.find_or_initialize_by(skill_repo_id: @repo.id, name: name)
       skill.assign_attributes(
         description: parsed.frontmatter["description"],
@@ -82,6 +89,21 @@ class SkillRepoSyncer
       skill.refresh_cached_metadata!
       name
     end
+  end
+
+  # Run the SKILL.md frontmatter through the JSON Schema validator and log
+  # any failures. The syncer is intentionally permissive — it falls back to
+  # the directory name for missing `name` and a nil description, so the
+  # import still happens — but operators want visibility when an upstream
+  # skill ships broken metadata.
+  def warn_on_invalid_frontmatter(slug, frontmatter)
+    validation = SkillMdValidator.validate(frontmatter)
+    return if validation[:valid]
+
+    Rails.logger.warn(
+      "SkillRepoSyncer: invalid SKILL.md frontmatter in #{@repo.name}/#{slug}: " \
+      "#{validation[:errors].join("; ")}"
+    )
   end
 
   def archive_missing(seen_names)
@@ -98,7 +120,16 @@ class SkillRepoSyncer
       next unless File.exist?(skill_md)
 
       name = parse_name(skill_md) || File.basename(dir)
-      acc[name] = File.read(notes_path).strip
+      acc[name] = read_install_notes(notes_path)
+    end
+  end
+
+  def read_install_notes(path)
+    raw = File.read(path)
+    if raw.bytesize > MAX_INSTALL_NOTES_BYTES
+      "#{raw.byteslice(0, MAX_INSTALL_NOTES_BYTES).strip}\n\n…(truncated; full file in repo)"
+    else
+      raw.strip
     end
   end
 

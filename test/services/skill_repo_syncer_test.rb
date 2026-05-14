@@ -96,6 +96,33 @@ class SkillRepoSyncerTest < ActiveSupport::TestCase
     assert_equal "Set ALPHA_API_KEY before using this skill.", repo.install_notes_for("alpha")
   end
 
+  test "install_notes are truncated past the configured byte cap" do
+    oversize = "x" * (SkillRepoSyncer::MAX_INSTALL_NOTES_BYTES + 5_000)
+    add_install_notes_to_remote("alpha", oversize)
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+
+    captured = repo.reload.install_notes_for("alpha")
+    assert captured.bytesize < oversize.bytesize, "expected truncation"
+    assert_includes captured, "truncated"
+  end
+
+  test "logs a warning when an imported SKILL.md has invalid frontmatter" do
+    # SKILL.md is missing the required `description` field. The syncer
+    # still imports the skill (with a nil description) but should log.
+    seed_remote_with_invalid_skill("missingdesc")
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+
+    captured = capture_rails_log do
+      result = SkillRepoSyncer.new(repo).call
+      assert_equal :ok, result.status
+      assert_includes result.imported, "missingdesc"
+    end
+
+    assert_match(/invalid SKILL\.md frontmatter/i, captured)
+    assert_match(/missingdesc/, captured)
+  end
+
   test "sync error is captured on the SkillRepo and returns :error status" do
     repo = SkillRepo.create!(
       name: "test-pack-#{SecureRandom.hex(3)}",
@@ -151,6 +178,33 @@ class SkillRepoSyncerTest < ActiveSupport::TestCase
     git_in(@seed, "add", ".")
     git_in(@seed, "commit", "-q", "-m", "install notes for #{skill_name}")
     git_in(@seed, "push", "-q", "origin", "main")
+  end
+
+  # Seeds a SKILL.md with frontmatter that's missing the required
+  # `description` field — enough to fail JSON-schema validation but still
+  # parse cleanly so the syncer's import path runs.
+  def seed_remote_with_invalid_skill(name)
+    dir = File.join(@seed, name)
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "SKILL.md"), <<~MD)
+      ---
+      name: #{name}
+      ---
+      body
+    MD
+    git_in(@seed, "add", ".")
+    git_in(@seed, "commit", "-q", "-m", "add #{name} (invalid)")
+    git_in(@seed, "push", "-q", "origin", "main")
+  end
+
+  def capture_rails_log
+    io = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(io)
+    yield
+    io.string
+  ensure
+    Rails.logger = original
   end
 
   def git_in(dir, *args)

@@ -134,6 +134,31 @@ All forward-compatible — running `db:migrate` is safe and non-destructive.
 4. `git worktree` is now a hard dependency — already standard on git ≥ 2.5
    so nothing to install, but worth knowing.
 
+### Review feedback fixes
+
+A round of polish after the PR review:
+
+- **WorktreeManager.cleanup** now runs `worktree prune` before `branch -D`,
+  so when the worktree dir is removed out-of-band and cleanup falls back
+  to `rm_rf`, stale metadata is pruned and branch deletion still succeeds.
+- **SkillRepoSyncer** now runs each imported `SKILL.md` through
+  `SkillMdValidator` and logs a warning via `Rails.logger.warn` when the
+  frontmatter doesn't match the schema. Import stays permissive
+  (slug-fallback for missing `name`, nil description allowed) but
+  operators get visibility into upstream skills with broken metadata.
+- **Skill#body** memoizes the `File.exist?` + parse so a single record
+  reads disk at most once. Skill index pages and other list views stop
+  paying O(N) stat syscalls on every render.
+- **SkillRepo#repo_url** validates URL form: accepts http(s)/ssh/git/file
+  schemes, scp-like `git@host:path`, and absolute paths; rejects git's
+  `ext::` helper and bare strings. Defense-in-depth against typo-style
+  bugs reaching `git clone`.
+- **SkillRepoSyncer** caps each captured `.install-notes` at 10 KB so an
+  oversized upstream file can't bloat the `install_notes` JSON column.
+- **WorktreeManager.default_branch_name** extracted as a shared helper;
+  MegaUpdate and the `prepare_for_worktrees` rake task both use it
+  instead of inlining `git symbolic-ref refs/remotes/origin/HEAD`.
+
 ### Stats
 
-21 commits, 647 tests passing (up from 555), rubocop clean.
+23 commits, 679 tests passing (up from 555), rubocop clean.

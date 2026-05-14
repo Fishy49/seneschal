@@ -20,13 +20,8 @@ namespace :seneschal do
           next
         end
 
-        default_branch, _stderr, status = Open3.capture3(
-          "git", "-C", project.local_path,
-          "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
-        )
-        if status.success?
-          default_branch = default_branch.strip.delete_prefix("origin/")
-        else
+        default_branch = WorktreeManager.default_branch_name(project)
+        if default_branch.nil?
           default_branch = "main"
           puts "warn   #{project.name}: could not detect default branch, falling back to main"
         end

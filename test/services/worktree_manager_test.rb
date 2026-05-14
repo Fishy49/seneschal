@@ -104,6 +104,25 @@ class WorktreeManagerTest < ActiveSupport::TestCase
     assert_nothing_raised { WorktreeManager.cleanup(run) }
   end
 
+  # Regression: when the worktree directory is removed out-of-band (rm_rf'd by
+  # the operator, disk failure, etc.), `git worktree remove` fails. cleanup
+  # falls back to rm_rf and must then `worktree prune` BEFORE attempting
+  # `branch -D`, otherwise git still believes the branch is checked out in
+  # the (now-gone) worktree and refuses to delete it.
+  test "cleanup deletes the branch even after the worktree dir was removed externally" do
+    run = create_run
+    WorktreeManager.allocate(run)
+
+    # Simulate out-of-band removal: directory is gone, git metadata is stale.
+    FileUtils.rm_rf(run.worktree_path)
+
+    WorktreeManager.cleanup(run)
+
+    branches, _err, _status = Open3.capture3("git", "-C", @repo_path, "branch", "--list")
+    assert_not_includes branches, "seneschal/run-#{run.id}",
+                        "branch should be deleted even when the worktree dir was removed out of band"
+  end
+
   test "retain flips the retention flag without touching the worktree" do
     run = create_run
     path = WorktreeManager.allocate(run)
@@ -191,6 +210,29 @@ class WorktreeManagerTest < ActiveSupport::TestCase
     # The setup repo has no remote configured; origin/HEAD isn't set and
     # origin/main / origin/master don't resolve either.
     assert_equal "HEAD", WorktreeManager.detect_start_point(@project)
+  end
+
+  test "default_branch_name returns the bare branch name when origin/HEAD is set" do
+    remote = File.join(@tmpdir, "remote.git")
+    in_dir(@tmpdir, "git", "init", "--bare", "-q", "-b", "main", remote)
+    seed = File.join(@tmpdir, "seed-default-branch")
+    in_dir(@tmpdir, "git", "clone", "-q", remote, seed)
+    in_dir(seed, "git", "config", "user.email", "test@example.com")
+    in_dir(seed, "git", "config", "user.name", "Test")
+    File.write(File.join(seed, "README.md"), "hi")
+    in_dir(seed, "git", "add", "README.md")
+    in_dir(seed, "git", "commit", "-q", "-m", "init")
+    in_dir(seed, "git", "push", "-q", "origin", "main")
+
+    clone = File.join(@tmpdir, "clone-default-branch")
+    in_dir(@tmpdir, "git", "clone", "-q", remote, clone)
+    @project.update!(local_path: clone)
+
+    assert_equal "main", WorktreeManager.default_branch_name(@project)
+  end
+
+  test "default_branch_name returns nil when no remote info is available" do
+    assert_nil WorktreeManager.default_branch_name(@project)
   end
 
   test "detect_start_point returns origin/main when the remote ref exists" do

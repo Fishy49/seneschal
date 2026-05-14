@@ -280,13 +280,7 @@ class MegaUpdate
   end
 
   def detect_default_branch(project)
-    stdout, _stderr, status = Open3.capture3(
-      "git", "-C", project.local_path,
-      "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
-    )
-    return stdout.strip.delete_prefix("origin/") if status.success?
-
-    "main"
+    WorktreeManager.default_branch_name(project) || "main"
   end
 
   def append_note(existing, note)

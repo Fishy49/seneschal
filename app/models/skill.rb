@@ -115,17 +115,23 @@ class Skill < ApplicationRecord
     abs && File.join(abs, "references")
   end
 
-  # Parsed SKILL.md (frontmatter + body). Memoized; call `reload` to clear or
-  # re-instantiate the record to pick up disk changes between reads.
+  # Parsed SKILL.md (frontmatter + body). Memoized — both the `File.exist?`
+  # check and the parse happen at most once per instance. Returns nil if the
+  # skill isn't filesystem-backed or its SKILL.md is missing from disk; in
+  # that case `body` falls back to the legacy DB column. Call
+  # `refresh_cached_metadata!` (or re-instantiate the record) to invalidate.
   def parsed_skill_md
-    @parsed_skill_md ||= SkillMdParser.parse(File.read(skill_md_path))
+    return @parsed_skill_md if defined?(@parsed_skill_md)
+
+    path = skill_md_path
+    @parsed_skill_md = path && File.exist?(path) ? SkillMdParser.parse(File.read(path)) : nil
   end
 
   def frontmatter
-    return cached_metadata if cached_metadata.present? && !@parsed_skill_md
+    return cached_metadata if cached_metadata.present? && !defined?(@parsed_skill_md)
     return {} unless filesystem_backed?
 
-    parsed_skill_md.frontmatter
+    parsed_skill_md&.frontmatter || {}
   end
 
   # Returns the body content used as the prompt template. For filesystem-backed
@@ -134,23 +140,29 @@ class Skill < ApplicationRecord
   # need to care which backing is in use.
   def body
     return super unless filesystem_backed?
-    return super unless File.exist?(skill_md_path.to_s)
 
-    parsed_skill_md.body
+    parsed = parsed_skill_md
+    parsed ? parsed.body : super
   end
 
-  # Sha256 of the SKILL.md contents. nil for legacy DB skills.
+  # Sha256 of the SKILL.md contents. nil for legacy DB skills or when the
+  # file is missing on disk.
   def compute_content_hash
-    return nil unless filesystem_backed? && File.exist?(skill_md_path.to_s)
+    return nil unless filesystem_backed?
 
-    Digest::SHA256.file(skill_md_path).hexdigest
+    path = skill_md_path
+    return nil unless path && File.exist?(path)
+
+    Digest::SHA256.file(path).hexdigest
   end
 
   def refresh_cached_metadata! # rubocop:disable Naming/PredicateMethod
-    return false unless filesystem_backed? && File.exist?(skill_md_path.to_s)
+    return false unless filesystem_backed?
 
-    @parsed_skill_md = nil
+    remove_instance_variable(:@parsed_skill_md) if defined?(@parsed_skill_md)
     fresh = parsed_skill_md
+    return false unless fresh
+
     update!(cached_metadata: fresh.frontmatter, content_hash: compute_content_hash)
     true
   end
