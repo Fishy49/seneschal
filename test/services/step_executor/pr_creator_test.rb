@@ -27,6 +27,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
         ["https://github.com/test/seneschal/pull/42\n", "", success_status]
@@ -59,11 +60,61 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_includes captured_argv, "--draft"
   end
 
+  # Regression: a fresh Seneschal worktree branches `seneschal/run-<id>`
+  # locally off origin/HEAD — that branch only exists on the operator's
+  # machine, not on origin, until something pushes it. `gh pr create`
+  # aborts with "you must first push the current branch to a remote, or
+  # use the --head flag" if the ref isn't reachable on origin. The step
+  # now pushes unconditionally before calling gh pr create.
+  test "pushes the local branch to origin before gh pr create" do
+    push_argv = nil
+    push_then_create_order = []
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "seneschal/run-30\n", success: true),
+      ["git", "push", "-u"] => lambda { |*argv|
+        push_argv = argv
+        push_then_create_order << :push
+        ["", "", success_status]
+      },
+      ["gh", "pr", "create"] => lambda { |*_argv|
+        push_then_create_order << :create
+        ["https://github.com/test/seneschal/pull/42\n", "", success_status]
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+    end
+
+    assert push_argv, "git push -u must run before gh pr create"
+    assert_equal ["git", "push", "-u", "origin", "seneschal/run-30"], push_argv.first(5)
+    assert_equal [:push, :create], push_then_create_order
+  end
+
+  test "fails cleanly when the pre-create push fails" do
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(stderr: "rejected (non-fast-forward)", success: false),
+      ["gh", "pr", "create"] => lambda { |*_argv|
+        flunk "gh pr create should not run when the push failed"
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "Failed to push local feature/foo"
+      assert_includes result.stderr, "non-fast-forward"
+    end
+  end
+
   test "interpolated title and body do not get re-escaped when passing to gh" do
     captured_argv = nil
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
         ["https://github.com/test/seneschal/pull/3\n", "", success_status]
@@ -91,6 +142,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*_argv|
         created = true
         ["https://github.com/test/seneschal/pull/99\n", "", success_status]
@@ -107,7 +159,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_not created, "gh pr create should not run when an existing PR is found"
   end
 
-  test "appends --reviewer, --label, and --assignee per array entry" do
+  test "appends --reviewer, --label, and --assignee per array entry" do # rubocop:disable Metrics/BlockLength
     @step.update!(config: @step.config.merge(
       "reviewers" => ["alice", "my-org/backend-team"],
       "labels" => ["feature", "needs-review"],
@@ -118,6 +170,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
         ["https://github.com/test/seneschal/pull/12\n", "", success_status]
@@ -145,6 +198,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
         ["https://github.com/test/seneschal/pull/1\n", "", success_status]
@@ -171,6 +225,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => stub_response(stdout: "", stderr: "remote: forbidden", success: false)
     ) do
       result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
@@ -184,6 +239,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => stub_response(stdout: "warning: no upstream\n", success: true)
     ) do
       result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
@@ -205,6 +261,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
       ["git", "rev-parse"] => lambda { |*_argv|
         flunk "should not consult git when branch is explicit"
       },
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_create_argv = argv
         ["https://github.com/test/seneschal/pull/8\n", "", success_status]
@@ -325,6 +382,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "close"] => stub_response(stderr: "remote: forbidden", success: false),
       ["gh", "pr", "create"] => lambda { |*_argv|
         create_called = true
@@ -349,6 +407,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "close"] => lambda { |*_argv|
         close_called = true
         ["", "", success_status]

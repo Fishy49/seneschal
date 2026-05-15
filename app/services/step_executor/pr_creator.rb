@@ -40,6 +40,14 @@ class StepExecutor
 
       end
 
+      # Push the local branch to origin so `gh pr create` can resolve --head.
+      # Idempotent — if already up to date, git just prints "Everything
+      # up-to-date." and exits 0. Required even outside the clean path
+      # because Seneschal worktrees branch off origin/HEAD locally and the
+      # `seneschal/run-<id>` ref doesn't exist on remote until we push it.
+      push_err = push_local_branch(branch, &)
+      return push_err if push_err
+
       base = interpolate_string(cfg.fetch("base", "main").to_s).strip
       base = "main" if base.empty?
       body = interpolate_string(cfg["body"].to_s)
@@ -107,17 +115,17 @@ class StepExecutor
     end
 
     # Closes every open PR on this branch (with a Seneschal-generated
-    # comment for audit), wipes the remote branch, and pushes the local
-    # branch fresh. Returns nil on success, a Result on the first failure.
-    # The order is deliberate — PRs first so GitHub doesn't try to update
-    # them when the underlying ref disappears; remote branch second so the
-    # subsequent push creates a clean ref; then the local push.
+    # comment for audit) and wipes the remote branch. Returns nil on
+    # success, a Result on close failure. The order is deliberate — PRs
+    # first so GitHub doesn't try to update them when the underlying ref
+    # disappears, then wipe the remote ref. The subsequent push (run from
+    # execute_pr_step on every code path) recreates the ref clean.
     def clean_branch_and_prs(existing_prs, branch, &)
       err = close_existing_prs(existing_prs, branch, &)
       return err if err
 
       wipe_remote_branch(branch, &) # best-effort — fine if the ref's already gone
-      push_local_branch(branch, &)
+      nil
     end
 
     def close_existing_prs(prs, branch)
