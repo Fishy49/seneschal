@@ -16,11 +16,17 @@ require "open3"
 #   3. Fail orphan RunSteps — any RunStep stuck in `running` while its
 #      parent Run is already in a terminal state (failed/stopped/completed).
 #      Leftover from before the recovery path properly cascaded.
-#   4. Prepare projects — `git checkout <default-branch> && git pull --ff-only`
+#   4. Convert legacy `git checkout <main>` workflow steps — Step rows
+#      whose body is the pre-worktree-era `git checkout main && git pull`
+#      pattern (or master/trunk variant) get rewritten as documented
+#      no-ops. Their body would otherwise fail inside the per-run
+#      worktree because the canonical clone already has the default
+#      branch checked out. Idempotent — skips bodies already converted.
+#   5. Prepare projects — `git checkout <default-branch> && git pull --ff-only`
 #      on each ready project's local_path. Normalizes the canonical clone
 #      back to a clean state for the out-of-band consumers (CLAUDE.md
 #      reader, code maps, context_projects).
-#   5. Export skills — materializes legacy DB-backed Skills as filesystem
+#   6. Export skills — materializes legacy DB-backed Skills as filesystem
 #      SKILL.md folders via SkillExporter. Skip with skip_skill_export: true.
 #
 # All steps emit progress lines to the configured io (defaults to $stdout).
@@ -30,6 +36,8 @@ class MegaUpdate
     :aborted,
     :hung_runs_failed,
     :orphan_run_steps_failed,
+    :legacy_steps_converted,
+    :legacy_steps_skipped,
     :projects_prepared,
     :skills_exported,
     :skills_skipped,
@@ -37,6 +45,14 @@ class MegaUpdate
   )
 
   DEFAULT_STALE_MINUTES = 30
+
+  # Matches Step bodies that are *only* the pre-worktree-era refresh-main
+  # pattern, with no surrounding script. Conservative on purpose: bodies
+  # that wrap `git checkout main` inside larger logic are left alone for
+  # operator review.
+  LEGACY_PULL_MAIN_RE = /\A\s*git\s+checkout\s+(?:main|master|trunk)(?:\s*&&\s*git\s+pull(?:\s+--ff-only)?)?\s*\z/
+
+  CONVERTED_MARKER = "# Auto-converted by seneschal:mega_update".freeze
 
   def self.call(**)
     new(**).call
@@ -50,6 +66,8 @@ class MegaUpdate
     @counts = {
       hung_runs_failed: 0,
       orphan_run_steps_failed: 0,
+      legacy_steps_converted: 0,
+      legacy_steps_skipped: 0,
       projects_prepared: 0,
       skills_exported: 0,
       skills_skipped: 0,
@@ -63,6 +81,7 @@ class MegaUpdate
 
     fail_hung_runs
     fail_orphan_run_steps
+    convert_legacy_pull_main_steps
     prepare_projects
     export_skills unless @skip_skill_export
 
@@ -98,7 +117,7 @@ class MegaUpdate
 
   def fail_hung_runs
     hung = Run.where(status: "running").where(updated_at: ..@stale_minutes.minutes.ago)
-    say "[1/4] Fail hung runs (status=running, no heartbeat for >#{@stale_minutes}m)"
+    say "[1/5] Fail hung runs (status=running, no heartbeat for >#{@stale_minutes}m)"
 
     if hung.none?
       say "  ok — none found"
@@ -139,7 +158,7 @@ class MegaUpdate
   end
 
   def fail_orphan_run_steps
-    say "[2/4] Fail orphan RunSteps (parent run terminal, RunStep still 'running')"
+    say "[2/5] Fail orphan RunSteps (parent run terminal, RunStep still 'running')"
 
     orphans = RunStep.where(status: "running").joins(:run).where.not(run: { status: "running" })
 
@@ -169,8 +188,78 @@ class MegaUpdate
     say ""
   end
 
+  def convert_legacy_pull_main_steps
+    say "[3/5] Convert legacy `git checkout main` workflow steps to no-ops"
+
+    # SQL pre-filter to narrow the candidate set, then strict-regex match
+    # in Ruby so we only touch bodies that are exactly the legacy pattern.
+    candidates = Step.where(step_type: ["command", "script"])
+                     .where("body LIKE ? OR body LIKE ? OR body LIKE ?",
+                            "%git checkout main%", "%git checkout master%", "%git checkout trunk%")
+
+    if candidates.none?
+      say "  ok — none found"
+      say ""
+      return
+    end
+
+    candidates.find_each do |step|
+      raw = step.body.to_s
+
+      # Marker check first — a previously-converted body keeps the original
+      # legacy text as a comment, so it still passes the SQL pre-filter but
+      # no longer matches the strict regex.
+      if raw.lstrip.start_with?(CONVERTED_MARKER)
+        say "  skip   Step ##{step.id} (#{step_label(step)}) — already converted"
+        @counts[:legacy_steps_skipped] += 1
+        next
+      end
+
+      next unless LEGACY_PULL_MAIN_RE.match?(raw)
+
+      label = "Step ##{step.id} (#{step_label(step)})"
+      if @dry_run
+        say "  (would convert) #{label}: #{raw.strip.inspect}"
+        next
+      end
+
+      original_body = raw
+      new_name = step.name.include?("legacy no-op") ? step.name : "#{step.name} (legacy no-op)"
+      step.update!(name: new_name, body: converted_step_body(original_body))
+      say "  converted #{label}"
+      @counts[:legacy_steps_converted] += 1
+    rescue StandardError => e
+      @counts[:errors] += 1
+      say "  ERROR  Step ##{step.id}: #{e.class}: #{e.message}"
+    end
+
+    say ""
+  end
+
+  def step_label(step)
+    "#{step.workflow.name} › #{step.name}"
+  end
+
+  # No-op replacement body. First line is the marker we check on idempotent
+  # re-runs; the original body is preserved as a comment for audit.
+  def converted_step_body(original_body)
+    original_inline = original_body.strip.lines.first(3).map { |l| "#   #{l.rstrip}" }.join("\n")
+    <<~BASH.strip
+      #{CONVERTED_MARKER} on #{Time.current.utc.iso8601}.
+      # The original body fails inside the per-run worktree because the
+      # canonical clone already has the default branch checked out. The
+      # worktree-isolation refactor starts every run on a fresh branch off
+      # origin/HEAD, so the explicit pull is redundant. Kept as a no-op so
+      # historical RunStep records still render with a step name.
+      #
+      # Original body:
+      #{original_inline}
+      true
+    BASH
+  end
+
   def prepare_projects
-    say "[3/4] Normalize project local_paths (checkout default branch + pull --ff-only)"
+    say "[4/5] Normalize project local_paths (checkout default branch + pull --ff-only)"
 
     projects = Project.where(repo_status: "ready")
     if projects.none?
@@ -221,7 +310,7 @@ class MegaUpdate
   end
 
   def export_skills
-    say "[4/4] Export DB-backed Skills to filesystem SKILL.md folders"
+    say "[5/5] Export DB-backed Skills to filesystem SKILL.md folders"
 
     skills = Skill.where(skill_repo_id: nil) # don't touch repo-indexed skills
     if skills.none?
@@ -261,12 +350,14 @@ class MegaUpdate
     if aborted
       say "  ABORTED — no changes made"
     else
-      say "  hung runs failed:          #{@counts[:hung_runs_failed]}"
-      say "  orphan RunSteps failed:    #{@counts[:orphan_run_steps_failed]}"
-      say "  projects prepared:         #{@counts[:projects_prepared]}"
-      say "  skills exported:           #{@counts[:skills_exported]}"
-      say "  skills already on disk:    #{@counts[:skills_skipped]}"
-      say "  errors:                    #{@counts[:errors]}"
+      say "  hung runs failed:           #{@counts[:hung_runs_failed]}"
+      say "  orphan RunSteps failed:     #{@counts[:orphan_run_steps_failed]}"
+      say "  legacy steps converted:     #{@counts[:legacy_steps_converted]}"
+      say "  legacy steps already no-op: #{@counts[:legacy_steps_skipped]}"
+      say "  projects prepared:          #{@counts[:projects_prepared]}"
+      say "  skills exported:            #{@counts[:skills_exported]}"
+      say "  skills already on disk:     #{@counts[:skills_skipped]}"
+      say "  errors:                     #{@counts[:errors]}"
       say ""
       unless @dry_run
         say "Next steps (optional, on demand):"

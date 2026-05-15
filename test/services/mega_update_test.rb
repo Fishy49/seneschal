@@ -161,9 +161,96 @@ class MegaUpdateTest < ActiveSupport::TestCase
     assert_respond_to summary, :aborted
     assert_respond_to summary, :hung_runs_failed
     assert_respond_to summary, :orphan_run_steps_failed
+    assert_respond_to summary, :legacy_steps_converted
+    assert_respond_to summary, :legacy_steps_skipped
     assert_respond_to summary, :projects_prepared
     assert_respond_to summary, :skills_exported
     assert_respond_to summary, :skills_skipped
     assert_respond_to summary, :errors
+  end
+
+  # The pre-worktree-era `git checkout main && git pull` workflow steps
+  # now fail inside the per-run worktree because the canonical clone
+  # already has the default branch checked out. mega_update rewrites
+  # them as documented no-ops so historical RunStep records keep their
+  # step labels and future runs succeed.
+  test "converts legacy `git checkout main` Step bodies into documented no-ops" do
+    workflow = workflows(:deploy)
+    step = workflow.steps.create!(
+      name: "Pull Latest Main", step_type: "command",
+      body: "git checkout main && git pull",
+      position: 999, timeout: 30, max_retries: 0, config: {}
+    )
+
+    summary = MegaUpdate.call(io: @io, skip_skill_export: true)
+    assert_not summary.aborted
+    assert_equal 1, summary.legacy_steps_converted
+
+    step.reload
+    assert_includes step.name, "legacy no-op"
+    assert step.body.start_with?(MegaUpdate::CONVERTED_MARKER)
+    assert_includes step.body, "git checkout main && git pull", "original body preserved as comment"
+    assert step.body.lines.last.strip == "true", "ends with `true` so bash exits 0"
+  end
+
+  test "converts `git checkout master` and `git checkout trunk` variants" do
+    workflow = workflows(:deploy)
+    master = workflow.steps.create!(
+      name: "Pull master", step_type: "command", body: "git checkout master && git pull --ff-only",
+      position: 990, timeout: 30, max_retries: 0, config: {}
+    )
+    trunk = workflow.steps.create!(
+      name: "Switch trunk", step_type: "command", body: "git checkout trunk",
+      position: 991, timeout: 30, max_retries: 0, config: {}
+    )
+
+    summary = MegaUpdate.call(io: @io, skip_skill_export: true)
+    assert_equal 2, summary.legacy_steps_converted
+    assert master.reload.body.start_with?(MegaUpdate::CONVERTED_MARKER)
+    assert trunk.reload.body.start_with?(MegaUpdate::CONVERTED_MARKER)
+  end
+
+  test "skips Step bodies that wrap `git checkout main` inside larger scripts" do
+    workflow = workflows(:deploy)
+    complex = workflow.steps.create!(
+      name: "Complex deploy", step_type: "script",
+      body: "set -e\ngit checkout main\nbundle install\nrails db:migrate",
+      position: 989, timeout: 30, max_retries: 0, config: {}
+    )
+
+    summary = MegaUpdate.call(io: @io, skip_skill_export: true)
+    assert_equal 0, summary.legacy_steps_converted
+    assert_equal "set -e\ngit checkout main\nbundle install\nrails db:migrate", complex.reload.body
+  end
+
+  test "is idempotent — already-converted steps are skipped" do
+    workflow = workflows(:deploy)
+    step = workflow.steps.create!(
+      name: "Pull Latest Main", step_type: "command",
+      body: "git checkout main && git pull",
+      position: 988, timeout: 30, max_retries: 0, config: {}
+    )
+
+    MegaUpdate.call(io: StringIO.new, skip_skill_export: true)
+    second = MegaUpdate.call(io: @io, skip_skill_export: true)
+
+    assert_equal 0, second.legacy_steps_converted, "second run finds nothing to convert"
+    assert_equal 1, second.legacy_steps_skipped, "second run sees the already-converted step"
+    assert step.reload.body.start_with?(MegaUpdate::CONVERTED_MARKER)
+  end
+
+  test "dry_run reports legacy-step conversions without changing them" do
+    workflow = workflows(:deploy)
+    step = workflow.steps.create!(
+      name: "Pull Latest Main", step_type: "command",
+      body: "git checkout main && git pull",
+      position: 987, timeout: 30, max_retries: 0, config: {}
+    )
+    original_body = step.body
+
+    summary = MegaUpdate.call(io: @io, dry_run: true, skip_skill_export: true, stale_minutes: 30)
+    assert_equal 0, summary.legacy_steps_converted
+    assert_equal original_body, step.reload.body
+    assert_includes @io.string, "(would convert)"
   end
 end
