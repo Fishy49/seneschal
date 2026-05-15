@@ -34,7 +34,7 @@ class StepsController < ApplicationController
   end
 
   def available_variables
-    vars = Step.available_variables_for(@workflow, params[:position].to_i)
+    vars = Step.available_variables_for(@workflow, params.expect(:position).to_i)
                .map { |v| { name: v["name"], source: v["source"] } }
     render json: { variables: vars }
   end
@@ -49,7 +49,7 @@ class StepsController < ApplicationController
   end
 
   def move
-    new_position = params[:position].to_i
+    new_position = params.expect(:position).to_i
     @step.update!(position: new_position)
     redirect_to project_workflow_path(@project, @workflow)
   end
@@ -62,12 +62,12 @@ class StepsController < ApplicationController
   private
 
   def set_project_and_workflow
-    @project = Project.find(params[:project_id])
-    @workflow = @project.workflows.find(params[:workflow_id])
+    @project = Project.find(params.expect(:project_id))
+    @workflow = @project.workflows.find(params.expect(:workflow_id))
   end
 
   def set_step
-    @step = @workflow.steps.find(params[:id])
+    @step = @workflow.steps.find(params.expect(:id))
   end
 
   def save_as_template(step)

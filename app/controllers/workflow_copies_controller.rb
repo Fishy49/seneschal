@@ -6,7 +6,7 @@ class WorkflowCopiesController < ApplicationController
   end
 
   def create
-    target = Project.find(params[:target_project_id])
+    target = Project.find(params.expect(:target_project_id))
     result = WorkflowCopier.new(@source_workflow, target).call
 
     notice = "Workflow copied to #{target.name}."
@@ -22,7 +22,7 @@ class WorkflowCopiesController < ApplicationController
   private
 
   def set_source
-    @source_project = Project.find(params[:project_id])
-    @source_workflow = @source_project.workflows.find(params[:workflow_id])
+    @source_project = Project.find(params.expect(:project_id))
+    @source_workflow = @source_project.workflows.find(params.expect(:workflow_id))
   end
 end

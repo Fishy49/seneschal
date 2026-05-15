@@ -47,7 +47,7 @@ class ProjectGroupsController < ApplicationController
   private
 
   def set_group
-    @group = ProjectGroup.find(params[:id])
+    @group = ProjectGroup.find(params.expect(:id))
   end
 
   def group_params

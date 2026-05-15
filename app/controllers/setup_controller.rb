@@ -11,7 +11,7 @@ class SetupController < ApplicationController
   end
 
   def update_allowed_tools
-    Setting["default_allowed_tools"] = params[:default_allowed_tools].strip
+    Setting["default_allowed_tools"] = params.expect(:default_allowed_tools).strip
     redirect_to setup_path, notice: "Allowed tools updated."
   end
 

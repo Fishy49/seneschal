@@ -46,7 +46,7 @@ class SkillsController < ApplicationController
   private
 
   def set_skill
-    @skill = Skill.find(params[:id])
+    @skill = Skill.find(params.expect(:id))
   end
 
   def skill_params

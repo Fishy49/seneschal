@@ -53,7 +53,7 @@ class PipelineTasksController < ApplicationController
   end
 
   def format_body
-    raw_text = params[:body].to_s.strip
+    raw_text = params.expect(:body).to_s.strip
     if raw_text.blank?
       render json: { error: "No text to format." }, status: :unprocessable_content
       return
@@ -86,7 +86,7 @@ class PipelineTasksController < ApplicationController
   end
 
   def remote_branches
-    url = params[:repo_url].to_s.strip
+    url = params.expect(:repo_url).to_s.strip
     if url.blank?
       render json: { error: "Provide a repo URL." }, status: :unprocessable_content
       return
@@ -131,7 +131,7 @@ class PipelineTasksController < ApplicationController
   private
 
   def set_task
-    @task = PipelineTask.find(params[:id])
+    @task = PipelineTask.find(params.expect(:id))
   end
 
   def task_params

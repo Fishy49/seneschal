@@ -44,11 +44,11 @@ class WorkflowsController < ApplicationController
   private
 
   def set_project
-    @project = Project.find(params[:project_id])
+    @project = Project.find(params.expect(:project_id))
   end
 
   def set_workflow
-    @workflow = @project.workflows.find(params[:id])
+    @workflow = @project.workflows.find(params.expect(:id))
   end
 
   def workflow_params

@@ -22,7 +22,7 @@ class UsersController < ApplicationController
   end
 
   def destroy
-    user = User.find(params[:id])
+    user = User.find(params.expect(:id))
     if user == current_user
       redirect_to users_path, alert: "You cannot delete your own account."
     else
@@ -32,7 +32,7 @@ class UsersController < ApplicationController
   end
 
   def reset_invite
-    user = User.find(params[:id])
+    user = User.find(params.expect(:id))
     user.generate_invite_token!
     redirect_to users_path, notice: "Invite link regenerated for #{user.email}."
   end
