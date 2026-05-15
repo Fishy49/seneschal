@@ -1,7 +1,7 @@
 require "test_helper"
 
 # rubocop:disable Style/ClassAndModuleChildren
-class StepExecutor::PrCreatorTest < ActiveSupport::TestCase
+class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Metrics/ClassLength
   # rubocop:enable Style/ClassAndModuleChildren
   setup do
     @project = projects(:seneschal)
@@ -219,6 +219,176 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase
     head_idx = captured_list_argv.index("--head")
     assert_equal "release/v2", captured_list_argv[head_idx + 1]
     assert captured_create_argv
+  end
+
+  # ---- clean: true (destructive re-create) ----
+
+  test "clean=true closes existing PR, wipes remote branch, pushes local, then creates fresh" do # rubocop:disable Metrics/BlockLength
+    @step.update!(config: @step.config.merge("clean" => true))
+    list_payload = JSON.dump([{ "number" => 7, "url" => "https://github.com/test/seneschal/pull/7" }])
+
+    close_argv = nil
+    delete_argv = nil
+    push_argv = nil
+    create_called = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["gh", "pr", "close"] => lambda { |*argv|
+        close_argv = argv
+        ["", "", success_status]
+      },
+      ["git", "push", "--delete"] => lambda { |*argv|
+        delete_argv = argv
+        ["", "", success_status]
+      },
+      ["git", "push", "-u"] => lambda { |*argv|
+        push_argv = argv
+        ["", "", success_status]
+      },
+      ["gh", "pr", "create"] => lambda { |*_argv|
+        create_called = true
+        ["https://github.com/test/seneschal/pull/42\n", "", success_status]
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+      assert_includes result.stdout, "::set-output pr_number=42",
+                      "expected fresh PR #42, not the reused #7"
+    end
+
+    assert create_called, "gh pr create should run after the clean path completes"
+    assert close_argv, "gh pr close should have been invoked"
+    assert_includes close_argv, "7"
+    comment_idx = close_argv.index("--comment")
+    assert comment_idx, "gh pr close should pass --comment"
+    assert_match(/Superseded by Seneschal/, close_argv[comment_idx + 1])
+
+    assert delete_argv, "git push --delete should have been invoked"
+    assert_equal ["git", "push", "--delete", "origin", "feature/foo"], delete_argv.first(5)
+    assert_equal ["git", "push", "-u", "origin", "feature/foo"], push_argv.first(5)
+  end
+
+  test "clean=true closes every open PR on the branch, not just the first" do
+    @step.update!(config: @step.config.merge("clean" => true))
+    list_payload = JSON.dump([
+                               { "number" => 7, "url" => "https://github.com/test/seneschal/pull/7" },
+                               { "number" => 8, "url" => "https://github.com/test/seneschal/pull/8" }
+                             ])
+
+    closed_numbers = []
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["gh", "pr", "close"] => lambda { |*argv|
+        closed_numbers << argv[3] # gh pr close <number> ...
+        ["", "", success_status]
+      },
+      ["git", "push", "--delete"] => stub_response(success: true),
+      ["git", "push", "-u"] => stub_response(success: true),
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+    end
+
+    assert_equal ["7", "8"], closed_numbers
+  end
+
+  test "clean=true tolerates git push --delete failure when the remote ref is already gone" do
+    @step.update!(config: @step.config.merge("clean" => true))
+    list_payload = JSON.dump([{ "number" => 7, "url" => "https://github.com/test/seneschal/pull/7" }])
+
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["gh", "pr", "close"] => stub_response(success: true),
+      ["git", "push", "--delete"] => stub_response(
+        stderr: "error: unable to delete 'feature/foo': remote ref does not exist", success: false
+      ),
+      ["git", "push", "-u"] => stub_response(success: true),
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, "delete-ref failure must not abort the clean flow: #{result.stderr}"
+    end
+  end
+
+  test "clean=true aborts when gh pr close fails" do
+    @step.update!(config: @step.config.merge("clean" => true))
+    list_payload = JSON.dump([{ "number" => 7, "url" => "https://github.com/test/seneschal/pull/7" }])
+
+    create_called = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["gh", "pr", "close"] => stub_response(stderr: "remote: forbidden", success: false),
+      ["gh", "pr", "create"] => lambda { |*_argv|
+        create_called = true
+        ["", "", success_status]
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "Failed to close PR #7"
+      assert_includes result.stderr, "forbidden"
+    end
+
+    assert_not create_called, "gh pr create should not run if the close step failed"
+  end
+
+  test "clean=true is a no-op on the close/wipe path when no PR exists yet" do
+    @step.update!(config: @step.config.merge("clean" => true))
+
+    close_called = false
+    delete_called = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["gh", "pr", "close"] => lambda { |*_argv|
+        close_called = true
+        ["", "", success_status]
+      },
+      ["git", "push", "--delete"] => lambda { |*_argv|
+        delete_called = true
+        ["", "", success_status]
+      },
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+    end
+
+    assert_not close_called, "no PR to close → don't call gh pr close"
+    assert_not delete_called, "no PR to clean → don't wipe remote"
+  end
+
+  test "refuses an unsafe branch name before any git/gh call" do
+    @step.update!(config: @step.config.merge("branch" => "--upload-pack=evil"))
+
+    any_call = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => lambda { |*_a|
+        any_call = true
+        ["[]", "", success_status]
+      },
+      ["gh", "pr", "create"] => lambda { |*_a|
+        any_call = true
+        ["", "", success_status]
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "not a safe git ref name"
+    end
+
+    assert_not any_call, "no gh/git command should run when the branch is rejected"
   end
 
   test "PipelineExtractor extracts the conventional outputs from a pr step result" do

@@ -343,6 +343,20 @@
     </div>
 
     <div class="mb-4">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-danger">
+        <input type="checkbox" name="pr_clean" value="1" <%= "checked" if pr_cfg["clean"] %> class="accent-danger">
+        Clean re-create (destructive)
+      </label>
+      <p class="text-xs text-content-muted mt-1">
+        On re-runs: close any existing open PRs for this branch (with an audit
+        comment), <code>git push --delete</code> the remote branch, then push
+        local fresh and open a new PR. Use when the branch's previous history
+        is no longer valid — e.g. after a forced rebase or a botched run.
+        Default off; the idempotent reuse path is the safer default.
+      </p>
+    </div>
+
+    <div class="mb-4">
       <label for="pr_reviewers" class="block text-sm font-medium text-content-muted mb-1.5">Reviewers (optional)</label>
       <input type="text" name="pr_reviewers" id="pr_reviewers"
              value="<%= Array(pr_cfg["reviewers"]).join(", ") %>"

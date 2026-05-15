@@ -169,9 +169,12 @@ class StepsController < ApplicationController
       "branch" => raw["pr_branch"].to_s.strip.presence,
       "reviewers" => split_csv(raw["pr_reviewers"]),
       "labels" => split_csv(raw["pr_labels"]),
-      "assignees" => split_csv(raw["pr_assignees"])
+      "assignees" => split_csv(raw["pr_assignees"]),
+      # Destructive re-create. Default false so the idempotent reuse path
+      # stays the easy default; operators have to opt in explicitly.
+      "clean" => raw["pr_clean"] == "1"
     }
-    # Strip nil + empty values without clobbering `draft: false`.
+    # Strip nil + empty values without clobbering `draft: false` or `clean: false`.
     cfg.reject { |_, v| v.nil? || v == "" || (v.respond_to?(:empty?) && v.empty?) }
   end
 
