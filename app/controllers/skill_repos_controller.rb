@@ -51,7 +51,7 @@ class SkillReposController < ApplicationController
   private
 
   def set_skill_repo
-    @skill_repo = SkillRepo.find(params[:id])
+    @skill_repo = SkillRepo.find(params.expect(:id))
   end
 
   # On create the operator supplies the URL; branch + priority default if blank.

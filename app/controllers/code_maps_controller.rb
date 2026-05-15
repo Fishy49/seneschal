@@ -33,7 +33,7 @@ class CodeMapsController < ApplicationController
       return
     end
 
-    description = params[:description].to_s.strip
+    description = params.expect(:description).to_s.strip
     if description.blank?
       render json: { error: "No description provided" }, status: :unprocessable_content
       return
@@ -88,6 +88,6 @@ class CodeMapsController < ApplicationController
   private
 
   def set_project
-    @project = Project.find(params[:project_id])
+    @project = Project.find(params.expect(:project_id))
   end
 end

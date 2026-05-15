@@ -4,7 +4,7 @@ class StepTemplatesController < ApplicationController
   end
 
   def destroy
-    StepTemplate.find(params[:id]).destroy
+    StepTemplate.find(params.expect(:id)).destroy
     redirect_to step_templates_path, notice: "Template deleted."
   end
 end

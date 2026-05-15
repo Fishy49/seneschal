@@ -45,7 +45,7 @@ class JsonSchemasController < ApplicationController
   private
 
   def set_schema
-    @schema = JsonSchema.find(params[:id])
+    @schema = JsonSchema.find(params.expect(:id))
   end
 
   def schema_params

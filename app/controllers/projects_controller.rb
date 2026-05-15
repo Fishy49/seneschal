@@ -68,7 +68,7 @@ class ProjectsController < ApplicationController
   private
 
   def set_project
-    @project = Project.find(params[:id])
+    @project = Project.find(params.expect(:id))
   end
 
   def project_params

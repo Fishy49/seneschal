@@ -52,7 +52,7 @@ class RunsController < ApplicationController
       return
     end
 
-    instructions = params[:instructions].to_s.strip
+    instructions = params.expect(:instructions).to_s.strip
     if instructions.blank?
       redirect_to run_path(@run), alert: "Follow-up instructions are required."
       return
@@ -85,7 +85,7 @@ class RunsController < ApplicationController
     awaiting = @run.awaiting_run_step
     return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
-    context = params[:rejection_context].to_s.strip
+    context = params.expect(:rejection_context).to_s.strip
     awaiting.update!(rejection_context: context.presence)
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, resume: true)
@@ -93,7 +93,7 @@ class RunsController < ApplicationController
   end
 
   def retry_from
-    step = @run.workflow.steps.find(params[:step_id])
+    step = @run.workflow.steps.find(params.expect(:step_id))
 
     failure_context = @run.context.dup
     failed_run_step = @run.run_steps.find_by(status: "failed")
@@ -146,6 +146,6 @@ class RunsController < ApplicationController
   end
 
   def set_run
-    @run = Run.includes(workflow: :project, run_steps: :step).find(params[:id])
+    @run = Run.includes(workflow: :project, run_steps: :step).find(params.expect(:id))
   end
 end
