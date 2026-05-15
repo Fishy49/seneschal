@@ -11,6 +11,17 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
+  # Tools available to a self_review step. Read-only by design — a step that
+  # could Write or Edit defeats its own purpose as a review checkpoint.
+  SELF_REVIEW_TOOLS = "Read,Grep,Glob".freeze
+  REVIEW_DIFF_MAX_CHARS = 80_000
+
+  # Subset of git's ref-name rules — strict enough to keep an attacker-
+  # controlled `base_ref` value from sneaking through as a `git diff` flag
+  # (no leading dashes, no shell metacharacters, no ".." segments). We
+  # intentionally accept less than git's full ruleset.
+  SAFE_GIT_REF = %r{\A[A-Za-z0-9_][A-Za-z0-9._/-]*\z}
+
   def initialize(step, context, repo_path, # rubocop:disable Metrics/ParameterLists
                  resolved_input_context: nil, resume_session_id: nil,
                  resume_message: nil, run_step_id: nil, runner: nil)
@@ -41,6 +52,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
     when "context_fetch" then execute_context_fetch(&)
+    when "self_review" then execute_self_review(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end
@@ -86,6 +98,109 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
     block = "```output\n#{produced_var}: #{JSON.generate(result.structured_output)}\n```\n"
     result.with(stdout: [result.stdout.to_s, block].reject(&:empty?).join("\n\n"))
+  end
+
+  # self_review: run Claude over the diff with read-only tools and a
+  # canned (or operator-overridden) review prompt. Designed to slot
+  # between an "implement" skill step and a "pr" step so a draft PR can
+  # only be promoted to ready when the review verdict is PASS.
+  def execute_self_review(&)
+    diff = compute_review_diff
+    prompt = build_review_prompt(diff)
+
+    # Force the read-only tool set regardless of step.config["allowed_tools"]
+    # — a self-review step that could Write or Edit defeats its own purpose.
+    kwargs = runner_call_kwargs(prompt: prompt, stream: block_given?)
+    kwargs[:allowed_tools] = SELF_REVIEW_TOOLS
+
+    result = runner.execute(**kwargs, &)
+    return result unless result.passed?
+
+    # Same schema-validated short-circuit + retry-loop fallback as
+    # execute_skill, so a self_review step can also be schema-bound.
+    return result unless @step.json_schema
+    return splice_structured_output(result) unless result.structured_output.nil?
+
+    validate_with_session_retry(result, &)
+  end
+
+  def compute_review_diff
+    base = (@step.config["base_ref"].presence || detect_review_base_ref).to_s
+    return "(refusing diff: base_ref #{base.inspect} is not a safe git ref name)" unless base.match?(SAFE_GIT_REF)
+
+    stdout, stderr, status = Open3.capture3(
+      "git", "-C", @repo_path, "diff", "--no-color", "#{base}...HEAD", "--"
+    )
+    return "(could not compute diff against #{base}: #{stderr.strip})" unless status.success?
+
+    truncate_review_diff(stdout)
+  end
+
+  def detect_review_base_ref
+    ref, _stderr, status = Open3.capture3(
+      "git", "-C", @repo_path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
+    )
+    return ref.strip if status.success? && ref.present?
+
+    ["origin/main", "origin/master"].each do |candidate|
+      _, _, check = Open3.capture3("git", "-C", @repo_path, "rev-parse", "--verify", "--quiet", candidate)
+      return candidate if check.success?
+    end
+
+    "HEAD~1"
+  end
+
+  def truncate_review_diff(diff)
+    return diff if diff.length <= REVIEW_DIFF_MAX_CHARS
+
+    omitted = diff.length - REVIEW_DIFF_MAX_CHARS
+    "#{diff.first(REVIEW_DIFF_MAX_CHARS)}\n\n... (diff truncated; #{omitted} more characters omitted)"
+  end
+
+  def build_review_prompt(diff)
+    focus = @step.config["focus"].presence ||
+            "correctness, safety, and adherence to existing patterns"
+    produced_var = @step.produces.first.presence || "review"
+    intro = if @step.body.present?
+              TemplateRenderer.new(@step.body, @context).render
+            else
+              default_review_intro(focus)
+            end
+
+    <<~PROMPT
+      #{intro}
+
+      ## Diff
+
+      ```diff
+      #{diff}
+      ```
+
+      ## Output Required
+
+      At the end of your response, emit your verdict in this format:
+
+      ```output
+      #{produced_var}: |
+        ## Verdict
+        PASS | NEEDS_FIX | BLOCKED
+
+        ## Concerns
+        (One per line, or "None.")
+
+        ## Suggestions
+        (Optional improvements, may be empty.)
+      ```
+    PROMPT
+  end
+
+  def default_review_intro(focus)
+    <<~INTRO.strip
+      You are reviewing a proposed code change. Focus on: #{focus}.
+
+      Use the read-only tools (Read, Grep, Glob) to investigate affected
+      files for context. You CANNOT make changes — review only.
+    INTRO
   end
 
   def execute_script(&)
@@ -179,8 +294,49 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       stream: stream,
       # Schema-validated structured outputs. Only runners that support this
       # contract (today: ClaudeSDK) will consume it; ClaudeCLI ignores it.
-      json_schema: @step.json_schema&.parsed_body
+      json_schema: @step.json_schema&.parsed_body,
+      # Runner-level policy hooks (also SDK-only). Today's only knob is the
+      # cwd-confining write hook, default ON. Operators can flip it off
+      # globally via Setting["confine_writes_to_cwd"] = "false" or
+      # per-step via Step.config["confine_writes_to_cwd"] = false.
+      hooks: { "confine_writes_to_cwd" => confine_writes_to_cwd? },
+      # Subagent definitions visible to the main agent via the Task tool.
+      # Each entry is a hash of AgentDefinition fields (description, prompt,
+      # tools, model, ...). SDK-only; ClaudeCLI ignores.
+      agents: @step.config["agents"].presence,
+      # MCP server registry. Per-step Step.config["mcp_servers"] wins;
+      # otherwise fall back to the global Setting. SDK-only.
+      mcp_servers: resolved_mcp_servers
     }
+  end
+
+  # Per-step config beats the Setting default. Returns nil (not {}) when
+  # nothing's configured so the runner can omit the field cleanly from
+  # the wire JSON.
+  def resolved_mcp_servers
+    per_step = @step.config["mcp_servers"]
+    return per_step if per_step.is_a?(Hash) && per_step.any?
+
+    global = Setting["mcp_servers"]
+    return nil if global.blank?
+
+    parsed = begin
+      JSON.parse(global)
+    rescue JSON::ParserError
+      nil
+    end
+    parsed.is_a?(Hash) && parsed.any? ? parsed : nil
+  end
+
+  def confine_writes_to_cwd?
+    if @step.config.key?("confine_writes_to_cwd")
+      ActiveModel::Type::Boolean.new.cast(@step.config["confine_writes_to_cwd"])
+    else
+      raw = Setting["confine_writes_to_cwd"]
+      return true if raw.nil?
+
+      ActiveModel::Type::Boolean.new.cast(raw)
+    end
   end
 
   def resolved_allowed_tools

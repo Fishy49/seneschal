@@ -19,7 +19,27 @@ Wire contract — stdin (single JSON object):
       "resume_session_id": null,
       "resume_message": null,
       "system_prompt": null,
-      "json_schema": {"type": "object", "properties": {...}} | null
+      "json_schema": {"type": "object", "properties": {...}} | null,
+      "hooks": {
+        "confine_writes_to_cwd": true     // default true; deny Write/Edit
+                                          // outside the cwd subtree
+      },
+      "agents": {                          // optional subagent definitions
+        "self-review": {                   // surfaced as named agents the
+          "description": "Reviews a diff for correctness.",
+          "prompt": "You are a code reviewer...",
+          "tools": ["Read", "Grep", "Glob"],
+          "model": "claude-sonnet-4-6"
+        }
+      },
+      "mcp_servers": {                     // optional MCP server registry
+        "github": {                        // each entry's `type` selects the
+          "type": "stdio",                 // McpStdioServerConfig / McpSSEServerConfig /
+          "command": "npx",                // McpHttpServerConfig dataclass to instantiate
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "..."}
+        }
+      }
     }
 
 When ``json_schema`` is non-null the sidecar wires the SDK's
@@ -46,6 +66,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import traceback
 from typing import Any
@@ -223,7 +244,200 @@ def build_options(config: dict[str, Any]) -> Any:
     if isinstance(schema, dict) and schema:
         kwargs["output_format"] = {"type": "json_schema", "schema": schema}
 
+    # Runner-level policy hooks. Today there's just the cwd-confining hook;
+    # the structure leaves room for future declarative policies (e.g.
+    # "block_dangerous_bash") without further wire-protocol churn.
+    hooks = build_hooks(config)
+    if hooks:
+        kwargs["hooks"] = hooks
+
+    # Per-call subagent definitions. The main agent can spawn these via the
+    # Task tool. Each entry is a dict of AgentDefinition kwargs.
+    agents = build_agents(config)
+    if agents:
+        kwargs["agents"] = agents
+
+    # MCP servers — stdio / SSE / HTTP configurations forwarded straight
+    # through to the SDK. In-process (SdkMcpServer) variants are added
+    # programmatically by other helpers (see seneschal-context wiring).
+    mcp_servers = build_mcp_servers(config)
+    if mcp_servers:
+        kwargs["mcp_servers"] = mcp_servers
+
     return ClaudeAgentOptions(**kwargs)
+
+
+def build_mcp_servers(config: dict[str, Any]) -> Any:
+    """Translate the wire-protocol `mcp_servers` field into SDK config types.
+
+    Accepts either:
+      - a string path (forwarded as-is — the SDK reads it as a .mcp.json file)
+      - a dict {name: {"type": "stdio"|"sse"|"http", ...other fields}}
+
+    Each named entry is instantiated as the matching McpStdio/SSE/Http
+    ServerConfig dataclass. Unknown fields are dropped silently so wire-
+    protocol evolution can't crash older sidecar versions on unfamiliar
+    keys.
+    """
+    from claude_agent_sdk import (
+        McpStdioServerConfig,
+        McpSSEServerConfig,
+        McpHttpServerConfig,
+    )
+
+    raw = config.get("mcp_servers")
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        return raw  # path to a .mcp.json — SDK handles it
+
+    if not isinstance(raw, dict) or not raw:
+        return None
+
+    type_to_cls = {
+        "stdio": (McpStdioServerConfig, {"type", "command", "args", "env"}),
+        "sse": (McpSSEServerConfig, {"type", "url", "headers"}),
+        "http": (McpHttpServerConfig, {"type", "url", "headers"}),
+    }
+
+    out: dict[str, Any] = {}
+    for name, spec in raw.items():
+        if not isinstance(spec, dict):
+            continue
+        kind = (spec.get("type") or "stdio").lower()
+        entry = type_to_cls.get(kind)
+        if not entry:
+            emit({
+                "type": "error",
+                "message": f"unsupported MCP server type {kind!r} for {name!r}",
+            })
+            continue
+        cls, allowed = entry
+        filtered = {k: v for k, v in spec.items() if k in allowed and v is not None}
+        try:
+            out[name] = cls(**filtered)
+        except TypeError as exc:
+            emit({
+                "type": "error",
+                "message": f"invalid MCP server config for {name!r}: {exc}",
+            })
+            continue
+    return out or None
+
+
+def build_agents(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Translate the wire `agents` dict into ``{name: AgentDefinition}``.
+
+    Returns None when no agents are declared, so the SDK uses its empty
+    default rather than an explicit empty dict. Unknown keys per agent
+    are dropped silently so wire-protocol evolution doesn't blow up on
+    older sidecar versions.
+    """
+    from claude_agent_sdk import AgentDefinition
+
+    raw = config.get("agents")
+    if not isinstance(raw, dict) or not raw:
+        return None
+
+    # Only pass kwargs AgentDefinition actually knows about — anything else
+    # could be a wire-protocol future we don't speak yet.
+    known_fields = {
+        "description", "prompt", "tools", "disallowedTools", "model", "skills",
+        "memory", "mcpServers", "initialPrompt", "maxTurns", "background",
+        "effort", "permissionMode",
+    }
+
+    out: dict[str, Any] = {}
+    for name, spec in raw.items():
+        if not isinstance(spec, dict):
+            continue
+        filtered = {k: v for k, v in spec.items() if k in known_fields and v is not None}
+        try:
+            out[name] = AgentDefinition(**filtered)
+        except TypeError as exc:
+            emit({
+                "type": "error",
+                "message": f"invalid AgentDefinition for {name!r}: {exc}",
+            })
+            continue
+    return out or None
+
+
+def build_hooks(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Translate the wire-protocol `hooks` dict into the SDK's hooks dict.
+
+    Returns None if no hooks are configured (so the SDK uses its empty
+    default rather than an explicit empty dict, which is the same end
+    result but a hair tidier in the request).
+    """
+    from claude_agent_sdk import HookMatcher
+
+    hooks_cfg = config.get("hooks") or {}
+    cwd = config.get("cwd")
+    pre_tool_use: list[Any] = []
+
+    # Default: confine Write/Edit to cwd. Operator can flip this off via
+    # Step.config or Setting on the Ruby side, which sets the wire field
+    # explicitly to false.
+    confine = hooks_cfg.get("confine_writes_to_cwd", True)
+    if confine and cwd:
+        confine_hook = make_confine_writes_hook(cwd)
+        for tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+            pre_tool_use.append(HookMatcher(matcher=tool, hooks=[confine_hook]))
+
+    if not pre_tool_use:
+        return None
+
+    return {"PreToolUse": pre_tool_use}
+
+
+def make_confine_writes_hook(cwd: str):
+    """Build a PreToolUse hook callback that denies Write/Edit/MultiEdit/
+    NotebookEdit calls whose `file_path` resolves outside the run's cwd.
+
+    The check uses os.path.realpath on both ends so symlink shenanigans
+    can't trick the policy. Relative paths are resolved against cwd
+    before the check.
+    """
+    cwd_resolved = os.path.realpath(cwd)
+    cwd_with_sep = cwd_resolved.rstrip(os.sep) + os.sep
+
+    async def confine_writes_hook(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+        tool_name = input_data.get("tool_name") or ""
+        tool_input = input_data.get("tool_input") or {}
+        file_path = tool_input.get("file_path") or tool_input.get("notebook_path")
+        if not file_path:
+            return {}  # nothing to police
+
+        target = file_path if os.path.isabs(file_path) else os.path.join(cwd_resolved, file_path)
+        target_resolved = os.path.realpath(target)
+
+        if target_resolved == cwd_resolved or target_resolved.startswith(cwd_with_sep):
+            return {}  # allowed — inside the worktree
+
+        reason = (
+            f"{tool_name} to {file_path!r} denied: path resolves to "
+            f"{target_resolved!r}, which is outside the run worktree {cwd_resolved!r}."
+        )
+        emit({
+            "type": "hook_denied",
+            "hook": "confine_writes_to_cwd",
+            "tool": tool_name,
+            "tool_use_id": tool_use_id,
+            "file_path": file_path,
+            "resolved_path": target_resolved,
+            "cwd": cwd_resolved,
+            "reason": reason,
+        })
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
+
+    return confine_writes_hook
 
 
 def resolve_prompt(config: dict[str, Any]) -> str:

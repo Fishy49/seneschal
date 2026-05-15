@@ -577,6 +577,77 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_includes final.stdout, JSON.generate(structured)
   end
 
+  test "runner_call_kwargs defaults hooks.confine_writes_to_cwd=true when nothing's set" do
+    Setting.find_by(key: "confine_writes_to_cwd")&.destroy
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal true, kwargs[:hooks]["confine_writes_to_cwd"]
+  end
+
+  test "runner_call_kwargs honors Setting[confine_writes_to_cwd]=false" do
+    Setting["confine_writes_to_cwd"] = "false"
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal false, kwargs[:hooks]["confine_writes_to_cwd"]
+  ensure
+    Setting.find_by(key: "confine_writes_to_cwd")&.destroy
+  end
+
+  test "runner_call_kwargs lets a per-step config override the Setting default" do
+    Setting["confine_writes_to_cwd"] = "false"
+    @step.update!(config: @step.config.merge("confine_writes_to_cwd" => true))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal true, kwargs[:hooks]["confine_writes_to_cwd"]
+  ensure
+    Setting.find_by(key: "confine_writes_to_cwd")&.destroy
+  end
+
+  test "runner_call_kwargs forwards Step.config[agents] verbatim when present" do
+    agents = {
+      "reviewer" => { "description" => "Reviews a diff.", "prompt" => "You are a reviewer.",
+                      "tools" => ["Read", "Grep"] }
+    }
+    @step.update!(config: @step.config.merge("agents" => agents))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal agents, kwargs[:agents]
+  end
+
+  test "runner_call_kwargs leaves agents nil when no Step.config[agents] is set" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_nil kwargs[:agents]
+  end
+
+  test "runner_call_kwargs prefers Step.config[mcp_servers] over Setting[mcp_servers]" do
+    Setting["mcp_servers"] = JSON.dump({ "global" => { "type" => "stdio", "command" => "g" } })
+    per_step = { "github" => { "type" => "stdio", "command" => "npx" } }
+    @step.update!(config: @step.config.merge("mcp_servers" => per_step))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal per_step, kwargs[:mcp_servers]
+  ensure
+    Setting.find_by(key: "mcp_servers")&.destroy
+  end
+
+  test "runner_call_kwargs falls back to Setting[mcp_servers] when Step has no override" do
+    global = { "global" => { "type" => "stdio", "command" => "g" } }
+    Setting["mcp_servers"] = JSON.dump(global)
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_equal global, kwargs[:mcp_servers]
+  ensure
+    Setting.find_by(key: "mcp_servers")&.destroy
+  end
+
+  test "runner_call_kwargs leaves mcp_servers nil when nothing is configured" do
+    Setting.find_by(key: "mcp_servers")&.destroy
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+    assert_nil kwargs[:mcp_servers]
+  end
+
   test "execute_skill leaves stdout untouched when produces.first is blank even if structured_output is present" do
     schema = json_schemas(:person_schema)
     @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => []))
@@ -595,6 +666,93 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_equal original_stdout, final.stdout
   end
 
+  # ---- self_review ----
+
+  test "Step accepts self_review as a valid step_type" do
+    step = Step.new(name: "review", step_type: "self_review",
+                    workflow: @step.workflow, position: 999, timeout: 60, max_retries: 0, config: {})
+    assert step.valid?, step.errors.full_messages.inspect
+  end
+
+  test "execute_self_review forces the read-only tool set regardless of step config" do
+    repo_path = setup_review_repo!
+    step = create_self_review_step!
+    step.update!(config: step.config.merge("allowed_tools" => "Bash,Edit,Write"))
+    executor = StepExecutor.new(step, {}, repo_path)
+
+    captured_kwargs = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_kwargs = kwargs
+      StepExecutor::Result.new(exit_code: 0, stdout: "review: PASS", stderr: "")
+    end
+
+    executor.execute
+    assert_equal StepExecutor::SELF_REVIEW_TOOLS, captured_kwargs[:allowed_tools]
+  ensure
+    FileUtils.rm_rf(@_review_repo_path) if @_review_repo_path
+  end
+
+  test "execute_self_review embeds the diff and a default focus into the prompt" do
+    repo_path = setup_review_repo!
+    File.write(File.join(repo_path, "added.rb"), "puts 'hi'\n")
+    in_review_repo("git", "add", "added.rb")
+    in_review_repo("git", "commit", "-q", "-m", "add file on feature branch")
+
+    step = create_self_review_step!
+    executor = StepExecutor.new(step, {}, repo_path)
+
+    captured_kwargs = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_kwargs = kwargs
+      StepExecutor::Result.new(exit_code: 0, stdout: "review: PASS", stderr: "")
+    end
+
+    executor.execute
+    assert_includes captured_kwargs[:prompt], "added.rb"
+    assert_includes captured_kwargs[:prompt], "puts 'hi'"
+    assert_includes captured_kwargs[:prompt], "correctness, safety"
+  end
+
+  # Regression: an attacker-controlled `base_ref` (via Step.config) shouldn't
+  # be able to inject a flag into `git diff` — e.g. `--upload-pack=evil`.
+  # The strict ref-name regex catches it before argv ever sees it.
+  test "execute_self_review refuses unsafe base_ref values without invoking git" do
+    repo_path = setup_review_repo!
+    step = create_self_review_step!
+    step.update!(config: step.config.merge("base_ref" => "--upload-pack=evil"))
+    executor = StepExecutor.new(step, {}, repo_path)
+
+    captured_kwargs = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_kwargs = kwargs
+      StepExecutor::Result.new(exit_code: 0, stdout: "review: PASS", stderr: "")
+    end
+
+    executor.execute
+    assert_includes captured_kwargs[:prompt], "refusing diff"
+    assert_includes captured_kwargs[:prompt], "--upload-pack=evil"
+  ensure
+    FileUtils.rm_rf(@_review_repo_path) if @_review_repo_path
+  end
+
+  test "execute_self_review honors a custom focus from step config" do
+    repo_path = setup_review_repo!
+    step = create_self_review_step!
+    step.update!(config: step.config.merge("focus" => "security and SQL injection risk"))
+    executor = StepExecutor.new(step, {}, repo_path)
+
+    captured_kwargs = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_kwargs = kwargs
+      StepExecutor::Result.new(exit_code: 0, stdout: "review: PASS", stderr: "")
+    end
+
+    executor.execute
+    assert_includes captured_kwargs[:prompt], "security and SQL injection risk"
+  ensure
+    FileUtils.rm_rf(@_review_repo_path) if @_review_repo_path
+  end
+
   test "context_fetch project_file interpolates ${var} in path" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "settings.json"), "{}")
@@ -607,5 +765,35 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
       assert result.passed?, result.stderr
       assert_equal "{}", result.stdout
     end
+  end
+
+  private
+
+  # Sets up a temp git repo with one commit on `main` and switches to a
+  # `feature` branch — same shape as a Seneschal worktree off origin/HEAD.
+  # Cached on @_review_repo_path so the test's `ensure` can clean up.
+  def setup_review_repo!
+    @_review_repo_path = Dir.mktmpdir("seneschal-review-test-")
+    in_review_repo("git", "init", "-q", "-b", "main")
+    in_review_repo("git", "config", "user.email", "test@example.com")
+    in_review_repo("git", "config", "user.name", "Test")
+    File.write(File.join(@_review_repo_path, "README.md"), "hello\n")
+    in_review_repo("git", "add", "README.md")
+    in_review_repo("git", "commit", "-q", "-m", "init")
+    in_review_repo("git", "checkout", "-q", "-b", "feature")
+    @_review_repo_path
+  end
+
+  def in_review_repo(*cmd)
+    _, stderr, status = Open3.capture3(*cmd, chdir: @_review_repo_path)
+    raise "git command failed in #{@_review_repo_path}: #{cmd.inspect} (#{stderr})" unless status.success?
+  end
+
+  def create_self_review_step!
+    workflows(:deploy).steps.create!(
+      name: "self_review_step", step_type: "self_review",
+      position: 998, timeout: 60, max_retries: 0,
+      config: { "produces" => ["review"], "base_ref" => "main" }
+    )
   end
 end

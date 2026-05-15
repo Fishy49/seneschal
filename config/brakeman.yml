@@ -5,3 +5,8 @@
 # they're someone else's code, not part of this app, so we skip them.
 :skip_files:
   - "repos/"
+
+# Findings reviewed and explicitly accepted live in the ignore file. Each
+# entry has a `note` explaining why the finding is a false positive or an
+# accepted risk.
+:ignore_file: "config/brakeman.ignore"

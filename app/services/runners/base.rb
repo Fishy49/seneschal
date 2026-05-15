@@ -27,6 +27,9 @@ module Runners
       add_dirs: [],
       stream: false,
       json_schema: nil,
+      hooks: nil,
+      agents: nil,
+      mcp_servers: nil,
       &block
     )
       raise NotImplementedError, "#{self.class} must implement #execute"

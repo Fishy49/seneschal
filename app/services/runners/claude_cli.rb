@@ -18,8 +18,12 @@ module Runners
       permission_mode: "dontAsk",
       add_dirs: [],
       stream: false,
-      # ignored by CLI; only ClaudeSDK supports schema-validated outputs
+      # ignored by CLI; only ClaudeSDK consumes these (structured outputs,
+      # hooks, subagents, MCP servers)
       json_schema: nil, # rubocop:disable Lint/UnusedMethodArgument
+      hooks: nil, # rubocop:disable Lint/UnusedMethodArgument
+      agents: nil, # rubocop:disable Lint/UnusedMethodArgument
+      mcp_servers: nil, # rubocop:disable Lint/UnusedMethodArgument
       &
     )
       cmd = build_cmd(

@@ -1,0 +1,27 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "80c231bd077d76af0ccc6df7af4535266c9251924d5b6bf8b53f59937835ddd8",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "app/services/step_executor.rb",
+      "line": 132,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": null,
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "StepExecutor",
+        "method": "compute_review_diff"
+      },
+      "user_input": null,
+      "confidence": "Medium",
+      "cwe_id": [77],
+      "note": "base_ref is validated against SAFE_GIT_REF (a strict subset of git's ref-name rules — no leading dashes, no shell metacharacters, no '..') before being interpolated into the diff range. Test coverage: `execute_self_review refuses unsafe base_ref values without invoking git`."
+    }
+  ],
+  "updated": "2026-05-15",
+  "brakeman_version": "8.0.4"
+}

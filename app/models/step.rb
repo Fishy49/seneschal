@@ -4,7 +4,7 @@ class Step < ApplicationRecord
   belongs_to :skill, optional: true
   has_many :run_steps, dependent: :destroy
 
-  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt"].freeze
+  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "self_review"].freeze
 
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }

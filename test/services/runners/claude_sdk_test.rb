@@ -211,6 +211,88 @@ module Runners
       assert_nil result.structured_output
     end
 
+    # ---- hooks passthrough ----
+
+    test "build_config carries the hooks dict to the wire payload" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", hooks: { "confine_writes_to_cwd" => true })
+      assert_equal({ "confine_writes_to_cwd" => true }, cfg["hooks"])
+    end
+
+    test "build_config defaults hooks to nil when unset" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp")
+      assert_nil cfg["hooks"]
+    end
+
+    test "hooks reach the sidecar's stdin verbatim" do
+      fake_python, capture_path = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      @runner.execute(prompt: "x", cwd: @cwd, hooks: { "confine_writes_to_cwd" => false })
+      captured = JSON.parse(File.read(capture_path))
+      assert_equal({ "confine_writes_to_cwd" => false }, captured["hooks"])
+    end
+
+    # ---- agents passthrough ----
+
+    test "build_config carries an agents hash to the wire payload" do
+      agents = {
+        "self-review" => {
+          "description" => "Reviews a diff.",
+          "prompt" => "You are a code reviewer.",
+          "tools" => ["Read", "Grep", "Glob"],
+          "model" => "claude-sonnet-4-6"
+        }
+      }
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", agents: agents)
+      assert_equal agents, cfg["agents"]
+    end
+
+    test "build_config defaults agents to nil when unset" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp")
+      assert_nil cfg["agents"]
+    end
+
+    test "agents reach the sidecar's stdin verbatim" do
+      fake_python, capture_path = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      agents = { "reviewer" => { "description" => "x", "prompt" => "y", "tools" => ["Read"] } }
+      @runner.execute(prompt: "x", cwd: @cwd, agents: agents)
+      captured = JSON.parse(File.read(capture_path))
+      assert_equal agents, captured["agents"]
+    end
+
+    # ---- mcp_servers passthrough ----
+
+    test "build_config carries an mcp_servers hash to the wire payload" do
+      servers = {
+        "github" => {
+          "type" => "stdio", "command" => "npx",
+          "args" => ["-y", "@modelcontextprotocol/server-github"]
+        }
+      }
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", mcp_servers: servers)
+      assert_equal servers, cfg["mcp_servers"]
+    end
+
+    test "build_config defaults mcp_servers to nil when unset" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp")
+      assert_nil cfg["mcp_servers"]
+    end
+
+    test "mcp_servers reach the sidecar's stdin verbatim" do
+      fake_python, capture_path = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      servers = { "linear" => { "type" => "http", "url" => "https://example.com/mcp" } }
+      @runner.execute(prompt: "x", cwd: @cwd, mcp_servers: servers)
+      captured = JSON.parse(File.read(capture_path))
+      assert_equal servers, captured["mcp_servers"]
+    end
+
     private
 
     # Writes a Ruby-based fake interpreter to a tempfile and returns its

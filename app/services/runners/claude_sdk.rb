@@ -35,6 +35,9 @@ module Runners
       add_dirs: [],
       stream: false,
       json_schema: nil,
+      hooks: nil,
+      agents: nil,
+      mcp_servers: nil,
       &
     )
       config = build_config(
@@ -43,7 +46,7 @@ module Runners
         model: model, max_turns: max_turns, effort: effort,
         allowed_tools: allowed_tools, dangerously_skip_permissions: dangerously_skip_permissions,
         permission_mode: permission_mode, add_dirs: add_dirs,
-        json_schema: json_schema
+        json_schema: json_schema, hooks: hooks, agents: agents, mcp_servers: mcp_servers
       )
 
       ensure_runner_script!
@@ -70,6 +73,9 @@ module Runners
       permission_mode: "dontAsk",
       add_dirs: [],
       json_schema: nil,
+      hooks: nil,
+      agents: nil,
+      mcp_servers: nil,
       **_
     )
       {
@@ -84,7 +90,10 @@ module Runners
         "dangerously_skip_permissions" => dangerously_skip_permissions ? true : false,
         "permission_mode" => permission_mode,
         "add_dirs" => Array(add_dirs),
-        "json_schema" => json_schema
+        "json_schema" => json_schema,
+        "hooks" => hooks,
+        "agents" => agents,
+        "mcp_servers" => mcp_servers
       }
     end
 
