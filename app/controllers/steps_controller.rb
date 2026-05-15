@@ -172,9 +172,15 @@ class StepsController < ApplicationController
       "assignees" => split_csv(raw["pr_assignees"]),
       # Destructive re-create. Default false so the idempotent reuse path
       # stays the easy default; operators have to opt in explicitly.
-      "clean" => raw["pr_clean"] == "1"
+      "clean" => raw["pr_clean"] == "1",
+      # Pre-flight `git commit --allow-empty -m <title>` when the branch
+      # has no diff vs base. Default false so the existing fail-loud
+      # behavior stays. Operators flip this on for "prep the branch / open
+      # the draft PR up front" patterns.
+      "seed_empty_commit" => raw["pr_seed_empty_commit"] == "1"
     }
-    # Strip nil + empty values without clobbering `draft: false` or `clean: false`.
+    # Strip nil + empty values without clobbering `draft: false`, `clean: false`,
+    # or `seed_empty_commit: false`.
     cfg.reject { |_, v| v.nil? || v == "" || (v.respond_to?(:empty?) && v.empty?) }
   end
 

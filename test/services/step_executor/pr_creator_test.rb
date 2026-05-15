@@ -427,6 +427,128 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_not delete_called, "no PR to clean → don't wipe remote"
   end
 
+  # ---- seed_empty_commit ----
+
+  test "seed_empty_commit=true creates an empty commit when branch is identical to base" do
+    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
+
+    commit_argv = nil
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "seneschal/run-31\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "0\n", success: true),
+      ["git", "commit", "--allow-empty"] => lambda { |*argv|
+        commit_argv = argv
+        ["", "", success_status]
+      },
+      ["git", "push", "-u"] => stub_response(success: true),
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "Add auth", "task_body" => "Login" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+    end
+
+    assert commit_argv, "git commit --allow-empty should have been invoked"
+    assert_includes commit_argv, "--allow-empty"
+    msg_idx = commit_argv.index("-m")
+    assert_equal "feat: Add auth", commit_argv[msg_idx + 1],
+                 "seed commit message should be the interpolated PR title"
+  end
+
+  test "seed_empty_commit=true skips the empty commit when branch has commits ahead of base" do
+    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
+
+    commit_called = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
+      ["git", "commit", "--allow-empty"] => lambda { |*_argv|
+        commit_called = true
+        ["", "", success_status]
+      },
+      ["git", "push", "-u"] => stub_response(success: true),
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert result.passed?, result.stderr
+    end
+
+    assert_not commit_called, "should not seed when there's already a diff to PR"
+  end
+
+  test "without seed_empty_commit, the rev-list / commit steps don't run" do
+    rev_list_called = false
+    commit_called = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => lambda { |*_argv|
+        rev_list_called = true
+        ["0\n", "", success_status]
+      },
+      ["git", "commit", "--allow-empty"] => lambda { |*_argv|
+        commit_called = true
+        ["", "", success_status]
+      },
+      ["git", "push", "-u"] => stub_response(success: true),
+      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
+    ) do
+      StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" }, @project.local_path).execute
+    end
+
+    assert_not rev_list_called, "rev-list count check should only run when seed_empty_commit is enabled"
+    assert_not commit_called
+  end
+
+  test "seed_empty_commit surfaces a commit failure cleanly" do
+    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
+
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
+      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "0\n", success: true),
+      ["git", "commit", "--allow-empty"] => stub_response(stderr: "nothing to commit (rebase in progress?)", success: false),
+      ["gh", "pr", "create"] => lambda { |*_argv|
+        flunk "gh pr create should not run when the seed commit failed"
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "Failed to create seed commit"
+      assert_includes result.stderr, "nothing to commit"
+    end
+  end
+
+  test "refuses an unsafe base value before any git/gh call" do
+    # Use an explicit branch so the validation fires before any subprocess
+    # is invoked (otherwise pr_branch_name would `git rev-parse` first).
+    @step.update!(config: @step.config.merge("base" => "--upload-pack=evil", "branch" => "feature/foo"))
+
+    any_call = false
+    with_stubbed_capture3(
+      ["gh", "pr", "list"] => lambda { |*_a|
+        any_call = true
+        ["[]", "", success_status]
+      },
+      ["gh", "pr", "create"] => lambda { |*_a|
+        any_call = true
+        ["", "", success_status]
+      }
+    ) do
+      result = StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" },
+                                @project.local_path).execute
+      assert_not result.passed?
+      assert_includes result.stderr, "base"
+      assert_includes result.stderr, "not a safe git ref name"
+    end
+
+    assert_not any_call, "no gh/git command should run when the base is rejected"
+  end
+
   test "refuses an unsafe branch name before any git/gh call" do
     @step.update!(config: @step.config.merge("branch" => "--upload-pack=evil"))
 

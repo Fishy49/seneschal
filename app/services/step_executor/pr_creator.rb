@@ -15,7 +15,7 @@ class StepExecutor
 
     private
 
-    def execute_pr_step(&) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def execute_pr_step(&) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
       cfg = @step.config || {}
       title = interpolate_string(cfg["title"].to_s).strip
       return Result.new(exit_code: 1, stdout: "", stderr: "PR step requires a non-empty title") if title.empty?
@@ -25,6 +25,13 @@ class StepExecutor
       unless branch.match?(SAFE_BRANCH_NAME)
         return Result.new(exit_code: 1, stdout: "",
                           stderr: "Refusing PR step: branch #{branch.inspect} is not a safe git ref name")
+      end
+
+      base = interpolate_string(cfg.fetch("base", "main").to_s).strip
+      base = "main" if base.empty?
+      unless base.match?(SAFE_BRANCH_NAME)
+        return Result.new(exit_code: 1, stdout: "",
+                          stderr: "Refusing PR step: base #{base.inspect} is not a safe git ref name")
       end
 
       yield({ output: "Checking for existing PR on #{branch}..." }) if block_given?
@@ -40,6 +47,16 @@ class StepExecutor
 
       end
 
+      # Optional: seed an empty commit when the branch is identical to base.
+      # GitHub refuses `gh pr create` with "No commits between …" otherwise.
+      # Use case: a `pr` step at position 1 of a workflow that opens a draft
+      # PR up front to claim the branch / give later steps something to push
+      # commits into.
+      if cfg["seed_empty_commit"]
+        seed_err = ensure_seed_commit(base: base, title: title, &)
+        return seed_err if seed_err
+      end
+
       # Push the local branch to origin so `gh pr create` can resolve --head.
       # Idempotent — if already up to date, git just prints "Everything
       # up-to-date." and exits 0. Required even outside the clean path
@@ -48,8 +65,6 @@ class StepExecutor
       push_err = push_local_branch(branch, &)
       return push_err if push_err
 
-      base = interpolate_string(cfg.fetch("base", "main").to_s).strip
-      base = "main" if base.empty?
       body = interpolate_string(cfg["body"].to_s)
       draft = cfg.fetch("draft", true)
 
@@ -183,6 +198,43 @@ class StepExecutor
         exit_code: status.exitstatus || 1,
         stdout: stdout,
         stderr: "Failed to push local #{branch}: #{stderr.strip}"
+      )
+    end
+
+    # When `seed_empty_commit: true` is set, create an empty commit on the
+    # current branch IF (and only if) there are no commits ahead of base.
+    # No-ops when the branch already has commits — re-runs of a workflow
+    # don't accumulate extra seed commits. The empty commit gets the PR's
+    # title as its message so the audit trail is recognizable.
+    def ensure_seed_commit(base:, title:)
+      yield({ output: "Checking commits ahead of #{base}..." }) if block_given?
+
+      # `--not <base>` avoids interpolating base into a `<base>..HEAD` ref-
+      # range string. Semantically equivalent to `git rev-list --count
+      # <base>..HEAD` (commits reachable from HEAD but not base).
+      ahead_stdout, _stderr, status = Open3.capture3(
+        env_vars,
+        "git", "rev-list", "--count", "HEAD", "--not", base,
+        chdir: @repo_path
+      )
+      # If rev-list itself fails (e.g. base ref doesn't exist locally), let
+      # the subsequent push / gh pr create surface the real error rather
+      # than masking it here.
+      return nil unless status.success?
+      return nil if ahead_stdout.strip.to_i.positive?
+
+      yield({ output: "Seeding an empty commit so the PR has a diff to open against..." }) if block_given?
+      _stdout, stderr, status = Open3.capture3(
+        env_vars,
+        "git", "commit", "--allow-empty", "-m", title,
+        chdir: @repo_path
+      )
+      return nil if status.success?
+
+      Result.new(
+        exit_code: status.exitstatus || 1,
+        stdout: "",
+        stderr: "Failed to create seed commit: #{stderr.strip}"
       )
     end
 
