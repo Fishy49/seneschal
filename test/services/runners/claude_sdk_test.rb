@@ -167,6 +167,50 @@ module Runners
       assert_includes result.stderr.to_s, "claude-agent-sdk is not installed"
     end
 
+    # ---- structured outputs ----
+
+    test "build_config carries json_schema through to the wire payload" do
+      schema = { "type" => "object", "properties" => { "pr_number" => { "type" => "integer" } } }
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", json_schema: schema)
+      assert_equal schema, cfg["json_schema"]
+    end
+
+    test "build_config sets json_schema to nil when unset" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp")
+      assert_nil cfg["json_schema"]
+    end
+
+    test "json_schema in the wire config reaches the sidecar's stdin" do
+      fake_python, capture_path = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      schema = { "type" => "object", "properties" => { "branch" => { "type" => "string" } } }
+      @runner.execute(prompt: "x", cwd: @cwd, json_schema: schema)
+
+      captured = JSON.parse(File.read(capture_path))
+      assert_equal schema, captured["json_schema"]
+    end
+
+    test "structured_output is extracted from the result event into Runners::Result" do
+      fake_python, = install_fake_python(:result_with_structured_output)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      result = @runner.execute(prompt: "x", cwd: @cwd)
+
+      assert_equal({ "pr_number" => 42, "branch" => "feat/x" }, result.structured_output)
+    end
+
+    test "structured_output is nil when the SDK didn't emit one (no schema in play)" do
+      fake_python, = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      result = @runner.execute(prompt: "x", cwd: @cwd)
+      assert_nil result.structured_output
+    end
+
     private
 
     # Writes a Ruby-based fake interpreter to a tempfile and returns its
@@ -218,6 +262,13 @@ module Runners
               "input_tokens"=>1_500, "output_tokens"=>240,
               "cache_read_input_tokens"=>800, "cache_creation_input_tokens"=>320
             }
+          })
+          exit 0
+        when "result_with_structured_output"
+          STDOUT.puts JSON.dump({
+            "type"=>"result", "subtype"=>"success", "is_error"=>false,
+            "result"=>"", "session_id"=>"sess_struct",
+            "structured_output"=>{"pr_number"=>42, "branch"=>"feat/x"}
           })
           exit 0
         end

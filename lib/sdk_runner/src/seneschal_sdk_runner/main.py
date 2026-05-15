@@ -13,13 +13,19 @@ Wire contract — stdin (single JSON object):
       "model": "claude-opus-4-7" | null,
       "max_turns": 5 | null,
       "allowed_tools": ["Bash", "Read"] | null,
-      "permission_mode": "default" | "acceptEdits" | "bypassPermissions" | "plan",
+      "permission_mode": "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk",
       "dangerously_skip_permissions": false,
       "add_dirs": ["/path1"],
       "resume_session_id": null,
       "resume_message": null,
-      "system_prompt": null
+      "system_prompt": null,
+      "json_schema": {"type": "object", "properties": {...}} | null
     }
+
+When ``json_schema`` is non-null the sidecar wires the SDK's
+``output_format={"type": "json_schema", "schema": ...}``, and the result
+event's ``structured_output`` will carry the parsed, schema-validated
+object.
 
 Wire contract — stdout (one JSON event per line):
 
@@ -45,23 +51,48 @@ import traceback
 from typing import Any
 
 
-# Map the Seneschal-side string for "use allowedTools, don't prompt" to
-# the SDK's permission_mode enum. The CLI quietly accepted "dontAsk" as a
-# legacy alias; the SDK doesn't, so translate here.
-PERMISSION_MODE_TRANSLATION = {
-    "dontAsk": "default",
-    "default": "default",
-    "acceptEdits": "acceptEdits",
-    "bypassPermissions": "bypassPermissions",
-    "plan": "plan",
-}
+def _json_safe_default(obj: Any) -> Any:
+    """Last-ditch JSON serializer for SDK dataclass / pydantic-like
+    instances we forgot to unpack — fall back to a dict of public attrs,
+    then to str(), so a single weird field never kills the event stream."""
+    if hasattr(obj, "__dict__"):
+        return {k: v for k, v in vars(obj).items() if not k.startswith("_")}
+    return str(obj)
 
 
 def emit(event: dict[str, Any]) -> None:
     """Write a single NDJSON event to stdout, flushing immediately so the
     Ruby parent reads it without buffering delay."""
-    sys.stdout.write(json.dumps(event) + "\n")
+    sys.stdout.write(json.dumps(event, default=_json_safe_default) + "\n")
     sys.stdout.flush()
+
+
+def serialize_content_blocks(blocks: Any) -> list[dict[str, Any]]:
+    """Translate a list of SDK content blocks (TextBlock, ToolUseBlock,
+    ToolResultBlock, etc.) into plain JSON-serializable dicts in the same
+    shape the `claude` CLI emits over `--output-format stream-json`."""
+    out: list[dict[str, Any]] = []
+    for block in blocks or []:
+        block_type = type(block).__name__
+        if block_type == "TextBlock":
+            out.append({"type": "text", "text": getattr(block, "text", "")})
+        elif block_type == "ToolUseBlock":
+            out.append({
+                "type": "tool_use",
+                "id": getattr(block, "id", None),
+                "name": getattr(block, "name", None),
+                "input": getattr(block, "input", None) or {},
+            })
+        elif block_type == "ToolResultBlock":
+            out.append({
+                "type": "tool_result",
+                "tool_use_id": getattr(block, "tool_use_id", None),
+                "content": getattr(block, "content", None),
+                "is_error": getattr(block, "is_error", False),
+            })
+        elif block_type == "ThinkingBlock":
+            out.append({"type": "thinking", "thinking": getattr(block, "thinking", "")})
+    return out
 
 
 def serialize_message(msg: Any, session_id: str | None) -> dict[str, Any] | None:
@@ -83,37 +114,20 @@ def serialize_message(msg: Any, session_id: str | None) -> dict[str, Any] | None
         }
 
     if msg_type == "AssistantMessage":
-        blocks: list[dict[str, Any]] = []
-        for block in getattr(msg, "content", None) or []:
-            block_type = type(block).__name__
-            if block_type == "TextBlock":
-                blocks.append({"type": "text", "text": getattr(block, "text", "")})
-            elif block_type == "ToolUseBlock":
-                blocks.append({
-                    "type": "tool_use",
-                    "id": getattr(block, "id", None),
-                    "name": getattr(block, "name", None),
-                    "input": getattr(block, "input", None) or {},
-                })
-            elif block_type == "ToolResultBlock":
-                blocks.append({
-                    "type": "tool_result",
-                    "tool_use_id": getattr(block, "tool_use_id", None),
-                    "content": getattr(block, "content", None),
-                    "is_error": getattr(block, "is_error", False),
-                })
         return {
             "type": "assistant",
-            "message": {"content": blocks},
+            "message": {"content": serialize_content_blocks(getattr(msg, "content", None))},
             "session_id": session_id,
         }
 
     if msg_type == "UserMessage":
-        # Tool results from the host appear as UserMessages. Preserve them
-        # for the activity log but flag the type so the UI can style them.
+        # Tool results from the host appear as UserMessages. Their `content`
+        # is a list of SDK block objects (typically ToolResultBlock) — has
+        # to be unpacked the same way as AssistantMessage or json.dumps
+        # blows up trying to serialize the raw dataclass.
         return {
             "type": "user",
-            "message": {"content": getattr(msg, "content", None)},
+            "message": {"content": serialize_content_blocks(getattr(msg, "content", None))},
             "session_id": session_id,
         }
 
@@ -136,9 +150,11 @@ def serialize_message(msg: Any, session_id: str | None) -> dict[str, Any] | None
             "model_usage": getattr(msg, "model_usage", None),
             "permission_denials": getattr(msg, "permission_denials", None),
             "stop_reason": getattr(msg, "stop_reason", None),
-            # `structured_output` is populated when the caller passes a
-            # schema; we don't use it yet but the Ruby side will start to
-            # consume it once R2 (typed step I/O) lands.
+            # Populated when the caller passed `json_schema` in the wire
+            # config (which the sidecar maps to ClaudeAgentOptions.output_format).
+            # The Ruby StepExecutor uses this directly as the step's
+            # produced value and skips its prompt-engineered retry loop
+            # since the SDK already enforced the schema upstream.
             "structured_output": getattr(msg, "structured_output", None),
         }
 
@@ -164,12 +180,14 @@ def build_options(config: dict[str, Any]) -> Any:
     """
     from claude_agent_sdk import ClaudeAgentOptions
 
+    # The SDK's permission_mode literal includes 'dontAsk' natively as of
+    # 0.2.x, so we forward whatever the Ruby caller gave us. The
+    # `dangerously_skip_permissions` shortcut still maps to the SDK's
+    # explicit bypass enum.
     permission_mode = (
         "bypassPermissions"
         if config.get("dangerously_skip_permissions")
-        else PERMISSION_MODE_TRANSLATION.get(
-            config.get("permission_mode") or "default", "default"
-        )
+        else (config.get("permission_mode") or "default")
     )
 
     kwargs: dict[str, Any] = {
@@ -197,6 +215,13 @@ def build_options(config: dict[str, Any]) -> Any:
 
     if config.get("resume_session_id"):
         kwargs["resume"] = config["resume_session_id"]
+
+    # Schema-validated structured outputs. The SDK takes the schema via
+    # `output_format={"type": "json_schema", "schema": <schema>}` and
+    # surfaces the parsed object back on ResultMessage.structured_output.
+    schema = config.get("json_schema")
+    if isinstance(schema, dict) and schema:
+        kwargs["output_format"] = {"type": "json_schema", "schema": schema}
 
     return ClaudeAgentOptions(**kwargs)
 

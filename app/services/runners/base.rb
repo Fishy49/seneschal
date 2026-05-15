@@ -26,6 +26,7 @@ module Runners
       permission_mode: "dontAsk",
       add_dirs: [],
       stream: false,
+      json_schema: nil,
       &block
     )
       raise NotImplementedError, "#{self.class} must implement #execute"

@@ -34,6 +34,7 @@ module Runners
       permission_mode: "dontAsk",
       add_dirs: [],
       stream: false,
+      json_schema: nil,
       &
     )
       config = build_config(
@@ -41,7 +42,8 @@ module Runners
         resume_session_id: resume_session_id, resume_message: resume_message,
         model: model, max_turns: max_turns, effort: effort,
         allowed_tools: allowed_tools, dangerously_skip_permissions: dangerously_skip_permissions,
-        permission_mode: permission_mode, add_dirs: add_dirs
+        permission_mode: permission_mode, add_dirs: add_dirs,
+        json_schema: json_schema
       )
 
       ensure_runner_script!
@@ -67,6 +69,7 @@ module Runners
       dangerously_skip_permissions: false,
       permission_mode: "dontAsk",
       add_dirs: [],
+      json_schema: nil,
       **_
     )
       {
@@ -80,7 +83,8 @@ module Runners
         "allowed_tools" => normalize_allowed_tools(allowed_tools),
         "dangerously_skip_permissions" => dangerously_skip_permissions ? true : false,
         "permission_mode" => permission_mode,
-        "add_dirs" => Array(add_dirs)
+        "add_dirs" => Array(add_dirs),
+        "json_schema" => json_schema
       }
     end
 
@@ -123,7 +127,7 @@ module Runners
             "Run bin/setup_sdk_runner."
     end
 
-    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize
+    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       events = []
       result_text = +""
       stderr_acc = +""
@@ -173,7 +177,8 @@ module Runners
 
         Result.new(
           exit_code: exit_code, stdout: result_text, stderr: stderr_acc,
-          stream_events: events, session_id: session_id
+          stream_events: events, session_id: session_id,
+          structured_output: structured_output_from(events)
         )
       end
     rescue StandardError => e
@@ -207,10 +212,19 @@ module Runners
         stdout: result_event&.dig("result").to_s,
         stderr: merged_stderr,
         stream_events: events,
-        session_id: session_id
+        session_id: session_id,
+        structured_output: structured_output_from(events)
       )
     rescue StandardError => e
       Result.new(exit_code: 1, stdout: "", stderr: e.message)
+    end
+
+    # Pulls a non-nil `structured_output` field off the most recent `result`
+    # event. Only populated when the wire config carried a `json_schema`
+    # and the SDK actually emitted a schema-conforming object.
+    def structured_output_from(events)
+      result_event = events.reverse.find { |e| e["type"] == "result" }
+      result_event && result_event["structured_output"]
     end
 
     def monotonic_now

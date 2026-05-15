@@ -48,7 +48,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&)
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
@@ -69,7 +69,23 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     return result unless result.passed?
     return result unless @step.json_schema
 
+    # SDK structured-output path: the runner already enforced the schema
+    # upstream (via Claude Agent SDK's `output_format` → `--json-schema`),
+    # so the parsed object is sitting on `result.structured_output`. Splice
+    # it into stdout as a fenced ```output block so PipelineExtractor + the
+    # rest of the pipeline see it via the normal path, and short-circuit
+    # the prompt-engineered retry loop.
+    return splice_structured_output(result) unless result.structured_output.nil?
+
     validate_with_session_retry(result, &)
+  end
+
+  def splice_structured_output(result)
+    produced_var = @step.produces.first
+    return result if produced_var.blank?
+
+    block = "```output\n#{produced_var}: #{JSON.generate(result.structured_output)}\n```\n"
+    result.with(stdout: [result.stdout.to_s, block].reject(&:empty?).join("\n\n"))
   end
 
   def execute_script(&)
@@ -160,7 +176,10 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       dangerously_skip_permissions: project_for_step&.skip_permissions? || false,
       permission_mode: "dontAsk",
       add_dirs: context_project_paths,
-      stream: stream
+      stream: stream,
+      # Schema-validated structured outputs. Only runners that support this
+      # contract (today: ClaudeSDK) will consume it; ClaudeCLI ignores it.
+      json_schema: @step.json_schema&.parsed_body
     }
   end
 

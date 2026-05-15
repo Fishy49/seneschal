@@ -530,6 +530,71 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_equal @ready.local_path, kwargs[:env]["REPO_PATH"]
   end
 
+  test "runner_call_kwargs forwards the parsed JSON Schema body when the step has a schema" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+
+    assert_equal schema.parsed_body, kwargs[:json_schema]
+    assert_equal "object", kwargs[:json_schema]["type"]
+  end
+
+  test "runner_call_kwargs sets json_schema to nil when the step has no schema" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: false)
+
+    assert_nil kwargs[:json_schema]
+  end
+
+  # Structured-outputs short-circuit: when the runner returns a result with
+  # a non-nil structured_output, execute_skill must (a) splice it into
+  # stdout as a fenced ```output block so PipelineExtractor sees it via
+  # the normal path and (b) skip validate_with_session_retry's prompt-
+  # engineered retry loop entirely (the SDK already enforced the schema).
+  test "execute_skill splices structured_output into stdout and skips the validation retry loop" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+
+    calls = 0
+    structured = { "name" => "Rick", "age" => 42 }
+    executor.runner.define_singleton_method(:execute) do |**_kwargs, &_block|
+      calls += 1
+      StepExecutor::Result.new(
+        exit_code: 0, stdout: "All done.", stderr: "",
+        stream_events: [{ "session_id" => "sess-x" }], session_id: "sess-x",
+        structured_output: structured
+      )
+    end
+
+    final = executor.send(:execute_skill)
+
+    assert_equal 1, calls, "runner should be called once — no retry loop"
+    assert final.passed?, final.stderr
+    assert_includes final.stdout, "```output"
+    assert_includes final.stdout, "person:"
+    assert_includes final.stdout, JSON.generate(structured)
+  end
+
+  test "execute_skill leaves stdout untouched when produces.first is blank even if structured_output is present" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => []))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    original_stdout = "Original output text."
+
+    executor.runner.define_singleton_method(:execute) do |**_kwargs, &_block|
+      StepExecutor::Result.new(
+        exit_code: 0, stdout: original_stdout, stderr: "",
+        stream_events: nil, session_id: nil,
+        structured_output: { "x" => 1 }
+      )
+    end
+
+    final = executor.send(:execute_skill)
+    assert_equal original_stdout, final.stdout
+  end
+
   test "context_fetch project_file interpolates ${var} in path" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "settings.json"), "{}")
