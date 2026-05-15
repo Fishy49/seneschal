@@ -131,6 +131,31 @@ module Runners
       assert_includes updates.last[:output].to_s, "final answer"
     end
 
+    # RunStep#usage_stats reads cost + token counts straight off the last
+    # `result` event in stream_log. If the SDK runner's serializer ever
+    # drops the `usage` sub-object or any of the documented keys, the
+    # cost/token displays in the UI would silently zero out. This test
+    # nails down the wire-format contract end-to-end.
+    test "result event preserves cost + usage telemetry so RunStep#usage_stats keeps working" do
+      fake_python, = install_fake_python(:full_telemetry_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      result = @runner.execute(prompt: "x", cwd: @cwd)
+
+      result_event = result.stream_events.reverse.find { |e| e["type"] == "result" }
+      assert_in_delta 0.0421, result_event["total_cost_usd"], 0.0001
+      assert_equal 4, result_event["num_turns"]
+      assert_equal 12_345, result_event["duration_ms"]
+
+      usage = result_event["usage"]
+      assert_kind_of Hash, usage
+      assert_equal 1_500, usage["input_tokens"]
+      assert_equal 240, usage["output_tokens"]
+      assert_equal 800, usage["cache_read_input_tokens"]
+      assert_equal 320, usage["cache_creation_input_tokens"]
+    end
+
     test "error events are surfaced into the Result's stderr" do
       fake_python, = install_fake_python(:emit_error)
       Setting["python_bin"] = fake_python
@@ -183,6 +208,18 @@ module Runners
         when "emit_error"
           STDOUT.puts JSON.dump({"type"=>"error","message"=>"claude-agent-sdk is not installed in this Python environment"})
           exit 1
+        when "full_telemetry_result"
+          STDOUT.puts JSON.dump({
+            "type"=>"result", "subtype"=>"success", "is_error"=>false,
+            "result"=>"Done.", "session_id"=>"sess_telem",
+            "total_cost_usd"=>0.0421, "num_turns"=>4,
+            "duration_ms"=>12_345, "duration_api_ms"=>11_900,
+            "usage"=>{
+              "input_tokens"=>1_500, "output_tokens"=>240,
+              "cache_read_input_tokens"=>800, "cache_creation_input_tokens"=>320
+            }
+          })
+          exit 0
         end
       RUBY
     end

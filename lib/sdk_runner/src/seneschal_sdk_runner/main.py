@@ -118,6 +118,10 @@ def serialize_message(msg: Any, session_id: str | None) -> dict[str, Any] | None
         }
 
     if msg_type == "ResultMessage":
+        # NOTE: `usage` is a passthrough dict from the Anthropic API — same
+        # keys (input_tokens, output_tokens, cache_creation_input_tokens,
+        # cache_read_input_tokens) as the CLI's `--output-format stream-json`
+        # emits, so RunStep#usage_stats keeps working unchanged.
         return {
             "type": "result",
             "subtype": getattr(msg, "subtype", None),
@@ -127,6 +131,15 @@ def serialize_message(msg: Any, session_id: str | None) -> dict[str, Any] | None
             "total_cost_usd": getattr(msg, "total_cost_usd", None),
             "num_turns": getattr(msg, "num_turns", None),
             "duration_ms": getattr(msg, "duration_ms", None),
+            "duration_api_ms": getattr(msg, "duration_api_ms", None),
+            "usage": getattr(msg, "usage", None) or {},
+            "model_usage": getattr(msg, "model_usage", None),
+            "permission_denials": getattr(msg, "permission_denials", None),
+            "stop_reason": getattr(msg, "stop_reason", None),
+            # `structured_output` is populated when the caller passes a
+            # schema; we don't use it yet but the Ruby side will start to
+            # consume it once R2 (typed step I/O) lands.
+            "structured_output": getattr(msg, "structured_output", None),
         }
 
     return None  # unknown message type — drop quietly
