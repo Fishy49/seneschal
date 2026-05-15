@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields",
+    "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields", "prFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
@@ -37,6 +37,9 @@ export default class extends Controller {
     }
     if (this.hasContextFetchFieldsTarget) {
       this.contextFetchFieldsTarget.style.display = type === "context_fetch" ? "" : "none"
+    }
+    if (this.hasPrFieldsTarget) {
+      this.prFieldsTarget.style.display = type === "pr" ? "" : "none"
     }
     this.applySchemaMode({ wipeOnEnter: false })
   }
@@ -245,6 +248,19 @@ export default class extends Controller {
       this.field("fetch_json_schema_id").value = cfg.json_schema_id || ""
       this.setProjectFile(cfg.path || "")
       if (this.hasFetchMethodTarget) this.fetchMethodChanged()
+    }
+
+    // PR step config
+    if (template.step_type === "pr") {
+      this.field("pr_title").value = cfg.title || ""
+      this.field("pr_body").value = cfg.body || ""
+      this.field("pr_base").value = cfg.base || "main"
+      this.field("pr_branch").value = cfg.branch || ""
+      const draftBox = this.element.querySelector('[name="pr_draft"]')
+      if (draftBox) draftBox.checked = cfg.draft !== false
+      this.field("pr_reviewers").value = (cfg.reviewers || []).join(", ")
+      this.field("pr_labels").value = (cfg.labels || []).join(", ")
+      this.field("pr_assignees").value = (cfg.assignees || []).join(", ")
     }
 
     // CI Check config

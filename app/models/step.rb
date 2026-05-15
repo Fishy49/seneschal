@@ -4,7 +4,7 @@ class Step < ApplicationRecord
   belongs_to :skill, optional: true
   has_many :run_steps, dependent: :destroy
 
-  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt"].freeze
+  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "pr"].freeze
 
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }
@@ -14,6 +14,7 @@ class Step < ApplicationRecord
   validates :skill, presence: true, if: -> { step_type == "skill" }
   validates :body, presence: true, if: -> { step_type.in?(["script", "command", "prompt"]) }
   validate :workflow_or_run_present
+  validate :pr_step_requires_title
 
   GLOBAL_VARIABLES = ["task_title", "task_body", "task_kind", "repo_owner", "repo_name", "context_files"].freeze
 
@@ -58,10 +59,18 @@ class Step < ApplicationRecord
     when "context_fetch"
       key = config["context_key"]
       key.present? ? [key] : []
+    when "pr"
+      # `pr` steps emit a fixed set of outputs in addition to anything the
+      # author declared via `produces`. Keep the conventional ones first so
+      # `produces.first` still resolves to `pr_number` for downstream uses.
+      (PR_DEFAULT_OUTPUTS + produces).uniq
     else
       produces
     end
   end
+
+  # Outputs every `pr` step produces, regardless of the user's `produces` list.
+  PR_DEFAULT_OUTPUTS = ["pr_number", "pr_url", "branch_name"].freeze
 
   def produces
     config["produces"] || []
@@ -123,5 +132,12 @@ class Step < ApplicationRecord
     return if workflow_id.present? || run_id.present?
 
     errors.add(:base, "Step must belong to a workflow or a run")
+  end
+
+  def pr_step_requires_title
+    return unless step_type == "pr"
+    return if config.is_a?(Hash) && config["title"].to_s.strip.present?
+
+    errors.add(:base, "PR step requires a title")
   end
 end
