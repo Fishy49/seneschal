@@ -1,0 +1,67 @@
+<%= form_with model: skill_repo, local: true, class: "space-y-4" do |f| %>
+  <% if skill_repo.errors.any? %>
+    <div class="bg-danger/10 border border-danger/30 rounded-lg p-3 text-sm text-danger">
+      <ul class="list-disc list-inside">
+        <% skill_repo.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, class: "block text-sm font-medium mb-1" %>
+    <%= f.text_field :name, required: true,
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm focus:outline-none focus:border-accent" %>
+    <p class="text-xs text-content-muted mt-1">Display name. Used in skill pickers as <code>name/skill-name</code>.</p>
+  </div>
+
+  <% if skill_repo.new_record? %>
+    <div>
+      <%= f.label :repo_url, "Repo URL", class: "block text-sm font-medium mb-1" %>
+      <%= f.text_field :repo_url, required: true, placeholder: "git@github.com:org/skills.git",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm focus:outline-none focus:border-accent" %>
+      <p class="text-xs text-content-muted mt-1">
+        Any URL <code>git clone</code> accepts (https, ssh, file://). For private repos,
+        make sure the server's SSH key has access.
+      </p>
+    </div>
+  <% else %>
+    <div>
+      <p class="block text-sm font-medium mb-1">Repo URL</p>
+      <code class="text-xs"><%= skill_repo.repo_url %></code>
+      <p class="text-xs text-content-muted mt-1">
+        Cannot be edited — remove and re-add to repoint to a different repo.
+      </p>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :branch, class: "block text-sm font-medium mb-1" %>
+    <%= f.text_field :branch, placeholder: "main",
+          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm focus:outline-none focus:border-accent" %>
+    <p class="text-xs text-content-muted mt-1">Defaults to <code>main</code> if blank.</p>
+  </div>
+
+  <div>
+    <%= f.label :priority, class: "block text-sm font-medium mb-1" %>
+    <%= f.number_field :priority, value: skill_repo.priority || 100, min: 0,
+          class: "w-32 px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm focus:outline-none focus:border-accent tabular-nums" %>
+    <p class="text-xs text-content-muted mt-1">
+      Lower numbers are checked first when resolving a skill name. Default 100.
+    </p>
+  </div>
+
+  <label class="flex items-center gap-2">
+    <%= f.check_box :enabled, checked: skill_repo.enabled.nil? || skill_repo.enabled,
+          class: "rounded border-edge" %>
+    <span class="text-sm">Enabled (sync periodically, include in skill resolution)</span>
+  </label>
+
+  <div class="flex items-center gap-2 pt-2">
+    <%= f.submit (skill_repo.new_record? ? "Add Repo" : "Save"),
+          class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+    <%= link_to "Cancel", (skill_repo.new_record? ? skill_repos_path : skill_repo_path(skill_repo)),
+          class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+<% end %>

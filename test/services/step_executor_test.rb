@@ -7,16 +7,26 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     @step = steps(:skill_step)
   end
 
+  # Helper: build the CLI command StepExecutor would produce for a given
+  # prompt, by routing through the same `runner_call_kwargs` → `build_cmd`
+  # path the executor uses at runtime. Lets these tests keep asserting on
+  # the final cmd array shape even though command construction moved to
+  # Runners::ClaudeCLI.
+  def built_skill_cmd(executor, prompt, stream: false)
+    kwargs = executor.send(:runner_call_kwargs, prompt: prompt, stream: stream)
+    executor.runner.build_cmd(**kwargs)
+  end
+
   test "skill cmd omits --add-dir when no context projects" do
     executor = StepExecutor.new(@step, {}, @ready.local_path)
-    cmd = executor.send(:build_skill_cmd, "hello")
+    cmd = built_skill_cmd(executor, "hello")
     assert_not_includes cmd, "--add-dir"
   end
 
   test "skill cmd appends --add-dir for each ready context project" do
     @step.update!(config: @step.config.merge("context_projects" => [@ready.id]))
     executor = StepExecutor.new(@step, {}, "/tmp/other")
-    cmd = executor.send(:build_skill_cmd, "hello")
+    cmd = built_skill_cmd(executor, "hello")
 
     add_dir_indexes = cmd.each_index.select { |i| cmd[i] == "--add-dir" }
     assert_equal 1, add_dir_indexes.size
@@ -27,7 +37,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     not_ready = projects(:other_project)
     @step.update!(config: @step.config.merge("context_projects" => [not_ready.id]))
     executor = StepExecutor.new(@step, {}, "/tmp/other")
-    cmd = executor.send(:build_skill_cmd, "hello")
+    cmd = built_skill_cmd(executor, "hello")
 
     assert_not_includes cmd, "--add-dir"
   end
@@ -158,7 +168,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     projects(:seneschal).update!(skip_permissions: true)
     step = steps(:skill_step)
     executor = StepExecutor.new(step, {}, projects(:seneschal).local_path)
-    cmd = executor.send(:build_skill_cmd, "hi")
+    cmd = built_skill_cmd(executor, "hi")
     assert_includes cmd, "--dangerously-skip-permissions"
     assert_not_includes cmd, "--permission-mode"
     assert_not_includes cmd, "--allowedTools"
@@ -168,7 +178,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     projects(:seneschal).update!(skip_permissions: false)
     step = steps(:skill_step)
     executor = StepExecutor.new(step, {}, projects(:seneschal).local_path)
-    cmd = executor.send(:build_skill_cmd, "hi")
+    cmd = built_skill_cmd(executor, "hi")
     assert_includes cmd, "--permission-mode"
     idx = cmd.index("--permission-mode")
     assert_equal "dontAsk", cmd[idx + 1]
@@ -192,7 +202,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     )
     FileUtils.mkdir_p(other.local_path)
     executor = StepExecutor.new(other_step, {}, other.local_path)
-    cmd = executor.send(:build_skill_cmd, "hi")
+    cmd = built_skill_cmd(executor, "hi")
     assert_includes cmd, "--permission-mode"
     assert_not_includes cmd, "--dangerously-skip-permissions"
   end
@@ -275,7 +285,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
     executor = StepExecutor.new(@step, {}, @ready.local_path)
     calls = 0
-    executor.define_singleton_method(:run_command) do |*_|
+    executor.runner.define_singleton_method(:execute) do |**_kwargs, &_block|
       calls += 1
       flunk("should not retry")
     end
@@ -294,28 +304,26 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
     executor = StepExecutor.new(@step, {}, @ready.local_path)
 
-    captured_cmd = nil
-    executor.define_singleton_method(:run_command) do |cmd, **_kwargs|
-      captured_cmd = cmd
+    captured_kwargs = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_kwargs = kwargs
       StepExecutor::Result.new(
         exit_code: 0, stdout: "```output\nperson: |\n  {\"name\":\"Rick\",\"age\":42}\n```",
-        stderr: "", stream_events: [{ "session_id" => "sess-1" }]
+        stderr: "", stream_events: [{ "session_id" => "sess-1" }], session_id: "sess-1"
       )
     end
 
     initial = StepExecutor::Result.new(
       exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":42}\n```",
-      stderr: "", stream_events: [{ "session_id" => "sess-1" }]
+      stderr: "", stream_events: [{ "session_id" => "sess-1" }], session_id: "sess-1"
     )
     final = executor.send(:validate_with_session_retry, initial)
 
     assert final.passed?, final.stderr
-    assert_includes captured_cmd, "--resume"
-    assert_includes captured_cmd, "sess-1"
-    feedback = captured_cmd.find { |s| s.is_a?(String) && s.include?("did not validate") }
-    assert feedback, "Expected feedback message in resume command: #{captured_cmd.inspect}"
-    assert_includes feedback, "person"
-    assert_includes feedback, "name"
+    assert_equal "sess-1", captured_kwargs[:resume_session_id]
+    assert_includes captured_kwargs[:resume_message], "did not validate"
+    assert_includes captured_kwargs[:resume_message], "person"
+    assert_includes captured_kwargs[:resume_message], "name"
   end
 
   test "validate_with_session_retry fails after max attempts with combined errors" do
@@ -326,14 +334,16 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     executor = StepExecutor.new(@step, {}, @ready.local_path)
 
     bad_stdout = "```output\nperson: |\n  {\"age\":1}\n```"
-    executor.define_singleton_method(:run_command) do |_cmd, **_kwargs|
+    executor.runner.define_singleton_method(:execute) do |**_kwargs, &_block|
       StepExecutor::Result.new(
-        exit_code: 0, stdout: bad_stdout, stderr: "", stream_events: [{ "session_id" => "sess" }]
+        exit_code: 0, stdout: bad_stdout, stderr: "",
+        stream_events: [{ "session_id" => "sess" }], session_id: "sess"
       )
     end
 
     initial = StepExecutor::Result.new(
-      exit_code: 0, stdout: bad_stdout, stderr: "", stream_events: [{ "session_id" => "sess" }]
+      exit_code: 0, stdout: bad_stdout, stderr: "",
+      stream_events: [{ "session_id" => "sess" }], session_id: "sess"
     )
     final = executor.send(:validate_with_session_retry, initial)
 
@@ -362,7 +372,7 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
       "json_schema_id" => schema.id, "produces" => ["person"], "validation_max_attempts" => 0
     ))
     executor = StepExecutor.new(@step, {}, @ready.local_path)
-    executor.define_singleton_method(:run_command) { |*_| flunk("should not retry") }
+    executor.runner.define_singleton_method(:execute) { |**_kwargs, &_block| flunk("should not retry") }
 
     initial = StepExecutor::Result.new(
       exit_code: 0, stdout: "```output\nperson: |\n  {\"age\":1}\n```", stderr: "", stream_events: nil
@@ -469,6 +479,55 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
       assert_not result.passed?
       assert_includes result.stderr, "escapes the project directory"
     end
+  end
+
+  test "runner defaults to ClaudeCLI when no config or Setting overrides" do
+    Setting.find_by(key: "default_runner")&.destroy
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeCLI, executor.runner
+  end
+
+  test "runner honors Step.config[runner] over the Setting default" do
+    Setting["default_runner"] = "claude_cli"
+    @step.update!(config: @step.config.merge("runner" => "claude_sdk"))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeSDK, executor.runner
+  ensure
+    Setting.find_by(key: "default_runner")&.destroy
+  end
+
+  test "runner uses Setting[default_runner] when step has no override" do
+    Setting["default_runner"] = "claude_sdk"
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeSDK, executor.runner
+  ensure
+    Setting.find_by(key: "default_runner")&.destroy
+  end
+
+  test "runner can be injected via constructor for tests" do
+    fake = Runners::ClaudeCLI.new
+    executor = StepExecutor.new(@step, {}, @ready.local_path, runner: fake)
+    assert_same fake, executor.runner
+  end
+
+  test "runner_call_kwargs assembles the per-step runner contract" do
+    @step.update!(config: @step.config.merge(
+      "model" => "claude-opus-4-7", "max_turns" => 7, "effort" => "high",
+      "allowed_tools" => "Read,Glob"
+    ))
+    executor = StepExecutor.new(@step, { "branch" => "main" }, @ready.local_path,
+                                resolved_input_context: "extra context")
+    kwargs = executor.send(:runner_call_kwargs, prompt: "go", stream: true)
+
+    assert_equal "go", kwargs[:prompt]
+    assert_equal @ready.local_path, kwargs[:cwd]
+    assert_equal "claude-opus-4-7", kwargs[:model]
+    assert_equal 7, kwargs[:max_turns]
+    assert_equal "high", kwargs[:effort]
+    assert_equal "Read,Glob", kwargs[:allowed_tools]
+    assert_equal true, kwargs[:stream]
+    assert_equal "extra context", kwargs[:env]["INPUT_CONTEXT"]
+    assert_equal @ready.local_path, kwargs[:env]["REPO_PATH"]
   end
 
   test "context_fetch project_file interpolates ${var} in path" do

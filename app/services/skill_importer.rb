@@ -22,8 +22,8 @@ class SkillImporter
   private
 
   def import_skill(path)
-    content = File.read(path)
-    frontmatter, body = parse_frontmatter(content)
+    parsed = SkillMdParser.parse(File.read(path))
+    frontmatter = parsed.frontmatter
 
     name = frontmatter["name"] || File.basename(File.dirname(path))
     description = frontmatter["description"]
@@ -40,23 +40,10 @@ class SkillImporter
     end
 
     if @target.is_a?(ProjectGroup)
-      Skill.create!(name: name, description: description, body: body.strip, project_group: @target)
+      Skill.create!(name: name, description: description, body: parsed.body.strip, project_group: @target)
     else
-      Skill.create!(name: name, description: description, body: body.strip, project: @target)
+      Skill.create!(name: name, description: description, body: parsed.body.strip, project: @target)
     end
     @imported << name
-  end
-
-  def parse_frontmatter(content)
-    if content.start_with?("---")
-      parts = content.split("---", 3)
-      if parts.length >= 3
-        frontmatter = YAML.safe_load(parts[1]) || {}
-        body = parts[2]
-        return [frontmatter, body]
-      end
-    end
-
-    [{}, content]
   end
 end

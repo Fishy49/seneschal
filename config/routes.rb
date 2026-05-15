@@ -69,6 +69,11 @@ Rails.application.routes.draw do
   end
 
   resources :skills
+  resources :skill_repos do
+    member do
+      post :sync
+    end
+  end
   resources :json_schemas
   resources :project_groups
   resources :step_templates, path: "templates", only: [:index, :destroy]

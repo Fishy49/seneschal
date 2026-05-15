@@ -67,6 +67,7 @@ Metrics/BlockLength:
     - "db/seeds.rb"
     - "app/services/**/*"
     - "app/jobs/**/*"
+    - "lib/tasks/*.rake"
 
 Metrics/CyclomaticComplexity:
   Max: 15

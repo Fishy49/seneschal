@@ -27,7 +27,12 @@ module RunStepContextHelper # rubocop:disable Metrics/ModuleLength
     path = File.join(project.local_path, "CLAUDE.md")
     if File.exist?(path)
       content = begin
-        File.read(path, CLAUDE_MD_MAX_BYTES)
+        # File.read(path, length) returns an ASCII-8BIT-encoded string —
+        # interpolating that into the UTF-8 ERB template throws
+        # Encoding::CompatibilityError as soon as CLAUDE.md contains any
+        # non-ASCII byte. Force back to UTF-8 and scrub in case the byte
+        # truncation landed mid-multibyte sequence.
+        File.read(path, CLAUDE_MD_MAX_BYTES).force_encoding("UTF-8").scrub
       rescue StandardError => e
         "(Could not read #{path}: #{e.message})"
       end

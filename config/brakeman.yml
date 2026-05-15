@@ -1,0 +1,7 @@
+# Brakeman configuration. `bin/brakeman` and the pre-commit hook both pick it
+# up automatically.
+#
+# `repos/` holds cloned working trees for the projects Seneschal manages —
+# they're someone else's code, not part of this app, so we skip them.
+:skip_files:
+  - "repos/"

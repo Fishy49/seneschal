@@ -1,0 +1,15 @@
+<div class="max-w-2xl">
+  <div class="mb-4">
+    <p class="text-sm text-content-muted"><%= link_to "← Skill Repos", skill_repos_path %></p>
+    <h1 class="text-2xl font-semibold mt-1">Add Skill Repo</h1>
+    <p class="text-sm text-content-muted mt-1">
+      Point at any git repository whose layout is one directory per skill, each
+      containing a <code>SKILL.md</code> with YAML frontmatter (agentskills.io format).
+      Seneschal will clone it, index the skills, and re-sync every 6 hours.
+    </p>
+  </div>
+
+  <div class="bg-surface-card border border-edge rounded-lg p-5">
+    <%= render "form", skill_repo: @skill_repo %>
+  </div>
+</div>
