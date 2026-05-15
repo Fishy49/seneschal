@@ -1,0 +1,25 @@
+[project]
+name = "seneschal-sdk-runner"
+version = "0.1.0"
+description = "Python sidecar that lets the Seneschal Rails app invoke the Claude Agent SDK over a subprocess + NDJSON wire protocol."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  # Pin to the 0.x line of the Anthropic Claude Agent SDK. We deliberately
+  # avoid floating to 1.x without an explicit review — the agent loop is too
+  # core to take silent major-version surprises.
+  "claude-agent-sdk>=0.1.0,<1.0",
+]
+
+[project.scripts]
+seneschal-sdk-runner = "seneschal_sdk_runner.main:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

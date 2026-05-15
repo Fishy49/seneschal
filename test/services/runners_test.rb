@@ -5,7 +5,7 @@ class RunnersTest < ActiveSupport::TestCase
     assert_instance_of Runners::ClaudeCLI, Runners.lookup("claude_cli")
   end
 
-  test "lookup returns a ClaudeSDK stub instance by name" do
+  test "lookup returns a ClaudeSDK instance by name" do
     assert_instance_of Runners::ClaudeSDK, Runners.lookup("claude_sdk")
   end
 
@@ -27,9 +27,5 @@ class RunnersTest < ActiveSupport::TestCase
   test "default_name falls back to claude_cli when unset" do
     Setting.find_by(key: "default_runner")&.destroy
     assert_equal "claude_cli", Runners.default_name
-  end
-
-  test "ClaudeSDK#execute raises NotImplementedError" do
-    assert_raises(NotImplementedError) { Runners::ClaudeSDK.new.execute }
   end
 end
