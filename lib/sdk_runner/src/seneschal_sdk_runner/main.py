@@ -279,7 +279,11 @@ def build_mcp_servers(config: dict[str, Any]) -> Any:
     protocol evolution can't crash older sidecar versions on unfamiliar
     keys.
     """
-    from claude_agent_sdk import (
+    # NOTE: these dataclasses live in claude_agent_sdk.types but the package's
+    # __init__ does not re-export them (as of 0.2.82), so import from .types
+    # directly. Otherwise build_mcp_servers raises ImportError before the run
+    # ever reaches the SDK.
+    from claude_agent_sdk.types import (
         McpStdioServerConfig,
         McpSSEServerConfig,
         McpHttpServerConfig,
