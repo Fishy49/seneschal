@@ -19,7 +19,7 @@ class PipelineExtractor
     case @step.step_type
     when "skill", "prompt"
       extract_output_block
-    when "script", "command"
+    when "script", "command", "pr"
       extract_set_output
     when "context_fetch"
       key = @step.config["context_key"]

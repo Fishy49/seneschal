@@ -193,6 +193,48 @@ class StepTest < ActiveSupport::TestCase
     assert_equal ["foundation"], s.queries
   end
 
+  test "pr step is valid with a title in config" do
+    s = Step.new(
+      name: "Open PR", workflow: workflows(:deploy),
+      step_type: "pr", position: 10, timeout: 60,
+      config: { "title" => "feat: ${task_title}" }
+    )
+    assert s.valid?, s.errors.full_messages.inspect
+  end
+
+  test "pr step is invalid without a title" do
+    s = Step.new(
+      name: "Open PR", workflow: workflows(:deploy),
+      step_type: "pr", position: 10, timeout: 60,
+      config: {}
+    )
+    assert_not s.valid?
+    assert s.errors.full_messages.any? { |m| m.match?(/title/i) }, s.errors.full_messages.inspect
+  end
+
+  test "pr step is invalid with a blank title" do
+    s = Step.new(
+      name: "Open PR", workflow: workflows(:deploy),
+      step_type: "pr", position: 10, timeout: 60,
+      config: { "title" => "   " }
+    )
+    assert_not s.valid?
+    assert s.errors.full_messages.any? { |m| m.match?(/title/i) }, s.errors.full_messages.inspect
+  end
+
+  test "pr step output_variables include the conventional triplet plus declared produces" do
+    s = Step.new(
+      name: "Open PR", workflow: workflows(:deploy),
+      step_type: "pr", position: 10, timeout: 60,
+      config: { "title" => "x", "produces" => ["pr_number", "extra_tag"] }
+    )
+    outputs = s.output_variables
+    assert_equal "pr_number", outputs.first, "pr_number should remain first for downstream consumers"
+    assert_includes outputs, "pr_url"
+    assert_includes outputs, "branch_name"
+    assert_includes outputs, "extra_tag"
+  end
+
   test "available_variables_for surfaces context_fetch context_key and schema sub-paths" do
     workflow = workflows(:deploy)
     workflow.steps.destroy_all

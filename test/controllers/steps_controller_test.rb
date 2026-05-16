@@ -1,6 +1,6 @@
 require "test_helper"
 
-class StepsControllerTest < ActionDispatch::IntegrationTest
+class StepsControllerTest < ActionDispatch::IntegrationTest # rubocop:disable Metrics/ClassLength
   setup do
     sign_in users(:admin)
     @project = projects(:seneschal)
@@ -295,6 +295,69 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     end
     assert_equal ["foundation"], Step.last.config["queries"]
     assert_equal ["foundation"], Step.last.queries
+  end
+
+  test "POST create pr step persists declared fields into config" do # rubocop:disable Metrics/BlockLength
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Open PR",
+          step_type: "pr",
+          position: 70,
+          timeout: 60,
+          max_retries: 0
+        },
+        pr_title: "feat: ${task_title}",
+        pr_body: "## Summary\n\n${task_body}",
+        pr_base: "main",
+        pr_draft: "1",
+        pr_reviewers: "alice, bob",
+        pr_labels: "feature, needs-review",
+        pr_assignees: "alice"
+      }
+    end
+
+    cfg = Step.last.config
+    assert_equal "feat: ${task_title}", cfg["title"]
+    assert_equal "## Summary\n\n${task_body}", cfg["body"]
+    assert_equal "main", cfg["base"]
+    assert_equal true, cfg["draft"]
+    assert_equal ["alice", "bob"], cfg["reviewers"]
+    assert_equal ["feature", "needs-review"], cfg["labels"]
+    assert_equal ["alice"], cfg["assignees"]
+  end
+
+  test "POST create pr step preserves draft=false when checkbox unchecked" do
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Ready PR",
+          step_type: "pr",
+          position: 71,
+          timeout: 60,
+          max_retries: 0
+        },
+        pr_title: "fix: thing",
+        pr_draft: "0"
+      }
+    end
+    assert_equal false, Step.last.config["draft"]
+  end
+
+  test "POST create pr step rejects missing title" do
+    assert_no_difference "Step.count" do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Bad PR",
+          step_type: "pr",
+          position: 72,
+          timeout: 60,
+          max_retries: 0
+        },
+        pr_title: ""
+      }
+    end
+    assert_response :unprocessable_content
   end
 
   test "POST create persists produces as array" do

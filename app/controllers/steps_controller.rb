@@ -128,6 +128,7 @@ class StepsController < ApplicationController
     when "ci_check" then build_ci_check_config(raw)
     when "skill", "prompt" then build_skill_config(raw)
     when "context_fetch" then build_context_fetch_config(raw)
+    when "pr" then build_pr_config(raw)
     else {}
     end
   end
@@ -157,6 +158,28 @@ class StepsController < ApplicationController
     config["context_projects"] = context_ids if context_ids.any?
 
     config
+  end
+
+  def build_pr_config(raw)
+    cfg = {
+      "title" => raw["pr_title"].to_s.strip.presence,
+      "body" => raw["pr_body"].to_s.presence,
+      "base" => raw["pr_base"].to_s.strip.presence || "main",
+      "draft" => raw["pr_draft"] != "0",
+      "branch" => raw["pr_branch"].to_s.strip.presence,
+      "reviewers" => split_csv(raw["pr_reviewers"]),
+      "labels" => split_csv(raw["pr_labels"]),
+      "assignees" => split_csv(raw["pr_assignees"]),
+      # Destructive re-create. Default false so the idempotent reuse path
+      # stays the easy default; operators have to opt in explicitly.
+      "clean" => raw["pr_clean"] == "1"
+    }
+    # Strip nil + empty values without clobbering `draft: false` or `clean: false`.
+    cfg.reject { |_, v| v.nil? || v == "" || (v.respond_to?(:empty?) && v.empty?) }
+  end
+
+  def split_csv(value)
+    value.to_s.split(",").map(&:strip).compact_blank
   end
 
   def build_context_fetch_config(raw)
