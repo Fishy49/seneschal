@@ -40,6 +40,7 @@
                       when 'command' then 'bg-success/15 text-success'
                       when 'script' then 'bg-warning/15 text-warning'
                       when 'ci_check' then 'bg-info/15 text-info'
+                      when 'pr' then 'bg-success/15 text-success'
                       end %>"><%= template.step_type %></span>
               </td>
               <td class="px-4 py-3 text-content-muted"><%= template.skill&.display_name || "&mdash;".html_safe %></td>

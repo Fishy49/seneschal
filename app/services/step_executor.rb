@@ -2,6 +2,7 @@ require "open3"
 
 class StepExecutor # rubocop:disable Metrics/ClassLength
   include ContextFetcher
+  include PrCreator
 
   # Backwards-compatible alias. Result lives in Runners::Result now so all
   # runners share one struct; consumers (ExecuteRunJob, tests) can continue
@@ -41,6 +42,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     when "command"  then execute_command(&)
     when "ci_check" then execute_ci_check
     when "context_fetch" then execute_context_fetch(&)
+    when "pr" then execute_pr_step(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end
