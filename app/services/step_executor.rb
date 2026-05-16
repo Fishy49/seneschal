@@ -17,6 +17,15 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   SELF_REVIEW_TOOLS = "Read,Grep,Glob".freeze
   REVIEW_DIFF_MAX_CHARS = 80_000
 
+  # Icon prefixes for the live ci_check status panel. Bucket names match
+  # `gh pr checks --json bucket`.
+  CHECK_BUCKET_ICONS = {
+    "pending" => "⏳",
+    "pass" => "✅",
+    "fail" => "❌",
+    "skipping" => "⏭"
+  }.freeze
+
   # Subset of git's ref-name rules — strict enough to keep an attacker-
   # controlled `base_ref` value from sneaking through as a `git diff` flag
   # (no leading dashes, no shell metacharacters, no ".." segments). We
@@ -376,42 +385,59 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   # --- CI polling (unchanged) ---
 
-  def poll_pr_checks(cfg)
+  def poll_pr_checks(cfg) # rubocop:disable Metrics/MethodLength
     pr = interpolate_string(cfg.fetch("pr", "${pr_number}"))
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
+    started_at = Time.current
+    poll_count = 0
 
     sleep 5
 
     loop do
-      yield({ output: "Polling CI checks for PR ##{pr}..." }) if block_given?
+      poll_count += 1
       stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "pr", "checks", pr.to_s, "--json", "name,bucket,link",
         chdir: @repo_path
       )
 
-      if status.success?
-        checks = begin; JSON.parse(stdout); rescue StandardError; []; end
+      checks = if status.success?
+                 begin
+                   JSON.parse(stdout)
+                 rescue StandardError
+                   []
+                 end
+               else
+                 []
+               end
 
-        if checks.any?
-          pending = checks.select { |c| c["bucket"] == "pending" }
+      if block_given?
+        yield({
+          output: render_pr_checks_status(
+            pr_number: pr, poll: poll_count, started_at: started_at,
+            deadline: deadline, checks: checks
+          )
+        })
+      end
 
-          if pending.empty?
-            failed = checks.select { |c| c["bucket"] == "fail" }
-            summary = checks.map do |c|
-              "#{c["bucket"] == "fail" ? "FAIL" : "PASS"} #{c["name"]}"
-            end.join("\n")
+      if checks.any?
+        pending = checks.select { |c| c["bucket"] == "pending" }
 
-            return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
+        if pending.empty?
+          failed = checks.select { |c| c["bucket"] == "fail" }
+          summary = checks.map do |c|
+            "#{c["bucket"] == "fail" ? "FAIL" : "PASS"} #{c["name"]}"
+          end.join("\n")
 
-            max_chars = cfg.fetch("max_log_chars", 10_000)
-            log_from = cfg.fetch("log_from", "end")
-            failure_logs = fetch_failure_logs(failed, max_chars: max_chars, from: log_from)
-            output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
-            return Result.new(exit_code: 1, stdout: output, stderr: "")
+          return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
 
-          end
+          max_chars = cfg.fetch("max_log_chars", 10_000)
+          log_from = cfg.fetch("log_from", "end")
+          failure_logs = fetch_failure_logs(failed, max_chars: max_chars, from: log_from)
+          output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
+          return Result.new(exit_code: 1, stdout: output, stderr: "")
+
         end
       end
 
@@ -419,6 +445,45 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       sleep poll_interval
     end
+  end
+
+  # Multi-line text used as RunStep#output for an in-flight ci_check (pr
+  # mode). The format is consumed both by humans reading the run page and
+  # by the `_ci_check_status` partial — keep the first three lines stable
+  # so the partial's regex parser keeps working.
+  def render_pr_checks_status(pr_number:, poll:, started_at:, deadline:, checks:)
+    elapsed = (Time.current - started_at).to_i
+    remaining = [(deadline - Time.current).to_i, 0].max
+    lines = [
+      "Watching CI checks for PR ##{pr_number}",
+      "Poll ##{poll} · elapsed #{format_seconds(elapsed)} · times out in #{format_seconds(remaining)}"
+    ]
+
+    if checks.any?
+      counts = checks.group_by { |c| c["bucket"] }.transform_values(&:size)
+      summary = ["pending", "pass", "fail", "skipping"].filter_map do |bucket|
+        next if counts[bucket].to_i.zero?
+
+        "#{counts[bucket]} #{bucket}"
+      end.join(" · ")
+      lines << "Checks: #{summary}"
+      lines << ""
+      checks.each do |c|
+        icon = CHECK_BUCKET_ICONS.fetch(c["bucket"], "❓")
+        lines << "#{icon} #{c["name"]}"
+      end
+    else
+      lines << "Checks: none reported yet"
+    end
+
+    lines.join("\n")
+  end
+
+  def format_seconds(secs)
+    return "0s" if secs <= 0
+
+    mins, s = secs.divmod(60)
+    mins.positive? ? "#{mins}m #{s}s" : "#{s}s"
   end
 
   def fetch_failure_logs(failed_checks, max_chars: 10_000, from: "end")
@@ -459,12 +524,14 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     "(Could not fetch failure logs: #{e.message})"
   end
 
-  def poll_workflow_run(cfg)
+  def poll_workflow_run(cfg) # rubocop:disable Metrics/MethodLength
     workflow_file = interpolate_string(cfg.fetch("workflow", "ci.yml"))
     ref = interpolate_string(cfg.fetch("ref", "main"))
     should_trigger = cfg.fetch("trigger", false)
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
+    started_at = Time.current
+    poll_count = 0
 
     if should_trigger
       _, stderr, status = Open3.capture3(
@@ -478,8 +545,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     end
 
     loop do
-      yield({ output: "Polling workflow '#{workflow_file}'..." }) if block_given?
-
+      poll_count += 1
       stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "run", "list",
@@ -490,27 +556,56 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
         chdir: @repo_path
       )
 
-      if status.success?
-        runs = begin; JSON.parse(stdout); rescue StandardError; []; end
+      runs = if status.success?
+               begin
+                 JSON.parse(stdout)
+               rescue StandardError
+                 []
+               end
+             else
+               []
+             end
+      run_data = runs.is_a?(Array) ? runs.first : nil
 
-        if runs.any?
-          run_data = runs.first
-          if run_data["status"] == "completed"
-            if run_data["conclusion"] == "success"
-              return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data["databaseId"]})", stderr: "")
-            end
+      if block_given?
+        yield({
+          output: render_workflow_run_status(
+            workflow_file: workflow_file, ref: ref, poll: poll_count,
+            started_at: started_at, deadline: deadline, run_data: run_data
+          )
+        })
+      end
 
-            return Result.new(exit_code: 1,
-                              stdout: "Workflow '#{workflow_file}' #{run_data["conclusion"]} (run ##{run_data["databaseId"]})", stderr: "")
-
-          end
+      if run_data && run_data["status"] == "completed"
+        if run_data["conclusion"] == "success"
+          return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data["databaseId"]})", stderr: "")
         end
+
+        return Result.new(exit_code: 1,
+                          stdout: "Workflow '#{workflow_file}' #{run_data["conclusion"]} (run ##{run_data["databaseId"]})", stderr: "")
+
       end
 
       return Result.new(exit_code: 1, stdout: "", stderr: "Workflow timed out after #{@step.timeout}s") if Time.current > deadline
 
       sleep poll_interval
     end
+  end
+
+  def render_workflow_run_status(workflow_file:, ref:, poll:, started_at:, deadline:, run_data:) # rubocop:disable Metrics/ParameterLists
+    elapsed = (Time.current - started_at).to_i
+    remaining = [(deadline - Time.current).to_i, 0].max
+    lines = [
+      "Watching GitHub Actions workflow #{workflow_file.inspect} on #{ref}",
+      "Poll ##{poll} · elapsed #{format_seconds(elapsed)} · times out in #{format_seconds(remaining)}"
+    ]
+    if run_data
+      lines << "Status: #{run_data["status"]}#{" (#{run_data["conclusion"]})" if run_data["conclusion"]}"
+      lines << "Run ##{run_data["databaseId"]}" if run_data["databaseId"]
+    else
+      lines << "Status: no run reported yet for #{ref}"
+    end
+    lines.join("\n")
   end
 
   # --- Helpers ---

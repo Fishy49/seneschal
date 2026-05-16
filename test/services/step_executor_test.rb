@@ -777,6 +777,56 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     FileUtils.rm_rf(@_review_repo_path) if @_review_repo_path
   end
 
+  # ---- ci_check polling status text ----
+
+  test "render_pr_checks_status produces a multi-line block with headline + per-check icons" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    started = 90.seconds.ago
+    deadline = 4.minutes.from_now
+    text = executor.send(:render_pr_checks_status, pr_number: "76", poll: 3,
+                                                   started_at: started, deadline: deadline,
+                                                   checks: [
+                                                     { "name" => "ci/build", "bucket" => "pending" },
+                                                     { "name" => "ci/lint",  "bucket" => "pass" },
+                                                     { "name" => "ci/test",  "bucket" => "fail" }
+                                                   ])
+    lines = text.lines.map(&:chomp)
+    assert_equal "Watching CI checks for PR #76", lines[0]
+    assert_match(/Poll #3 · elapsed 1m \d+s · times out in \dm \d+s/, lines[1])
+    assert_match(/^Checks:.*pending.*pass.*fail/, lines[2])
+    assert_includes text, "⏳ ci/build"
+    assert_includes text, "✅ ci/lint"
+    assert_includes text, "❌ ci/test"
+  end
+
+  test "render_pr_checks_status reports 'none reported yet' when checks are empty" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    text = executor.send(:render_pr_checks_status, pr_number: "76", poll: 1,
+                                                   started_at: Time.current, deadline: 5.minutes.from_now,
+                                                   checks: [])
+    assert_includes text, "Checks: none reported yet"
+  end
+
+  test "render_workflow_run_status surfaces status + run id when one's reported" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    text = executor.send(:render_workflow_run_status,
+                         workflow_file: "ci.yml", ref: "main", poll: 2,
+                         started_at: 30.seconds.ago, deadline: 5.minutes.from_now,
+                         run_data: { "status" => "in_progress", "databaseId" => 99_887 })
+    assert_includes text, 'Watching GitHub Actions workflow "ci.yml" on main'
+    assert_includes text, "Status: in_progress"
+    assert_includes text, "Run #99887"
+  end
+
+  test "format_seconds collapses small numbers and uses Xm Ys for the rest" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_equal "0s", executor.send(:format_seconds, 0)
+    assert_equal "0s", executor.send(:format_seconds, -5)
+    assert_equal "45s", executor.send(:format_seconds, 45)
+    assert_equal "1m 0s", executor.send(:format_seconds, 60)
+    assert_equal "4m 14s", executor.send(:format_seconds, 254)
+  end
+
   test "context_fetch project_file interpolates ${var} in path" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "settings.json"), "{}")

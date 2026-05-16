@@ -59,7 +59,9 @@
         </div>
       </details>
     <% end %>
-    <% if run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
+    <% if run_step.step.step_type == "ci_check" && run_step.status.in?(%w[running retrying]) %>
+      <%= render "runs/ci_check_status", run_step: run_step %>
+    <% elsif run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
       <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
       <details class="mt-1" <%= "open" if run_step.status.in?(%w[running retrying]) %>>
         <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
