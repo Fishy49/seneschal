@@ -42,8 +42,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     @runner ||= Runners.lookup(runner_name)
   end
 
+  # Runner resolution precedence:
+  #   1. Step.config["runner"]   — finest-grained override
+  #   2. Workflow#runner_name    — workflow-level pick (e.g. "this workflow
+  #                                 uses structured outputs, route everything
+  #                                 through the SDK")
+  #   3. Setting["default_runner"] / Runners.default_name — global fallback
   def runner_name
-    @step.config["runner"].presence || Runners.default_name
+    @step.config["runner"].presence ||
+      workflow_for_step&.runner_name ||
+      Runners.default_name
+  end
+
+  def workflow_for_step
+    @workflow_for_step ||= @step.workflow || @step.run&.workflow
   end
 
   def execute(&)

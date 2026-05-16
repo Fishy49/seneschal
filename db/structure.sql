@@ -25,7 +25,7 @@ FOREIGN KEY ("workflow_id")
 );
 CREATE INDEX "index_runs_on_pipeline_task_id" ON "runs" ("pipeline_task_id") /*application='Seneschal'*/;
 CREATE INDEX "index_runs_on_workflow_id" ON "runs" ("workflow_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "workflows" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer NOT NULL, "trigger_config" json, "trigger_type" varchar DEFAULT 'manual' NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_382d2c48c7"
+CREATE TABLE IF NOT EXISTS "workflows" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "name" varchar NOT NULL, "project_id" integer NOT NULL, "trigger_config" json, "trigger_type" varchar DEFAULT 'manual' NOT NULL, "updated_at" datetime(6) NOT NULL, "config" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/, CONSTRAINT "fk_rails_382d2c48c7"
 FOREIGN KEY ("project_id")
   REFERENCES "projects" ("id")
 );
@@ -124,6 +124,7 @@ CREATE INDEX "index_skills_on_source_kind_and_relative_path" ON "skills" ("sourc
 CREATE INDEX "index_skills_on_skill_repo_id" ON "skills" ("skill_repo_id") /*application='Seneschal'*/;
 CREATE INDEX "index_skills_on_archived_at" ON "skills" ("archived_at") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260515000001'),
 ('20260512000003'),
 ('20260512000002'),
 ('20260512000001'),

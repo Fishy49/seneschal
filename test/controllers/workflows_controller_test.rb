@@ -62,4 +62,26 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
       end
     end
   end
+
+  test "PATCH update sets workflow.config[runner] when the form picks one" do
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, runner: "claude_sdk" }
+    }
+    assert_equal "claude_sdk", @workflow.reload.config["runner"]
+  end
+
+  test "PATCH update clears workflow.config[runner] when the form picks the default" do
+    @workflow.update!(config: { "runner" => "claude_sdk" })
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, runner: "" }
+    }
+    assert_not @workflow.reload.config.key?("runner")
+  end
+
+  test "PATCH update refuses an unknown runner value rather than persisting garbage" do
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, runner: "fake_runner_lol" }
+    }
+    assert_not_includes @workflow.reload.config.fetch("runner", "missing"), "fake"
+  end
 end

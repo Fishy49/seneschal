@@ -52,7 +52,15 @@ class WorkflowsController < ApplicationController
   end
 
   def workflow_params
-    params.expect(workflow: [:name, :description])
+    raw = params.expect(workflow: [:name, :description, :runner])
+    runner = raw.delete(:runner).to_s
+    base = @workflow&.config.is_a?(Hash) ? @workflow.config : {}
+    raw[:config] = if Runners::KNOWN_NAMES.include?(runner)
+                     base.merge("runner" => runner)
+                   else
+                     base.except("runner")
+                   end
+    raw
   end
 
   def trigger_input_params

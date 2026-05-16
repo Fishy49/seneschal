@@ -504,6 +504,30 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     Setting.find_by(key: "default_runner")&.destroy
   end
 
+  # Precedence: Step.config["runner"] > Workflow.config["runner"] > Setting > default
+  test "runner falls through to Workflow.config[runner] when step has no override" do
+    Setting.find_by(key: "default_runner")&.destroy
+    @step.workflow.update!(config: @step.workflow.config.merge("runner" => "claude_sdk"))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeSDK, executor.runner
+  end
+
+  test "Step.config[runner] beats Workflow.config[runner]" do
+    @step.workflow.update!(config: @step.workflow.config.merge("runner" => "claude_sdk"))
+    @step.update!(config: @step.config.merge("runner" => "claude_cli"))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeCLI, executor.runner
+  end
+
+  test "Workflow.config[runner] beats Setting[default_runner]" do
+    Setting["default_runner"] = "claude_cli"
+    @step.workflow.update!(config: @step.workflow.config.merge("runner" => "claude_sdk"))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    assert_instance_of Runners::ClaudeSDK, executor.runner
+  ensure
+    Setting.find_by(key: "default_runner")&.destroy
+  end
+
   test "runner can be injected via constructor for tests" do
     fake = Runners::ClaudeCLI.new
     executor = StepExecutor.new(@step, {}, @ready.local_path, runner: fake)
