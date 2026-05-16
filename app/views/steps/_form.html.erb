@@ -357,21 +357,6 @@
     </div>
 
     <div class="mb-4">
-      <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
-        <input type="checkbox" name="pr_seed_empty_commit" value="1" <%= "checked" if pr_cfg["seed_empty_commit"] %> class="accent-accent">
-        Seed an empty commit if the branch has no diff against base
-      </label>
-      <p class="text-xs text-content-muted mt-1">
-        Useful when this <code>pr</code> step runs at the start of a workflow
-        to "prep a spot to work" — opens the draft PR up front so later
-        steps push commits into it. Without this, GitHub refuses
-        <code>gh pr create</code> on an empty branch with
-        <em>No commits between &lt;base&gt; and &lt;branch&gt;</em>. No-op
-        when the branch already has commits ahead of base.
-      </p>
-    </div>
-
-    <div class="mb-4">
       <label for="pr_reviewers" class="block text-sm font-medium text-content-muted mb-1.5">Reviewers (optional)</label>
       <input type="text" name="pr_reviewers" id="pr_reviewers"
              value="<%= Array(pr_cfg["reviewers"]).join(", ") %>"

@@ -27,6 +27,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
@@ -72,6 +73,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "seneschal/run-30\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => lambda { |*argv|
         push_argv = argv
         push_then_create_order << :push
@@ -96,6 +98,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(stderr: "rejected (non-fast-forward)", success: false),
       ["gh", "pr", "create"] => lambda { |*_argv|
         flunk "gh pr create should not run when the push failed"
@@ -114,6 +117,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
@@ -142,6 +146,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*_argv|
         created = true
@@ -170,6 +175,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
@@ -198,6 +204,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_argv = argv
@@ -225,6 +232,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => stub_response(stdout: "", stderr: "remote: forbidden", success: false)
     ) do
@@ -239,6 +247,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => stub_response(stdout: "warning: no upstream\n", success: true)
     ) do
@@ -249,7 +258,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     end
   end
 
-  test "honors explicit branch override in config" do
+  test "honors explicit branch override in config" do # rubocop:disable Metrics/BlockLength
     @step.update!(config: @step.config.merge("branch" => "release/v2"))
     captured_list_argv = nil
     captured_create_argv = nil
@@ -261,6 +270,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
       ["git", "rev-parse"] => lambda { |*_argv|
         flunk "should not consult git when branch is explicit"
       },
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "create"] => lambda { |*argv|
         captured_create_argv = argv
@@ -291,6 +301,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["gh", "pr", "close"] => lambda { |*argv|
         close_argv = argv
         ["", "", success_status]
@@ -338,6 +349,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["gh", "pr", "close"] => lambda { |*argv|
         closed_numbers << argv[3] # gh pr close <number> ...
         ["", "", success_status]
@@ -361,6 +373,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["gh", "pr", "close"] => stub_response(success: true),
       ["git", "push", "--delete"] => stub_response(
         stderr: "error: unable to delete 'feature/foo': remote ref does not exist", success: false
@@ -382,6 +395,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: list_payload, success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "close"] => stub_response(stderr: "remote: forbidden", success: false),
       ["gh", "pr", "create"] => lambda { |*_argv|
@@ -407,6 +421,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
+      ["git", "rev-list", "--count"] => stub_response(stdout: "3\n", success: true),
       ["git", "push", "-u"] => stub_response(success: true),
       ["gh", "pr", "close"] => lambda { |*_argv|
         close_called = true
@@ -427,11 +442,9 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_not delete_called, "no PR to clean → don't wipe remote"
   end
 
-  # ---- seed_empty_commit ----
+  # ---- empty-branch seeding (always-on) ----
 
-  test "seed_empty_commit=true creates an empty commit when branch is identical to base" do
-    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
-
+  test "creates an empty seed commit when branch is identical to base" do
     commit_argv = nil
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
@@ -456,9 +469,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
                  "seed commit message should be the interpolated PR title"
   end
 
-  test "seed_empty_commit=true skips the empty commit when branch has commits ahead of base" do
-    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
-
+  test "skips the seed commit when branch already has commits ahead of base" do
     commit_called = false
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
@@ -479,33 +490,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_not commit_called, "should not seed when there's already a diff to PR"
   end
 
-  test "without seed_empty_commit, the rev-list / commit steps don't run" do
-    rev_list_called = false
-    commit_called = false
-    with_stubbed_capture3(
-      ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
-      ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),
-      ["git", "rev-list", "--count"] => lambda { |*_argv|
-        rev_list_called = true
-        ["0\n", "", success_status]
-      },
-      ["git", "commit", "--allow-empty"] => lambda { |*_argv|
-        commit_called = true
-        ["", "", success_status]
-      },
-      ["git", "push", "-u"] => stub_response(success: true),
-      ["gh", "pr", "create"] => stub_response(stdout: "https://github.com/test/seneschal/pull/42\n", success: true)
-    ) do
-      StepExecutor.new(@step, { "task_title" => "x", "task_body" => "y" }, @project.local_path).execute
-    end
-
-    assert_not rev_list_called, "rev-list count check should only run when seed_empty_commit is enabled"
-    assert_not commit_called
-  end
-
-  test "seed_empty_commit surfaces a commit failure cleanly" do
-    @step.update!(config: @step.config.merge("seed_empty_commit" => true))
-
+  test "surfaces a seed-commit failure cleanly without invoking gh pr create" do
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
       ["git", "rev-parse"] => stub_response(stdout: "feature/foo\n", success: true),

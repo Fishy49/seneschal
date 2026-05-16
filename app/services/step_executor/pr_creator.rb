@@ -47,15 +47,15 @@ class StepExecutor
 
       end
 
-      # Optional: seed an empty commit when the branch is identical to base.
-      # GitHub refuses `gh pr create` with "No commits between …" otherwise.
-      # Use case: a `pr` step at position 1 of a workflow that opens a draft
-      # PR up front to claim the branch / give later steps something to push
-      # commits into.
-      if cfg["seed_empty_commit"]
-        seed_err = ensure_seed_commit(base: base, title: title, &)
-        return seed_err if seed_err
-      end
+      # GitHub refuses `gh pr create` with "No commits between …" if the
+      # branch is identical to base. The "prep a spot to work" pattern (a
+      # `pr` step at position 1 to claim the branch + open the draft PR
+      # before later steps push commits into it) hits that wall by design.
+      # Always seed an empty commit when the branch has zero diff vs base —
+      # idempotent (no-op when the branch already has commits) and small
+      # enough to revert if it ever surprises an operator.
+      seed_err = ensure_seed_commit(base: base, title: title, &)
+      return seed_err if seed_err
 
       # Push the local branch to origin so `gh pr create` can resolve --head.
       # Idempotent — if already up to date, git just prints "Everything
