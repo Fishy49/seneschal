@@ -24,6 +24,22 @@ FileUtils.chdir APP_ROOT do
   system! "bin/rails db:prepare"
   system! "bin/rails db:reset" if ARGV.include?("--reset")
 
+  # Optional but recommended — provisions the Python sidecar that backs
+  # `Runners::ClaudeSDK`. Skip if `--skip-sdk-runner` is passed (useful in
+  # CI / Docker builds that intentionally exclude Python) or if the host
+  # has no python3 on PATH (we bail loudly rather than silently skip).
+  unless ARGV.include?("--skip-sdk-runner")
+    if system("command -v python3 > /dev/null 2>&1")
+      puts "\n== Provisioning SDK runner =="
+      system! "bin/setup_sdk_runner"
+    else
+      puts "\n== Skipping SDK runner =="
+      puts "    python3 not found on PATH — install it and re-run `bin/setup_sdk_runner`"
+      puts "    when you're ready. Seneschal will keep using the `claude` CLI runner"
+      puts "    until then."
+    end
+  end
+
   puts "\n== Removing old logs and tempfiles =="
   system! "bin/rails log:clear tmp:clear"
 
