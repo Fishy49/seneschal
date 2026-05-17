@@ -240,9 +240,19 @@ def build_options(config: dict[str, Any]) -> Any:
     # Schema-validated structured outputs. The SDK takes the schema via
     # `output_format={"type": "json_schema", "schema": <schema>}` and
     # surfaces the parsed object back on ResultMessage.structured_output.
+    #
+    # Workaround: with claude-agent-sdk 0.2.82 + bundled CLI 2.1.142, the
+    # CLI's StructuredOutput tool only gets injected when --print is on the
+    # argv. The SDK's `query()` path runs in streaming-stdin mode and
+    # deliberately omits --print, which causes the schema to be silently
+    # ignored — the model just emits JSON as plaintext and ResultMessage
+    # .structured_output ends up None. Forcing --print via `extra_args`
+    # restores it. Once the SDK passes --print itself (or removes the
+    # requirement), this clause can drop the extra_args nudge.
     schema = config.get("json_schema")
     if isinstance(schema, dict) and schema:
         kwargs["output_format"] = {"type": "json_schema", "schema": schema}
+        kwargs.setdefault("extra_args", {})["print"] = None
 
     # Runner-level policy hooks. Today there's just the cwd-confining hook;
     # the structure leaves room for future declarative policies (e.g.
