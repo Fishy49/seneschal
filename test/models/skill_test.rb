@@ -128,4 +128,47 @@ class SkillTest < ActiveSupport::TestCase
     project_groups(:frontend).destroy
     assert_nil skill.reload.project_group_id
   end
+
+  # --- Default schema + output variable ---
+
+  test "default_output_variable must be snake_case when set" do
+    skill = skills(:shared_skill)
+    skill.default_output_variable = "MyOutput"
+    assert_not skill.valid?
+    assert_includes skill.errors[:default_output_variable].first, "snake_case"
+  end
+
+  test "default_output_variable accepts blank when no schema is set" do
+    skill = skills(:shared_skill)
+    skill.default_json_schema = nil
+    skill.default_output_variable = nil
+    assert skill.valid?
+  end
+
+  test "default_output_variable required when default schema is set" do
+    skill = skills(:shared_skill)
+    skill.default_json_schema = json_schemas(:simple_schema)
+    skill.default_output_variable = nil
+    assert_not skill.valid?
+    assert_includes skill.errors[:default_output_variable].first, "required"
+  end
+
+  test "default schema + output variable are persisted and round-trip" do
+    skill = skills(:shared_skill)
+    skill.update!(
+      default_json_schema: json_schemas(:simple_schema),
+      default_output_variable: "feature_plan"
+    )
+    skill.reload
+    assert_equal json_schemas(:simple_schema), skill.default_json_schema
+    assert_equal "feature_plan", skill.default_output_variable
+  end
+
+  test "destroying the default schema nullifies the link on associated skills" do
+    schema = JsonSchema.create!(name: "tmp_default", body: '{"type":"object"}')
+    skill = Skill.create!(name: "tmp_skill", body: "x",
+                          default_json_schema: schema, default_output_variable: "x_out")
+    schema.destroy
+    assert_nil skill.reload.default_json_schema_id
+  end
 end

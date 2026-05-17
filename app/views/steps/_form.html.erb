@@ -133,17 +133,55 @@
       <p class="text-sm text-content-muted mt-2">Comma-separated list of Claude CLI tools this step can use. Supports patterns like <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>. Leave blank for the global default.</p>
     </div>
 
-    <div class="mb-4">
-      <label for="json_schema_id" class="block text-sm font-medium text-content-muted mb-1.5">Output Schema (optional)</label>
-      <select name="json_schema_id" id="json_schema_id"
-              data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        <option value="">None</option>
-        <% JsonSchema.order(:name).each do |s| %>
-          <option value="<%= s.id %>" <%= "selected" if claude_cfg["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+    <%# Output schema picker. When the selected skill carries a default
+        schema + output variable, the picker collapses to a compact "Using
+        skill default" badge so the common case is one-line. Click "Override"
+        to expand the full picker. %>
+    <% skill_default_schema = step.skill&.default_json_schema %>
+    <% skill_default_var    = step.skill&.default_output_variable.to_s %>
+    <% picker_selected_id   = claude_cfg["json_schema_id"].to_i %>
+    <% using_skill_default  = skill_default_schema && (claude_cfg["json_schema_id"].blank? || picker_selected_id == skill_default_schema.id) %>
+    <div class="mb-4" data-controller="step-schema-picker" data-step-schema-picker-overridden-value="<%= using_skill_default ? 'false' : 'true' %>">
+      <%# mode marker: "inherit" → controller leaves config["json_schema_id"] absent
+          so Step#inherit_skill_defaults can fill it from skill.default_json_schema.
+          "override" → controller writes whatever the picker has (id or nil) so the
+          user's explicit choice (including None) sticks. %>
+      <input type="hidden" name="schema_picker_mode"
+             value="<%= using_skill_default ? 'inherit' : 'override' %>"
+             data-step-schema-picker-target="modeInput">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Output Schema</label>
+
+      <% if skill_default_schema %>
+        <div data-step-schema-picker-target="badge" style="<%= 'display:none' if !using_skill_default %>"
+             class="flex items-center justify-between gap-3 px-3 py-2 bg-surface-input border border-edge rounded-lg">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/15 text-accent uppercase tracking-wide shrink-0">From skill</span>
+            <span class="text-sm font-mono text-content truncate"><%= skill_default_schema.name %></span>
+            <% if skill_default_var.present? %>
+              <span class="text-xs text-content-muted">→</span>
+              <span class="text-xs font-mono text-content-muted truncate"><%= skill_default_var %></span>
+            <% end %>
+          </div>
+          <button type="button" data-action="step-schema-picker#override"
+                  class="text-xs text-accent hover:underline shrink-0">Override</button>
+        </div>
+      <% end %>
+
+      <div data-step-schema-picker-target="picker" style="<%= 'display:none' if using_skill_default && skill_default_schema %>">
+        <select name="json_schema_id" id="json_schema_id"
+                data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
+                class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+          <option value="">None</option>
+          <% JsonSchema.order(:name).each do |s| %>
+            <option value="<%= s.id %>" <%= "selected" if claude_cfg["json_schema_id"].to_i == s.id %>><%= s.name %></option>
+          <% end %>
+        </select>
+        <% if skill_default_schema %>
+          <button type="button" data-action="step-schema-picker#restoreDefault"
+                  class="text-xs text-content-muted hover:text-accent mt-1">↩ Use skill default (<%= skill_default_schema.name %>)</button>
         <% end %>
-      </select>
-      <p class="text-xs text-content-muted mt-1">When set, the step's only output is a single variable holding JSON that conforms to this schema. The Produces field below collapses to a single output name.</p>
+        <p class="text-xs text-content-muted mt-1">When set, the step's only output is a single variable holding JSON that conforms to this schema.</p>
+      </div>
     </div>
 
     <% other_projects  = Project.where.not(id: @project.id).order(:name) %>

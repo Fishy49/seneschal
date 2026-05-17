@@ -50,7 +50,14 @@ class SkillsController < ApplicationController
   end
 
   def skill_params
-    attrs = params.expect(skill: [:name, :description, :body, :scope])
+    attrs = params.expect(
+      skill: [:name, :description, :body, :scope, :default_json_schema_id, :default_output_variable]
+    )
+
+    # Blank schema_id from the form arrives as "" (empty string). Normalize
+    # to nil so the FK doesn't try to look up id=0 and AR clears it cleanly.
+    attrs[:default_json_schema_id] = attrs[:default_json_schema_id].presence
+
     return attrs unless attrs.key?(:scope)
 
     scope = attrs.delete(:scope)

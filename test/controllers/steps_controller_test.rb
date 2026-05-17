@@ -191,6 +191,50 @@ class StepsControllerTest < ActionDispatch::IntegrationTest # rubocop:disable Me
     assert_equal schema.id, Step.last.config["json_schema_id"]
   end
 
+  test "POST create skill step in inherit mode lets skill default schema fill in" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "inherited_var")
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Inherit Skill",
+          step_type: "skill",
+          skill_id: skill.id,
+          position: 51,
+          timeout: 60,
+          max_retries: 0
+        },
+        # No json_schema_id, no schema_picker_mode (or "inherit"): inheritance fires.
+        schema_picker_mode: "inherit"
+      }
+    end
+    assert_equal schema.id, Step.last.config["json_schema_id"]
+    assert_equal ["inherited_var"], Step.last.config["produces"]
+  end
+
+  test "POST create skill step in override mode with blank schema beats inheritance" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "inherited_var")
+    assert_difference "Step.count", 1 do
+      post project_workflow_steps_path(@project, @workflow), params: {
+        step: {
+          name: "Override-None Skill",
+          step_type: "skill",
+          skill_id: skill.id,
+          position: 52,
+          timeout: 60,
+          max_retries: 0
+        },
+        # Explicit override → None must stick instead of inheriting the skill default.
+        schema_picker_mode: "override",
+        json_schema_id: ""
+      }
+    end
+    assert_nil Step.last.config["json_schema_id"]
+  end
+
   test "GET edit renders produces-input controller" do
     get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
     assert_response :success
