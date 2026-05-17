@@ -12,6 +12,26 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   BROADCAST_INTERVAL = 2.0 # seconds between progress broadcasts
   DEFAULT_ALLOWED_TOOLS = "Bash,Read,Edit,Glob,Grep".freeze
 
+  # Tools available to a self_review step. Read-only by design — a step that
+  # could Write or Edit defeats its own purpose as a review checkpoint.
+  SELF_REVIEW_TOOLS = "Read,Grep,Glob".freeze
+  REVIEW_DIFF_MAX_CHARS = 80_000
+
+  # Icon prefixes for the live ci_check status panel. Bucket names match
+  # `gh pr checks --json bucket`.
+  CHECK_BUCKET_ICONS = {
+    "pending" => "⏳",
+    "pass" => "✅",
+    "fail" => "❌",
+    "skipping" => "⏭"
+  }.freeze
+
+  # Subset of git's ref-name rules — strict enough to keep an attacker-
+  # controlled `base_ref` value from sneaking through as a `git diff` flag
+  # (no leading dashes, no shell metacharacters, no ".." segments). We
+  # intentionally accept less than git's full ruleset.
+  SAFE_GIT_REF = %r{\A[A-Za-z0-9_][A-Za-z0-9._/-]*\z}
+
   def initialize(step, context, repo_path, # rubocop:disable Metrics/ParameterLists
                  resolved_input_context: nil, resume_session_id: nil,
                  resume_message: nil, run_step_id: nil, runner: nil)
@@ -31,8 +51,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     @runner ||= Runners.lookup(runner_name)
   end
 
+  # Runner resolution precedence:
+  #   1. Step.config["runner"]   — finest-grained override
+  #   2. Workflow#runner_name    — workflow-level pick (e.g. "this workflow
+  #                                 uses structured outputs, route everything
+  #                                 through the SDK")
+  #   3. Setting["default_runner"] / Runners.default_name — global fallback
   def runner_name
-    @step.config["runner"].presence || Runners.default_name
+    @step.config["runner"].presence ||
+      workflow_for_step&.runner_name ||
+      Runners.default_name
+  end
+
+  def workflow_for_step
+    @workflow_for_step ||= @step.workflow || @step.run&.workflow
   end
 
   def execute(&)
@@ -43,6 +75,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     when "ci_check" then execute_ci_check
     when "context_fetch" then execute_context_fetch(&)
     when "pr" then execute_pr_step(&)
+    when "self_review" then execute_self_review(&)
     else
       Result.new(exit_code: 1, stdout: "", stderr: "Unknown step type: #{@step.step_type}")
     end
@@ -50,7 +83,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&)
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
@@ -59,8 +92,18 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_queryable_context(prompt) if @step.queries.any? && queryable_schemas.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
+    # When the runner handles schemas natively (SDK's StructuredOutput tool
+    # injection) we deliberately omit BOTH the schema-shape and the generic
+    # produces ```output``` block instructions — otherwise the model follows
+    # the prompt and emits text instead of calling the injected tool, leaving
+    # structured_output null. produces extraction still works downstream via
+    # splice_structured_output.
     if @step.json_schema
-      prompt = append_schema_instructions(prompt)
+      prompt = if runner.supports_structured_outputs?
+                 append_structured_output_tool_nudge(prompt)
+               else
+                 append_schema_instructions(prompt)
+               end
     elsif @step.produces.any?
       prompt = append_produces_instructions(prompt)
     end
@@ -71,7 +114,126 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     return result unless result.passed?
     return result unless @step.json_schema
 
+    # SDK structured-output path: the runner already enforced the schema
+    # upstream (via Claude Agent SDK's `output_format` → `--json-schema`),
+    # so the parsed object is sitting on `result.structured_output`. Splice
+    # it into stdout as a fenced ```output block so PipelineExtractor + the
+    # rest of the pipeline see it via the normal path, and short-circuit
+    # the prompt-engineered retry loop.
+    return splice_structured_output(result) unless result.structured_output.nil?
+
     validate_with_session_retry(result, &)
+  end
+
+  def splice_structured_output(result)
+    produced_var = @step.produces.first
+    return result if produced_var.blank?
+
+    block = "```output\n#{produced_var}: #{JSON.generate(result.structured_output)}\n```\n"
+    result.with(stdout: [result.stdout.to_s, block].reject(&:empty?).join("\n\n"))
+  end
+
+  # self_review: run Claude over the diff with read-only tools and a
+  # canned (or operator-overridden) review prompt. Designed to slot
+  # between an "implement" skill step and a "pr" step so a draft PR can
+  # only be promoted to ready when the review verdict is PASS.
+  def execute_self_review(&)
+    diff = compute_review_diff
+    prompt = build_review_prompt(diff)
+
+    # Force the read-only tool set regardless of step.config["allowed_tools"]
+    # — a self-review step that could Write or Edit defeats its own purpose.
+    kwargs = runner_call_kwargs(prompt: prompt, stream: block_given?)
+    kwargs[:allowed_tools] = SELF_REVIEW_TOOLS
+
+    result = runner.execute(**kwargs, &)
+    return result unless result.passed?
+
+    # Same schema-validated short-circuit + retry-loop fallback as
+    # execute_skill, so a self_review step can also be schema-bound.
+    return result unless @step.json_schema
+    return splice_structured_output(result) unless result.structured_output.nil?
+
+    validate_with_session_retry(result, &)
+  end
+
+  def compute_review_diff
+    base = (@step.config["base_ref"].presence || detect_review_base_ref).to_s
+    return "(refusing diff: base_ref #{base.inspect} is not a safe git ref name)" unless base.match?(SAFE_GIT_REF)
+
+    stdout, stderr, status = Open3.capture3(
+      "git", "-C", @repo_path, "diff", "--no-color", "#{base}...HEAD", "--"
+    )
+    return "(could not compute diff against #{base}: #{stderr.strip})" unless status.success?
+
+    truncate_review_diff(stdout)
+  end
+
+  def detect_review_base_ref
+    ref, _stderr, status = Open3.capture3(
+      "git", "-C", @repo_path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
+    )
+    return ref.strip if status.success? && ref.present?
+
+    ["origin/main", "origin/master"].each do |candidate|
+      _, _, check = Open3.capture3("git", "-C", @repo_path, "rev-parse", "--verify", "--quiet", candidate)
+      return candidate if check.success?
+    end
+
+    "HEAD~1"
+  end
+
+  def truncate_review_diff(diff)
+    return diff if diff.length <= REVIEW_DIFF_MAX_CHARS
+
+    omitted = diff.length - REVIEW_DIFF_MAX_CHARS
+    "#{diff.first(REVIEW_DIFF_MAX_CHARS)}\n\n... (diff truncated; #{omitted} more characters omitted)"
+  end
+
+  def build_review_prompt(diff)
+    focus = @step.config["focus"].presence ||
+            "correctness, safety, and adherence to existing patterns"
+    produced_var = @step.produces.first.presence || "review"
+    intro = if @step.body.present?
+              TemplateRenderer.new(@step.body, @context).render
+            else
+              default_review_intro(focus)
+            end
+
+    <<~PROMPT
+      #{intro}
+
+      ## Diff
+
+      ```diff
+      #{diff}
+      ```
+
+      ## Output Required
+
+      At the end of your response, emit your verdict in this format:
+
+      ```output
+      #{produced_var}: |
+        ## Verdict
+        PASS | NEEDS_FIX | BLOCKED
+
+        ## Concerns
+        (One per line, or "None.")
+
+        ## Suggestions
+        (Optional improvements, may be empty.)
+      ```
+    PROMPT
+  end
+
+  def default_review_intro(focus)
+    <<~INTRO.strip
+      You are reviewing a proposed code change. Focus on: #{focus}.
+
+      Use the read-only tools (Read, Grep, Glob) to investigate affected
+      files for context. You CANNOT make changes — review only.
+    INTRO
   end
 
   def execute_script(&)
@@ -162,8 +324,52 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       dangerously_skip_permissions: project_for_step&.skip_permissions? || false,
       permission_mode: "dontAsk",
       add_dirs: context_project_paths,
-      stream: stream
+      stream: stream,
+      # Schema-validated structured outputs. Only runners that support this
+      # contract (today: ClaudeSDK) will consume it; ClaudeCLI ignores it.
+      json_schema: @step.json_schema&.parsed_body,
+      # Runner-level policy hooks (also SDK-only). Today's only knob is the
+      # cwd-confining write hook, default ON. Operators can flip it off
+      # globally via Setting["confine_writes_to_cwd"] = "false" or
+      # per-step via Step.config["confine_writes_to_cwd"] = false.
+      hooks: { "confine_writes_to_cwd" => confine_writes_to_cwd? },
+      # Subagent definitions visible to the main agent via the Task tool.
+      # Each entry is a hash of AgentDefinition fields (description, prompt,
+      # tools, model, ...). SDK-only; ClaudeCLI ignores.
+      agents: @step.config["agents"].presence,
+      # MCP server registry. Per-step Step.config["mcp_servers"] wins;
+      # otherwise fall back to the global Setting. SDK-only.
+      mcp_servers: resolved_mcp_servers
     }
+  end
+
+  # Per-step config beats the Setting default. Returns nil (not {}) when
+  # nothing's configured so the runner can omit the field cleanly from
+  # the wire JSON.
+  def resolved_mcp_servers
+    per_step = @step.config["mcp_servers"]
+    return per_step if per_step.is_a?(Hash) && per_step.any?
+
+    global = Setting["mcp_servers"]
+    return nil if global.blank?
+
+    parsed = begin
+      JSON.parse(global)
+    rescue JSON::ParserError
+      nil
+    end
+    parsed.is_a?(Hash) && parsed.any? ? parsed : nil
+  end
+
+  def confine_writes_to_cwd?
+    if @step.config.key?("confine_writes_to_cwd")
+      ActiveModel::Type::Boolean.new.cast(@step.config["confine_writes_to_cwd"])
+    else
+      raw = Setting["confine_writes_to_cwd"]
+      return true if raw.nil?
+
+      ActiveModel::Type::Boolean.new.cast(raw)
+    end
   end
 
   def resolved_allowed_tools
@@ -189,42 +395,59 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   # --- CI polling (unchanged) ---
 
-  def poll_pr_checks(cfg)
+  def poll_pr_checks(cfg) # rubocop:disable Metrics/MethodLength
     pr = interpolate_string(cfg.fetch("pr", "${pr_number}"))
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
+    started_at = Time.current
+    poll_count = 0
 
     sleep 5
 
     loop do
-      yield({ output: "Polling CI checks for PR ##{pr}..." }) if block_given?
+      poll_count += 1
       stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "pr", "checks", pr.to_s, "--json", "name,bucket,link",
         chdir: @repo_path
       )
 
-      if status.success?
-        checks = begin; JSON.parse(stdout); rescue StandardError; []; end
+      checks = if status.success?
+                 begin
+                   JSON.parse(stdout)
+                 rescue StandardError
+                   []
+                 end
+               else
+                 []
+               end
 
-        if checks.any?
-          pending = checks.select { |c| c["bucket"] == "pending" }
+      if block_given?
+        yield({
+          output: render_pr_checks_status(
+            pr_number: pr, poll: poll_count, started_at: started_at,
+            deadline: deadline, checks: checks
+          )
+        })
+      end
 
-          if pending.empty?
-            failed = checks.select { |c| c["bucket"] == "fail" }
-            summary = checks.map do |c|
-              "#{c["bucket"] == "fail" ? "FAIL" : "PASS"} #{c["name"]}"
-            end.join("\n")
+      if checks.any?
+        pending = checks.select { |c| c["bucket"] == "pending" }
 
-            return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
+        if pending.empty?
+          failed = checks.select { |c| c["bucket"] == "fail" }
+          summary = checks.map do |c|
+            "#{c["bucket"] == "fail" ? "FAIL" : "PASS"} #{c["name"]}"
+          end.join("\n")
 
-            max_chars = cfg.fetch("max_log_chars", 10_000)
-            log_from = cfg.fetch("log_from", "end")
-            failure_logs = fetch_failure_logs(failed, max_chars: max_chars, from: log_from)
-            output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
-            return Result.new(exit_code: 1, stdout: output, stderr: "")
+          return Result.new(exit_code: 0, stdout: "All CI checks passed:\n#{summary}", stderr: "") if failed.empty?
 
-          end
+          max_chars = cfg.fetch("max_log_chars", 10_000)
+          log_from = cfg.fetch("log_from", "end")
+          failure_logs = fetch_failure_logs(failed, max_chars: max_chars, from: log_from)
+          output = "CI checks failed:\n#{summary}\n\n#{failure_logs}".strip
+          return Result.new(exit_code: 1, stdout: output, stderr: "")
+
         end
       end
 
@@ -232,6 +455,45 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       sleep poll_interval
     end
+  end
+
+  # Multi-line text used as RunStep#output for an in-flight ci_check (pr
+  # mode). The format is consumed both by humans reading the run page and
+  # by the `_ci_check_status` partial — keep the first three lines stable
+  # so the partial's regex parser keeps working.
+  def render_pr_checks_status(pr_number:, poll:, started_at:, deadline:, checks:)
+    elapsed = (Time.current - started_at).to_i
+    remaining = [(deadline - Time.current).to_i, 0].max
+    lines = [
+      "Watching CI checks for PR ##{pr_number}",
+      "Poll ##{poll} · elapsed #{format_seconds(elapsed)} · times out in #{format_seconds(remaining)}"
+    ]
+
+    if checks.any?
+      counts = checks.group_by { |c| c["bucket"] }.transform_values(&:size)
+      summary = ["pending", "pass", "fail", "skipping"].filter_map do |bucket|
+        next if counts[bucket].to_i.zero?
+
+        "#{counts[bucket]} #{bucket}"
+      end.join(" · ")
+      lines << "Checks: #{summary}"
+      lines << ""
+      checks.each do |c|
+        icon = CHECK_BUCKET_ICONS.fetch(c["bucket"], "❓")
+        lines << "#{icon} #{c["name"]}"
+      end
+    else
+      lines << "Checks: none reported yet"
+    end
+
+    lines.join("\n")
+  end
+
+  def format_seconds(secs)
+    return "0s" if secs <= 0
+
+    mins, s = secs.divmod(60)
+    mins.positive? ? "#{mins}m #{s}s" : "#{s}s"
   end
 
   def fetch_failure_logs(failed_checks, max_chars: 10_000, from: "end")
@@ -272,12 +534,14 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     "(Could not fetch failure logs: #{e.message})"
   end
 
-  def poll_workflow_run(cfg)
+  def poll_workflow_run(cfg) # rubocop:disable Metrics/MethodLength
     workflow_file = interpolate_string(cfg.fetch("workflow", "ci.yml"))
     ref = interpolate_string(cfg.fetch("ref", "main"))
     should_trigger = cfg.fetch("trigger", false)
     poll_interval = cfg.fetch("poll_interval", 30)
     deadline = Time.current + @step.timeout
+    started_at = Time.current
+    poll_count = 0
 
     if should_trigger
       _, stderr, status = Open3.capture3(
@@ -291,8 +555,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     end
 
     loop do
-      yield({ output: "Polling workflow '#{workflow_file}'..." }) if block_given?
-
+      poll_count += 1
       stdout, _, status = Open3.capture3(
         env_vars,
         "gh", "run", "list",
@@ -303,27 +566,56 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
         chdir: @repo_path
       )
 
-      if status.success?
-        runs = begin; JSON.parse(stdout); rescue StandardError; []; end
+      runs = if status.success?
+               begin
+                 JSON.parse(stdout)
+               rescue StandardError
+                 []
+               end
+             else
+               []
+             end
+      run_data = runs.is_a?(Array) ? runs.first : nil
 
-        if runs.any?
-          run_data = runs.first
-          if run_data["status"] == "completed"
-            if run_data["conclusion"] == "success"
-              return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data["databaseId"]})", stderr: "")
-            end
+      if block_given?
+        yield({
+          output: render_workflow_run_status(
+            workflow_file: workflow_file, ref: ref, poll: poll_count,
+            started_at: started_at, deadline: deadline, run_data: run_data
+          )
+        })
+      end
 
-            return Result.new(exit_code: 1,
-                              stdout: "Workflow '#{workflow_file}' #{run_data["conclusion"]} (run ##{run_data["databaseId"]})", stderr: "")
-
-          end
+      if run_data && run_data["status"] == "completed"
+        if run_data["conclusion"] == "success"
+          return Result.new(exit_code: 0, stdout: "Workflow '#{workflow_file}' passed (run ##{run_data["databaseId"]})", stderr: "")
         end
+
+        return Result.new(exit_code: 1,
+                          stdout: "Workflow '#{workflow_file}' #{run_data["conclusion"]} (run ##{run_data["databaseId"]})", stderr: "")
+
       end
 
       return Result.new(exit_code: 1, stdout: "", stderr: "Workflow timed out after #{@step.timeout}s") if Time.current > deadline
 
       sleep poll_interval
     end
+  end
+
+  def render_workflow_run_status(workflow_file:, ref:, poll:, started_at:, deadline:, run_data:) # rubocop:disable Metrics/ParameterLists
+    elapsed = (Time.current - started_at).to_i
+    remaining = [(deadline - Time.current).to_i, 0].max
+    lines = [
+      "Watching GitHub Actions workflow #{workflow_file.inspect} on #{ref}",
+      "Poll ##{poll} · elapsed #{format_seconds(elapsed)} · times out in #{format_seconds(remaining)}"
+    ]
+    if run_data
+      lines << "Status: #{run_data["status"]}#{" (#{run_data["conclusion"]})" if run_data["conclusion"]}"
+      lines << "Run ##{run_data["databaseId"]}" if run_data["databaseId"]
+    else
+      lines << "Status: no run reported yet for #{ref}"
+    end
+    lines.join("\n")
   end
 
   # --- Helpers ---
@@ -550,12 +842,19 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   def validation_feedback_message(errors)
     output_var = @step.produces.first.presence || "result"
     bullets = errors.map { |e| "- #{e}" }.join("\n")
+    delivery_hint = if runner.supports_structured_outputs?
+                      "Call the **StructuredOutput** tool with the corrected `#{output_var}` value. " \
+                        "Do not emit it inline as text."
+                    else
+                      "Please re-emit the corrected `#{output_var}` value in the same `output` block format. " \
+                        "Include the full JSON, not a summary or status word."
+                    end
     <<~MSG
       The `#{output_var}` JSON you just emitted did not validate against the schema "#{@step.json_schema.name}":
 
       #{bullets}
 
-      Please re-emit the corrected `#{output_var}` value in the same `output` block format. Include the full JSON, not a summary or status word.
+      #{delivery_hint}
     MSG
   end
 
@@ -597,6 +896,26 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       #{schema.body}
       ```
     INSTRUCTIONS
+  end
+
+  # Sibling of append_schema_instructions for the SDK runner: instead of
+  # asking the model to emit JSON inline, just nudge it to deliver the final
+  # answer via the StructuredOutput tool (which the CLI auto-injects via
+  # --json-schema). Without this nudge, longer / agentic prompts whose body
+  # tells the model to "output the plan as markdown" tend to win — the model
+  # answers conversationally and never calls the tool, leaving
+  # result.structured_output null and tripping the validation retry loop.
+  def append_structured_output_tool_nudge(prompt)
+    output_var = @step.produces.first.presence || "result"
+    prompt + <<~NUDGE
+
+      ## Deliver Your Final Answer
+
+      When you are finished, call the **StructuredOutput** tool to deliver
+      the final result (variable name: `#{output_var}`). Do not emit the
+      result inline as text or in an ```output``` block — the tool call is
+      the only delivery channel for this step.
+    NUDGE
   end
 
   def append_produces_instructions(prompt)

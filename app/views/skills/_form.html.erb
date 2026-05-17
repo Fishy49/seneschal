@@ -37,6 +37,37 @@
     <%= f.hidden_field :body, data: { code_editor_target: "input" } %>
   </div>
 
+  <%# When a skill declares a default output schema, every Step that uses it
+      automatically inherits the schema + output variable (unless the step
+      explicitly overrides). This is where the schema/skill contract lives —
+      authoring the prompt and the output shape side-by-side keeps them in
+      sync, and downstream steps in the workflow can consume sub-paths via
+      the queryable-variables system. %>
+  <div class="mb-4 border border-edge rounded-lg p-4 bg-surface-muted/40">
+    <div class="flex items-center justify-between mb-2">
+      <h4 class="text-sm font-semibold text-content">Default Output Shape</h4>
+      <span class="text-xs text-content-muted">Optional · inherited by every Step using this skill</span>
+    </div>
+    <p class="text-xs text-content-muted mb-3">
+      Bind this skill to a JSON Schema so steps using it auto-populate the
+      schema + produces variable. Leave blank for unstructured Markdown output.
+    </p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <%= f.label :default_json_schema_id, "Schema", class: "block text-xs font-medium text-content-muted mb-1" %>
+        <%= f.select :default_json_schema_id,
+              options_from_collection_for_select(JsonSchema.order(:name), :id, :name, skill.default_json_schema_id),
+              { include_blank: "— None —" },
+              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+      </div>
+      <div>
+        <%= f.label :default_output_variable, "Output variable", class: "block text-xs font-medium text-content-muted mb-1" %>
+        <%= f.text_field :default_output_variable, placeholder: "e.g. feature_plan",
+              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent font-mono" %>
+      </div>
+    </div>
+  </div>
+
   <div class="flex gap-2">
     <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
     <%= link_to "Cancel", skills_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>

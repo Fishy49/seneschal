@@ -62,4 +62,32 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
       end
     end
   end
+
+  test "PATCH update sets workflow.config[runner] when the form picks one" do
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, description: @workflow.description.to_s, runner: "claude_sdk" }
+    }
+    # A redirect means the controller didn't blow up on UnfilteredParameters
+    # — earlier the request silently raised mid-mass-assignment and the
+    # config-key assertion below would still happen to pass on stale state.
+    assert_response :redirect
+    assert_equal "claude_sdk", @workflow.reload.config["runner"]
+  end
+
+  test "PATCH update clears workflow.config[runner] when the form picks the default" do
+    @workflow.update!(config: { "runner" => "claude_sdk" })
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, description: @workflow.description.to_s, runner: "" }
+    }
+    assert_response :redirect
+    assert_not @workflow.reload.config.key?("runner")
+  end
+
+  test "PATCH update refuses an unknown runner value rather than persisting garbage" do
+    patch project_workflow_path(@project, @workflow), params: {
+      workflow: { name: @workflow.name, description: @workflow.description.to_s, runner: "fake_runner_lol" }
+    }
+    assert_response :redirect
+    assert_not_includes @workflow.reload.config.fetch("runner", "missing"), "fake"
+  end
 end

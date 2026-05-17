@@ -4,7 +4,7 @@ class Step < ApplicationRecord
   belongs_to :skill, optional: true
   has_many :run_steps, dependent: :destroy
 
-  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "pr"].freeze
+  STEP_TYPES = ["skill", "script", "command", "ci_check", "context_fetch", "prompt", "pr", "self_review"].freeze
 
   validates :name, presence: true
   validates :position, presence: true, numericality: { only_integer: true, greater_than: 0 }, unless: -> { run_id.present? }
@@ -15,6 +15,8 @@ class Step < ApplicationRecord
   validates :body, presence: true, if: -> { step_type.in?(["script", "command", "prompt"]) }
   validate :workflow_or_run_present
   validate :pr_step_requires_title
+
+  before_validation :inherit_skill_defaults, if: -> { skill_id_changed? || new_record? }
 
   GLOBAL_VARIABLES = ["task_title", "task_body", "task_kind", "repo_owner", "repo_name", "context_files"].freeze
 
@@ -127,6 +129,24 @@ class Step < ApplicationRecord
   end
 
   private
+
+  # When a skill is chosen that declares a default schema + output variable,
+  # auto-populate Step.config["json_schema_id"] and config["produces"] —
+  # but only if the caller hasn't included the key at all, so explicit
+  # overrides from the Step form (including an explicit nil from the
+  # "override → None" path) always win over inheritance.
+  def inherit_skill_defaults
+    return unless skill && step_type == "skill"
+
+    self.config = config.is_a?(Hash) ? config.dup : {}
+
+    config["json_schema_id"] = skill.default_json_schema_id if skill.default_json_schema_id.present? && !config.key?("json_schema_id")
+
+    var = skill.default_output_variable.to_s
+    return unless var.present? && !config.key?("produces")
+
+    config["produces"] = [var]
+  end
 
   def workflow_or_run_present
     return if workflow_id.present? || run_id.present?

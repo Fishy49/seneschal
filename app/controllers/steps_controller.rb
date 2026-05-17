@@ -152,7 +152,17 @@ class StepsController < ApplicationController
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
-    config["json_schema_id"] = raw["json_schema_id"].to_i if raw["json_schema_id"].present?
+
+    # Schema picker has two modes (see app/views/steps/_form.html.erb):
+    #   "inherit"  → omit the key so Step#inherit_skill_defaults can fill it
+    #                from skill.default_json_schema_id at validation time.
+    #   "override" → write whatever the picker has, even if blank — explicit
+    #                "None" must beat inheritance.
+    if raw["schema_picker_mode"] == "override"
+      config["json_schema_id"] = raw["json_schema_id"].presence&.to_i
+    elsif raw["json_schema_id"].present?
+      config["json_schema_id"] = raw["json_schema_id"].to_i
+    end
 
     context_ids = Array(raw["skill_context_projects"]).compact_blank.map(&:to_i).uniq
     config["context_projects"] = context_ids if context_ids.any?

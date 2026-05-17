@@ -1,4 +1,10 @@
 class JsonSchema < ApplicationRecord
+  has_many :default_for_skills,
+           class_name: "Skill",
+           foreign_key: :default_json_schema_id,
+           inverse_of: :default_json_schema,
+           dependent: :nullify
+
   validates :name, presence: true, uniqueness: true
   validates :body, presence: true
   validate :body_is_valid_json

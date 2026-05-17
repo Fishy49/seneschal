@@ -36,6 +36,7 @@ Rails.application.routes.draw do
   get   "setup",                    to: "setup#index"
   post  "setup/check_claude",       to: "setup#check_claude",       as: :check_claude_setup
   post  "setup/check_gh",           to: "setup#check_gh",           as: :check_gh_setup
+  post  "setup/check_sdk_runner",   to: "setup#check_sdk_runner",   as: :check_sdk_runner_setup
   patch "setup/allowed_tools",      to: "setup#update_allowed_tools", as: :update_allowed_tools_setup
 
   resources :projects do

@@ -4,12 +4,17 @@ class Skill < ApplicationRecord
   belongs_to :project, optional: true
   belongs_to :project_group, optional: true
   belongs_to :skill_repo, optional: true
+  belongs_to :default_json_schema, class_name: "JsonSchema", optional: true
   has_many :steps, dependent: :nullify
   has_many :step_templates, dependent: :nullify
 
   validates :name, presence: true, uniqueness: { scope: [:project_id, :project_group_id, :skill_repo_id] }
   validates :body, presence: true, unless: :filesystem_backed?
   validates :source_kind, inclusion: { in: SOURCE_KINDS }, allow_nil: true
+  validates :default_output_variable,
+            format: { with: /\A[a-z][a-z0-9_]*\z/, message: "must be snake_case (letters, digits, underscores; start with a letter)" },
+            allow_blank: true
+  validate :default_output_variable_present_when_schema_set
   validate :scope_is_exclusive
 
   scope :active, -> { where(archived_at: nil) }
@@ -173,5 +178,14 @@ class Skill < ApplicationRecord
     return unless project_id.present? && project_group_id.present?
 
     errors.add(:base, "Skill cannot belong to both a project and a project group")
+  end
+
+  # A schema without an output-variable name is unusable from a Step (we'd
+  # have nothing to splice the structured_output into). Fail loudly at
+  # save time rather than silently producing broken Step defaults later.
+  def default_output_variable_present_when_schema_set
+    return if default_json_schema_id.blank? || default_output_variable.present?
+
+    errors.add(:default_output_variable, "is required when a default schema is set")
   end
 end

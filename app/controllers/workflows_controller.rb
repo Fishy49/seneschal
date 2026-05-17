@@ -52,7 +52,19 @@ class WorkflowsController < ApplicationController
   end
 
   def workflow_params
-    params.expect(workflow: [:name, :description])
+    raw = params.expect(workflow: [:name, :description, :runner])
+    runner = raw[:runner].to_s
+    base = @workflow&.config.is_a?(Hash) ? @workflow.config : {}
+    config = if Runners::KNOWN_NAMES.include?(runner)
+               base.merge("runner" => runner)
+             else
+               base.except("runner")
+             end
+    # Return a plain Hash. `raw[:config] = <hash>` would re-wrap config as
+    # an *unpermitted* ActionController::Parameters under the hood, and
+    # mass-assignment then explodes with UnfilteredParameters when AR tries
+    # to serialize it for the json column.
+    raw.except(:runner).to_h.merge("config" => config)
   end
 
   def trigger_input_params

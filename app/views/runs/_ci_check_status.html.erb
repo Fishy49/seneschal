@@ -1,0 +1,51 @@
+<%# Live status panel rendered while a ci_check step is polling. Replaces
+    the empty stream_log activity log (ci_check steps don't run a Claude
+    session, so there are no NDJSON events to render) with the structured
+    status text the executor's polling helper writes into run_step.output.
+
+    The first two lines of run_step.output follow a fixed format from
+    StepExecutor#render_pr_checks_status / #render_workflow_run_status:
+
+      Watching CI checks for PR #N
+      Poll #M · elapsed Xs · times out in Ys
+      Checks: ...
+      ⏳ check-name
+      ✅ check-name
+      ...
+
+    We pull the headline + meta line out for prominent display and render
+    the rest as a list. Falls back gracefully if the format is unfamiliar
+    (e.g. the very first poll before the executor has yielded anything). %>
+
+<% raw_lines = run_step.output.to_s.lines.map(&:chomp) %>
+<% headline = raw_lines.shift %>
+<% meta = raw_lines.shift %>
+<% summary = raw_lines.shift if raw_lines.first.to_s.start_with?("Checks:", "Status:") %>
+<% _blank = raw_lines.shift if raw_lines.first.to_s.empty? %>
+<% check_lines = raw_lines.reject(&:empty?) %>
+
+<div id="ci_check_status_<%= run_step.id %>"
+     class="mt-2 rounded-lg bg-surface border border-edge p-4 text-sm">
+  <div class="flex items-start gap-3">
+    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-accent animate-pulse mt-1.5 shrink-0"></span>
+    <div class="flex-1 min-w-0">
+      <div class="font-medium text-content">
+        <%= headline.presence || "Waiting for CI to report…" %>
+      </div>
+      <% if meta.present? %>
+        <div class="text-xs text-content-muted mt-0.5"><%= meta %></div>
+      <% end %>
+      <% if summary.present? %>
+        <div class="text-xs text-content-muted mt-1"><%= summary %></div>
+      <% end %>
+    </div>
+  </div>
+
+  <% if check_lines.any? %>
+    <ul class="mt-3 space-y-1 text-xs font-mono text-content-muted">
+      <% check_lines.each do |line| %>
+        <li><%= line %></li>
+      <% end %>
+    </ul>
+  <% end %>
+</div>

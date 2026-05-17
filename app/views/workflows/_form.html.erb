@@ -19,6 +19,22 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y min-h-20" %>
   </div>
 
+  <div class="mb-4">
+    <% current_runner = workflow.config.is_a?(Hash) ? workflow.config["runner"].to_s : "" %>
+    <% global_default = Runners.default_name %>
+    <label for="workflow_runner" class="block text-sm font-medium text-content-muted mb-1.5">Runner</label>
+    <select name="workflow[runner]" id="workflow_runner"
+            class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+      <option value="" <%= "selected" if current_runner.empty? %>>Use global default (currently <code><%= global_default %></code>)</option>
+      <option value="claude_cli" <%= "selected" if current_runner == "claude_cli" %>>Claude CLI — current default; shells out to <code>claude -p</code></option>
+      <option value="claude_sdk" <%= "selected" if current_runner == "claude_sdk" %>>Claude Agent SDK (Python sidecar) — unlocks structured outputs, hooks, subagents, MCP</option>
+    </select>
+    <p class="text-xs text-content-muted mt-1">
+      Applies to every skill/prompt step in this workflow unless overridden via <code>Step.config["runner"]</code>.
+      The SDK runner needs <code>bin/setup_sdk_runner</code> to have been run on the host.
+    </p>
+  </div>
+
   <div class="flex gap-2">
     <%= f.submit class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
     <%= link_to "Cancel", project_path(@project), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>

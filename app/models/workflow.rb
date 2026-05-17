@@ -9,4 +9,11 @@ class Workflow < ApplicationRecord
   def duplicate_to(target_project)
     WorkflowCopier.new(self, target_project).call
   end
+
+  # Workflow-level runner override. Reads config["runner"] — nil if the
+  # workflow doesn't pin a specific runner, in which case StepExecutor
+  # falls through to Setting["default_runner"] and finally to "claude_cli".
+  def runner_name
+    config["runner"].presence if config.is_a?(Hash)
+  end
 end

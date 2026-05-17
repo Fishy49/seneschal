@@ -251,4 +251,59 @@ class StepTest < ActiveSupport::TestCase
     assert_includes names, "flags.name"
     assert_includes names, "flags.age"
   end
+
+  # --- inherit_skill_defaults ---
+
+  test "skill step inherits default_json_schema + default_output_variable from its skill" do
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: json_schemas(:simple_schema),
+                  default_output_variable: "the_plan")
+    step = Step.new(
+      name: "Inheriting", workflow: workflows(:deploy),
+      step_type: "skill", skill: skill,
+      position: 11, timeout: 300
+    )
+    assert step.valid?
+    assert_equal json_schemas(:simple_schema).id, step.config["json_schema_id"]
+    assert_equal ["the_plan"], step.config["produces"]
+  end
+
+  test "explicit config wins over inherited defaults" do
+    skill = skills(:shared_skill)
+    other_schema = JsonSchema.create!(name: "other_test_schema", body: '{"type":"object"}')
+    skill.update!(default_json_schema: json_schemas(:simple_schema),
+                  default_output_variable: "default_var")
+    step = Step.new(
+      name: "Overriding", workflow: workflows(:deploy),
+      step_type: "skill", skill: skill,
+      position: 12, timeout: 300,
+      config: { "json_schema_id" => other_schema.id, "produces" => ["custom"] }
+    )
+    assert step.valid?
+    assert_equal other_schema.id, step.config["json_schema_id"]
+    assert_equal ["custom"], step.config["produces"]
+  end
+
+  test "inheritance does not apply when the skill has no defaults" do
+    step = Step.new(
+      name: "Plain", workflow: workflows(:deploy),
+      step_type: "skill", skill: skills(:shared_skill),
+      position: 13, timeout: 300
+    )
+    assert step.valid?
+    assert_nil step.config["json_schema_id"]
+    assert_nil step.config["produces"]
+  end
+
+  test "inheritance does not apply to non-skill step types" do
+    skills(:shared_skill).update!(default_json_schema: json_schemas(:simple_schema),
+                                  default_output_variable: "x")
+    step = Step.new(
+      name: "Script", workflow: workflows(:deploy),
+      step_type: "script", body: "echo hi",
+      position: 14, timeout: 60
+    )
+    assert step.valid?
+    assert_nil step.config["json_schema_id"]
+  end
 end

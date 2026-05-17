@@ -64,6 +64,49 @@
               class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{@gh[:ok] ? 'bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge' : 'bg-accent text-white hover:bg-accent-hover'}" %>
       </div>
     </div>
+
+    <%# ── Claude Agent SDK runner (optional) ── %>
+    <div class="bg-surface-card border border-edge rounded-lg p-5">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <h2 class="text-lg font-semibold mb-1">
+            Claude Agent SDK runner
+            <span class="ml-1 text-xs font-normal text-content-muted">— optional</span>
+          </h2>
+          <p class="text-sm text-content-muted">
+            Python sidecar that wraps the Claude Agent SDK. Unlocks structured outputs,
+            programmatic hooks, subagents, and MCP servers on a per-step basis.
+            Steps opt in via <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Step.config["runner"] = "claude_sdk"</code>
+            or globally via <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Setting["default_runner"] = "claude_sdk"</code>.
+            The CLI runner stays the default if this isn't installed.
+          </p>
+        </div>
+        <% if @sdk_runner[:ok] %>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success">Verified</span>
+        <% else %>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-input text-content-muted">Not installed</span>
+        <% end %>
+      </div>
+
+      <% if @sdk_runner[:ok] %>
+        <pre class="mt-3 text-xs bg-surface-input rounded-lg px-3 py-2 text-content-muted overflow-x-auto"><%= @sdk_runner[:details] %></pre>
+        <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_in_words(@sdk_runner[:checked_at]) %> ago</p>
+      <% else %>
+        <div class="mt-4 bg-surface-input rounded-lg px-4 py-3 text-sm space-y-2">
+          <p class="text-content-muted font-medium">Install:</p>
+          <pre class="text-xs text-content font-mono">bin/setup_sdk_runner</pre>
+          <p class="text-xs text-content-muted">
+            Idempotent. Uses <code>uv</code> if available, falls back to <code>python3 -m venv</code>.
+            Requires Python ≥ 3.10 on PATH.
+          </p>
+        </div>
+      <% end %>
+
+      <div class="mt-4">
+        <%= button_to @sdk_runner[:ok] ? "Re-check" : "Check", check_sdk_runner_setup_path,
+              class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{@sdk_runner[:ok] ? 'bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge' : 'bg-accent text-white hover:bg-accent-hover'}" %>
+      </div>
+    </div>
   </div>
 
     <%# ── Claude Permissions ── %>
