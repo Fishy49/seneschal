@@ -83,7 +83,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
@@ -92,7 +92,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_queryable_context(prompt) if @step.queries.any? && queryable_schemas.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
-    if @step.json_schema
+    # When the runner handles schemas natively (SDK's StructuredOutput tool
+    # injection) we deliberately omit the inline-JSON ```output``` block
+    # instructions — otherwise the model follows the prompt and emits text
+    # instead of calling the injected tool, leaving structured_output null.
+    if @step.json_schema && !runner.supports_structured_outputs?
       prompt = append_schema_instructions(prompt)
     elsif @step.produces.any?
       prompt = append_produces_instructions(prompt)

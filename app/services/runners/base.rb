@@ -34,5 +34,14 @@ module Runners
     )
       raise NotImplementedError, "#{self.class} must implement #execute"
     end
+
+    # Whether this runner can enforce a JSON schema natively (via constrained
+    # generation / tool injection) and surface the parsed object back on
+    # Result#structured_output. When true, StepExecutor will NOT append
+    # inline-JSON-emit instructions to the prompt — the runner handles it.
+    # When false, the prompt-engineered ```output block``` fallback is used.
+    def supports_structured_outputs?
+      false
+    end
   end
 end

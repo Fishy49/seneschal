@@ -19,6 +19,16 @@ module Runners
       Setting.find_by(key: "sdk_runner_script")&.destroy
     end
 
+    # ---- capabilities ----
+
+    test "advertises native structured-output support" do
+      assert_predicate @runner, :supports_structured_outputs?
+    end
+
+    test "ClaudeCLI does NOT advertise structured-output support" do
+      assert_not_predicate Runners::ClaudeCLI.new, :supports_structured_outputs?
+    end
+
     # ---- build_config ----
 
     test "build_config carries the prompt, cwd, model, max_turns through verbatim" do

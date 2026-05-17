@@ -20,6 +20,10 @@ module Runners
     BUNDLED_VENV_PYTHON = Rails.root.join("lib/sdk_runner/.venv/bin/python").to_s.freeze
     DEFAULT_RUNNER_SCRIPT = Rails.root.join("lib/sdk_runner/src/seneschal_sdk_runner/main.py").to_s.freeze
 
+    def supports_structured_outputs?
+      true
+    end
+
     def execute( # rubocop:disable Metrics/ParameterLists
       prompt:,
       cwd:,
