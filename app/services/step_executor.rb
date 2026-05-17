@@ -93,11 +93,13 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     # When the runner handles schemas natively (SDK's StructuredOutput tool
-    # injection) we deliberately omit the inline-JSON ```output``` block
-    # instructions — otherwise the model follows the prompt and emits text
-    # instead of calling the injected tool, leaving structured_output null.
-    if @step.json_schema && !runner.supports_structured_outputs?
-      prompt = append_schema_instructions(prompt)
+    # injection) we deliberately omit BOTH the schema-shape and the generic
+    # produces ```output``` block instructions — otherwise the model follows
+    # the prompt and emits text instead of calling the injected tool, leaving
+    # structured_output null. produces extraction still works downstream via
+    # splice_structured_output.
+    if @step.json_schema
+      prompt = append_schema_instructions(prompt) unless runner.supports_structured_outputs?
     elsif @step.produces.any?
       prompt = append_produces_instructions(prompt)
     end
