@@ -99,7 +99,11 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     # structured_output null. produces extraction still works downstream via
     # splice_structured_output.
     if @step.json_schema
-      prompt = append_schema_instructions(prompt) unless runner.supports_structured_outputs?
+      prompt = if runner.supports_structured_outputs?
+                 append_structured_output_tool_nudge(prompt)
+               else
+                 append_schema_instructions(prompt)
+               end
     elsif @step.produces.any?
       prompt = append_produces_instructions(prompt)
     end
@@ -838,12 +842,19 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   def validation_feedback_message(errors)
     output_var = @step.produces.first.presence || "result"
     bullets = errors.map { |e| "- #{e}" }.join("\n")
+    delivery_hint = if runner.supports_structured_outputs?
+                      "Call the **StructuredOutput** tool with the corrected `#{output_var}` value. " \
+                        "Do not emit it inline as text."
+                    else
+                      "Please re-emit the corrected `#{output_var}` value in the same `output` block format. " \
+                        "Include the full JSON, not a summary or status word."
+                    end
     <<~MSG
       The `#{output_var}` JSON you just emitted did not validate against the schema "#{@step.json_schema.name}":
 
       #{bullets}
 
-      Please re-emit the corrected `#{output_var}` value in the same `output` block format. Include the full JSON, not a summary or status word.
+      #{delivery_hint}
     MSG
   end
 
@@ -885,6 +896,26 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       #{schema.body}
       ```
     INSTRUCTIONS
+  end
+
+  # Sibling of append_schema_instructions for the SDK runner: instead of
+  # asking the model to emit JSON inline, just nudge it to deliver the final
+  # answer via the StructuredOutput tool (which the CLI auto-injects via
+  # --json-schema). Without this nudge, longer / agentic prompts whose body
+  # tells the model to "output the plan as markdown" tend to win — the model
+  # answers conversationally and never calls the tool, leaving
+  # result.structured_output null and tripping the validation retry loop.
+  def append_structured_output_tool_nudge(prompt)
+    output_var = @step.produces.first.presence || "result"
+    prompt + <<~NUDGE
+
+      ## Deliver Your Final Answer
+
+      When you are finished, call the **StructuredOutput** tool to deliver
+      the final result (variable name: `#{output_var}`). Do not emit the
+      result inline as text or in an ```output``` block — the tool call is
+      the only delivery channel for this step.
+    NUDGE
   end
 
   def append_produces_instructions(prompt)

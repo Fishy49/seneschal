@@ -251,6 +251,14 @@ def build_options(config: dict[str, Any]) -> Any:
     # requirement), this clause can drop the extra_args nudge.
     schema = config.get("json_schema")
     if isinstance(schema, dict) and schema:
+        # The bundled CLI (2.1.142) only registers its StructuredOutput tool
+        # when the schema's `$schema` URI is the draft-07 keyword. Anything
+        # newer (draft 2019-09, 2020-12) or older silently drops the tool,
+        # leaving the model with nowhere to deliver structured output. Strip
+        # the field defensively — JSON Schema treats omission as "any draft",
+        # which is what the CLI needs to be happy. Keep this stripping until
+        # the CLI gains broader draft support.
+        schema = {k: v for k, v in schema.items() if k != "$schema"}
         kwargs["output_format"] = {"type": "json_schema", "schema": schema}
         kwargs.setdefault("extra_args", {})["print"] = None
 
