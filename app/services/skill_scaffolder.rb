@@ -27,6 +27,39 @@ class SkillScaffolder
     new(**).call
   end
 
+  # Removes a SKILL.md (and the now-empty enclosing directory) created by an
+  # earlier `.call`. Used by SkillsController to clean up after an AR-side
+  # save failure so the next attempt doesn't trip the "already_existed"
+  # branch. Refuses to touch anything that doesn't resolve to a
+  # <skills_root>/<name>/SKILL.md shape under one of the known bases — that
+  # constraint is what makes this safe to call with a Result derived from
+  # user-controlled form input.
+  # Returns true when a rollback was performed (or there was nothing to roll
+  # back); false when the safety guard refused the target. Action verb, not a
+  # predicate — keep the cop quiet without renaming.
+  def self.rollback(result) # rubocop:disable Naming/PredicateMethod
+    return false unless result.is_a?(Result)
+    return false unless path_under_known_skills_root?(result.absolute_path)
+
+    File.delete(result.skill_md_path) if File.file?(result.skill_md_path)
+    Dir.delete(result.absolute_path) if Dir.exist?(result.absolute_path) && Dir.empty?(result.absolute_path)
+    true
+  end
+
+  # Whether `path` resolves inside a directory we'd legitimately scaffold a
+  # Skill under: a SkillLoader global root, or any `.seneschal/skills` subtree
+  # belonging to a known Project. Used by `rollback` as the safety guard so
+  # `File.delete` + `Dir.delete` can't be coaxed into touching arbitrary
+  # filesystem locations even when called with attacker-influenced input.
+  def self.path_under_known_skills_root?(path)
+    resolved = File.expand_path(path.to_s)
+    allowed_roots = SkillLoader.global_roots.map { |r| File.expand_path(r) }
+    allowed_roots += Project.where.not(local_path: [nil, ""]).pluck(:local_path).map do |lp|
+      File.expand_path(File.join(lp, ".seneschal", "skills"))
+    end
+    allowed_roots.any? { |root| resolved.start_with?(root + File::SEPARATOR) }
+  end
+
   def initialize(name:, description:, body: nil, project: nil, project_group: nil)
     @name = name.to_s.strip
     @description = description.to_s.strip

@@ -91,6 +91,44 @@ class SkillScaffolderTest < ActiveSupport::TestCase
     assert_match(/group/i, err.message)
   end
 
+  test "rollback removes the scaffolded SKILL.md and its enclosing directory" do
+    result = SkillScaffolder.call(name: "ephemeral", description: "x")
+    assert File.file?(result.skill_md_path)
+    assert File.directory?(result.absolute_path)
+
+    assert SkillScaffolder.rollback(result)
+    assert_not File.exist?(result.skill_md_path)
+    assert_not File.exist?(result.absolute_path)
+  end
+
+  test "rollback refuses to touch paths outside known skill roots" do
+    fake_result = SkillScaffolder::Result.new(
+      source_kind: "global",
+      relative_path: "x",
+      absolute_path: "/tmp/totally-elsewhere/x",
+      skill_md_path: "/tmp/totally-elsewhere/x/SKILL.md",
+      already_existed: false
+    )
+    FileUtils.mkdir_p("/tmp/totally-elsewhere/x")
+    File.write("/tmp/totally-elsewhere/x/SKILL.md", "not ours")
+
+    assert_not SkillScaffolder.rollback(fake_result)
+    assert File.exist?("/tmp/totally-elsewhere/x/SKILL.md"), "Rollback must not delete files outside known skill roots"
+  ensure
+    FileUtils.rm_rf("/tmp/totally-elsewhere")
+  end
+
+  test "rollback leaves the directory intact when it still contains other files" do
+    result = SkillScaffolder.call(name: "shared-dir", description: "x")
+    File.write(File.join(result.absolute_path, "extra.md"), "kept")
+
+    SkillScaffolder.rollback(result)
+
+    assert_not File.exist?(result.skill_md_path)
+    assert File.directory?(result.absolute_path)
+    assert File.exist?(File.join(result.absolute_path, "extra.md"))
+  end
+
   test "quotes descriptions containing YAML-significant characters" do
     result = SkillScaffolder.call(name: "tricky", description: "Use when: needs colons & quotes")
     parsed = SkillMdParser.parse(File.read(result.skill_md_path))

@@ -72,8 +72,10 @@ class SkillsController < ApplicationController
     else
       # Persisting the AR row failed after we wrote the file — back the file
       # out so the next attempt doesn't trip the "already_existed" branch on
-      # a half-created skill.
-      FileUtils.rm_rf(result.absolute_path)
+      # a half-created skill. SkillScaffolder.rollback enforces a path-
+      # confinement check so this is safe even though `result.absolute_path`
+      # ultimately derives from form input.
+      SkillScaffolder.rollback(result)
       render :new, status: :unprocessable_content
     end
   end
