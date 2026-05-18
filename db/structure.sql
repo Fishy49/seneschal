@@ -16,7 +16,7 @@ FOREIGN KEY ("step_id")
 );
 CREATE INDEX "index_run_steps_on_run_id" ON "run_steps" ("run_id") /*application='Seneschal'*/;
 CREATE INDEX "index_run_steps_on_step_id" ON "run_steps" ("step_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "runs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "context" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "error_message" text, "finished_at" datetime(6), "input" json DEFAULT '{}' NOT NULL, "pipeline_task_id" integer, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer NOT NULL, "system_flags" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/, "worktree_path" varchar /*application='Seneschal'*/, "worktree_retained" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, CONSTRAINT "fk_rails_fe71673043"
+CREATE TABLE IF NOT EXISTS "runs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "context" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "error_message" text, "finished_at" datetime(6), "input" json DEFAULT '{}' NOT NULL, "pipeline_task_id" integer, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer NOT NULL, "system_flags" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/, "worktree_path" varchar /*application='Seneschal'*/, "worktree_retained" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, "branch_name" varchar /*application='Seneschal'*/, CONSTRAINT "fk_rails_fe71673043"
 FOREIGN KEY ("pipeline_task_id")
   REFERENCES "pipeline_tasks" ("id")
 , CONSTRAINT "fk_rails_404232665a"
@@ -124,6 +124,7 @@ CREATE INDEX "index_skills_on_skill_repo_id" ON "skills" ("skill_repo_id") /*app
 CREATE INDEX "index_skills_on_archived_at" ON "skills" ("archived_at") /*application='Seneschal'*/;
 CREATE INDEX "index_skills_on_default_json_schema_id" ON "skills" ("default_json_schema_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260518100001'),
 ('20260518000001'),
 ('20260517000001'),
 ('20260516000001'),
