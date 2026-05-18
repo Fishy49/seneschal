@@ -189,16 +189,16 @@ class SkillsTest < ApplicationSystemTestCase
     visit edit_skill_path(skill)
 
     # Edit form deliberately omits Name (rename on disk) and Body (lives in
-    # SKILL.md) — just verify scope is mutable.
-    select "Group: Frontend", from: "Scope"
+    # SKILL.md) — just verify scope is mutable. Reassign the shared skill
+    # onto a project; the show page renders the project name in the header.
+    select "Project: Seneschal", from: "Scope"
     click_on "Update Skill"
 
-    # Wait for redirect to show. The show page renders the group name in the
-    # header so we don't need to query AR from the test thread (system tests
-    # run the Puma server on a thread whose new rows aren't always visible
-    # from the test thread under transactional isolation).
+    # Wait for redirect to show. The post-redirect render is the user-visible
+    # proof of the update — querying AR from the test thread crosses the
+    # system-test transactional isolation boundary in CI.
     assert_text "Skill updated"
-    assert_text "Group: Frontend"
+    assert_text "Seneschal"
   end
 
   test "delete skill" do

@@ -3,12 +3,15 @@ require "test_helper"
 class SkillImporterTest < ActiveSupport::TestCase
   setup do
     @project = projects(:seneschal)
-    @skills_dir = File.join(@project.local_path, ".claude", "skills")
   end
 
   test "returns nil when no .claude/skills directory" do
-    result = SkillImporter.new(@project).call
-    assert_nil result
+    Dir.mktmpdir do |empty_root|
+      project = Project.new(name: "Empty", repo_url: "https://github.com/t/e.git", local_path: empty_root)
+      project.save!(validate: false)
+      result = SkillImporter.new(project).call
+      assert_nil result
+    end
   end
 
   test "imports skills from SKILL.md files" do
@@ -35,6 +38,8 @@ class SkillImporterTest < ActiveSupport::TestCase
 
       skill = project.skills.find_by(name: "my-skill")
       assert_not_nil skill
+      assert_equal "project", skill.source_kind
+      assert_equal "my-skill", skill.relative_path
       assert_equal "A test skill", skill.description
       assert_includes skill.body, "# My Skill"
     end
@@ -44,7 +49,7 @@ class SkillImporterTest < ActiveSupport::TestCase
     Dir.mktmpdir do |dir|
       project = Project.new(name: "SkipTest", repo_url: "https://github.com/t/t.git", local_path: dir)
       project.save!(validate: false)
-      project.skills.create!(name: "existing", body: "old body")
+      project.skills.create!(name: "existing", source_kind: "project", relative_path: "existing")
 
       skill_dir = File.join(dir, ".claude", "skills", "existing")
       FileUtils.mkdir_p(skill_dir)
@@ -60,7 +65,6 @@ class SkillImporterTest < ActiveSupport::TestCase
       result = SkillImporter.new(project).call
       assert_empty result[:imported]
       assert_equal ["existing"], result[:skipped]
-      assert_equal "old body", project.skills.find_by(name: "existing").body
     end
   end
 
@@ -75,35 +79,6 @@ class SkillImporterTest < ActiveSupport::TestCase
 
       result = SkillImporter.new(project).call
       assert_equal ["fallback-name"], result[:imported]
-    end
-  end
-
-  test "imports skills under a project group when target is a ProjectGroup" do
-    Dir.mktmpdir do |dir|
-      project = Project.new(name: "GroupImportTest", repo_url: "https://github.com/t/t.git", local_path: dir)
-      project.save!(validate: false)
-      group = ProjectGroup.create!(name: "ImportGroup")
-
-      skill_dir = File.join(dir, ".claude", "skills", "foo")
-      FileUtils.mkdir_p(skill_dir)
-      File.write(File.join(skill_dir, "SKILL.md"), <<~MD)
-        ---
-        name: foo
-        description: A group skill
-        ---
-
-        Do foo things.
-      MD
-
-      result = SkillImporter.new(project, target: group).call
-      assert_equal ["foo"], result[:imported]
-      assert_empty result[:skipped]
-
-      skill = Skill.find_by(name: "foo")
-      assert_not_nil skill
-      assert_equal group.id, skill.project_group_id
-      assert_nil skill.project_id
-      assert_empty project.skills
     end
   end
 end

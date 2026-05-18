@@ -23,7 +23,6 @@
   <% end %>
 
   <% scope_options = [["Shared (available to all projects)", ""]] +
-       ProjectGroup.ordered.map { |g| ["Group: #{g.name}", "group:#{g.id}"] } +
        Project.order(:name).map { |p| ["Project: #{p.name}", "project:#{p.id}"] } %>
   <div class="mb-4">
     <%= f.label :scope, "Scope", class: "block text-sm font-medium text-content-muted mb-1.5" %>
@@ -33,8 +32,7 @@
     <% if skill.new_record? %>
       <p class="text-xs text-content-muted mt-1">
         <strong>Shared</strong> → <code><%= SkillLoader.global_root %>/&lt;name&gt;/SKILL.md</code><br>
-        <strong>Project</strong> → <code>&lt;project&gt;/.seneschal/skills/&lt;name&gt;/SKILL.md</code><br>
-        <em class="text-content-muted">Group-scoped skills don't have an on-disk location yet.</em>
+        <strong>Project</strong> → <code>&lt;project&gt;/.seneschal/skills/&lt;name&gt;/SKILL.md</code>
       </p>
     <% end %>
   </div>

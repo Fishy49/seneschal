@@ -2,22 +2,13 @@ class SkillsController < ApplicationController
   before_action :set_skill, only: [:show, :edit, :update, :destroy]
 
   def index
-    @skills = Skill.includes(:project, :project_group).order(:name)
-    @project_groups = ProjectGroup.ordered
-    return if params[:group_id].blank?
-
-    @skills = if params[:group_id] == "none"
-                @skills.where(project_group_id: nil)
-              else
-                @skills.where(project_group_id: params[:group_id])
-              end
+    @skills = Skill.includes(:project).order(:name)
   end
 
   def show
     # Auto-refresh cached frontmatter when the file on disk has drifted from
     # what we cached last. Cheap when nothing changed (sha256 of SKILL.md vs
-    # the stored content_hash); a no-op for legacy DB-only Skills.
-    return unless @skill.filesystem_backed?
+    # the stored content_hash); a no-op when the file is missing.
     return unless @skill.skill_md_path && File.exist?(@skill.skill_md_path)
 
     fresh_hash = @skill.compute_content_hash
@@ -38,19 +29,17 @@ class SkillsController < ApplicationController
   # root (`SkillLoader.global_root`).
   def create
     attrs = create_params
-    @skill = Skill.new(attrs.slice(:name, :description, :project_id, :project_group_id,
+    @skill = Skill.new(attrs.slice(:name, :description, :project_id,
                                    :default_json_schema_id, :default_output_variable))
 
     project = Project.find_by(id: attrs[:project_id])
-    project_group = ProjectGroup.find_by(id: attrs[:project_group_id])
 
     begin
       result = SkillScaffolder.call(
         name: attrs[:name],
         description: attrs[:description],
         body: attrs[:body],
-        project: project,
-        project_group: project_group
+        project: project
       )
     rescue SkillScaffolder::Error => e
       @skill.errors.add(:base, e.message)
@@ -134,16 +123,9 @@ class SkillsController < ApplicationController
     return unless attrs.key?(:scope)
 
     scope = attrs.delete(:scope)
-    case scope
-    when /\Agroup:(\d+)\z/
-      attrs[:project_group_id] = ::Regexp.last_match(1).to_i
-      attrs[:project_id] = nil
-    when /\Aproject:(\d+)\z/
-      attrs[:project_id] = ::Regexp.last_match(1).to_i
-      attrs[:project_group_id] = nil
-    else
-      attrs[:project_id] = nil
-      attrs[:project_group_id] = nil
-    end
+    attrs[:project_id] = case scope
+                         when /\Aproject:(\d+)\z/
+                           ::Regexp.last_match(1).to_i
+                         end
   end
 end

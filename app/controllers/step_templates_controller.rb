@@ -1,6 +1,6 @@
 class StepTemplatesController < ApplicationController
   def index
-    @templates = StepTemplate.ordered.includes(skill: [:project, :project_group])
+    @templates = StepTemplate.ordered.includes(skill: :project)
   end
 
   def destroy

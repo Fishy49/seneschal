@@ -2,12 +2,11 @@ class ProjectGroupsController < ApplicationController
   before_action :set_group, only: [:show, :edit, :update, :destroy]
 
   def index
-    @groups = ProjectGroup.ordered.includes(:projects, :skills)
+    @groups = ProjectGroup.ordered.includes(:projects)
   end
 
   def show
     @projects = @group.projects.order(:name)
-    @skills = @group.skills.order(:name)
   end
 
   def new

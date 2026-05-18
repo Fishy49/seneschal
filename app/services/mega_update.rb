@@ -26,8 +26,6 @@ require "open3"
 #      on each ready project's local_path. Normalizes the canonical clone
 #      back to a clean state for the out-of-band consumers (CLAUDE.md
 #      reader, code maps, context_projects).
-#   6. Export skills — materializes legacy DB-backed Skills as filesystem
-#      SKILL.md folders via SkillExporter. Skip with skip_skill_export: true.
 #
 # All steps emit progress lines to the configured io (defaults to $stdout).
 # Pass io: a StringIO to capture for tests.
@@ -39,8 +37,6 @@ class MegaUpdate
     :legacy_steps_converted,
     :legacy_steps_skipped,
     :projects_prepared,
-    :skills_exported,
-    :skills_skipped,
     :errors
   )
 
@@ -58,10 +54,9 @@ class MegaUpdate
     new(**).call
   end
 
-  def initialize(dry_run: false, stale_minutes: DEFAULT_STALE_MINUTES, skip_skill_export: false, io: $stdout)
+  def initialize(dry_run: false, stale_minutes: DEFAULT_STALE_MINUTES, io: $stdout)
     @dry_run = dry_run
     @stale_minutes = stale_minutes
-    @skip_skill_export = skip_skill_export
     @io = io
     @counts = {
       hung_runs_failed: 0,
@@ -69,8 +64,6 @@ class MegaUpdate
       legacy_steps_converted: 0,
       legacy_steps_skipped: 0,
       projects_prepared: 0,
-      skills_exported: 0,
-      skills_skipped: 0,
       errors: 0
     }
   end
@@ -83,7 +76,6 @@ class MegaUpdate
     fail_orphan_run_steps
     convert_legacy_pull_main_steps
     prepare_projects
-    export_skills unless @skip_skill_export
 
     finalize(aborted: false)
   end
@@ -94,7 +86,6 @@ class MegaUpdate
     say "=== Seneschal mega-update ==="
     say "  mode:           #{@dry_run ? "DRY RUN — no changes will be made" : "EXECUTE"}"
     say "  stale window:   #{@stale_minutes} minutes"
-    say "  skill export:   #{@skip_skill_export ? "SKIPPED" : "included"}"
     say ""
   end
 
@@ -117,7 +108,7 @@ class MegaUpdate
 
   def fail_hung_runs
     hung = Run.where(status: "running").where(updated_at: ..@stale_minutes.minutes.ago)
-    say "[1/5] Fail hung runs (status=running, no heartbeat for >#{@stale_minutes}m)"
+    say "[1/4] Fail hung runs (status=running, no heartbeat for >#{@stale_minutes}m)"
 
     if hung.none?
       say "  ok — none found"
@@ -158,7 +149,7 @@ class MegaUpdate
   end
 
   def fail_orphan_run_steps
-    say "[2/5] Fail orphan RunSteps (parent run terminal, RunStep still 'running')"
+    say "[2/4] Fail orphan RunSteps (parent run terminal, RunStep still 'running')"
 
     orphans = RunStep.where(status: "running").joins(:run).where.not(run: { status: "running" })
 
@@ -189,7 +180,7 @@ class MegaUpdate
   end
 
   def convert_legacy_pull_main_steps
-    say "[3/5] Convert legacy `git checkout main` workflow steps to no-ops"
+    say "[3/4] Convert legacy `git checkout main` workflow steps to no-ops"
 
     # SQL pre-filter to narrow the candidate set, then strict-regex match
     # in Ruby so we only touch bodies that are exactly the legacy pattern.
@@ -259,7 +250,7 @@ class MegaUpdate
   end
 
   def prepare_projects
-    say "[4/5] Normalize project local_paths (checkout default branch + pull --ff-only)"
+    say "[4/4] Normalize project local_paths (checkout default branch + pull --ff-only)"
 
     projects = Project.where(repo_status: "ready")
     if projects.none?
@@ -309,42 +300,6 @@ class MegaUpdate
     say ""
   end
 
-  def export_skills
-    say "[5/5] Export DB-backed Skills to filesystem SKILL.md folders"
-
-    skills = Skill.where(skill_repo_id: nil) # don't touch repo-indexed skills
-    if skills.none?
-      say "  ok — no skills to consider"
-      say ""
-      return
-    end
-
-    skills.find_each do |skill|
-      if @dry_run
-        say "  (would export) #{skill.display_name}"
-        next
-      end
-
-      result = SkillExporter.call(skill)
-      case result.status
-      when :exported
-        say "  exported #{skill.display_name} → #{result.path}"
-        @counts[:skills_exported] += 1
-      when :skipped
-        say "  skip     #{skill.display_name} (already on disk)"
-        @counts[:skills_skipped] += 1
-      when :skipped_group
-        say "  skip     #{skill.display_name} (group-scoped — migrate manually)"
-        @counts[:skills_skipped] += 1
-      end
-    rescue StandardError => e
-      @counts[:errors] += 1
-      say "  ERROR    #{skill.display_name}: #{e.class}: #{e.message}"
-    end
-
-    say ""
-  end
-
   def finalize(aborted:)
     say "=== Summary ==="
     if aborted
@@ -355,8 +310,6 @@ class MegaUpdate
       say "  legacy steps converted:     #{@counts[:legacy_steps_converted]}"
       say "  legacy steps already no-op: #{@counts[:legacy_steps_skipped]}"
       say "  projects prepared:          #{@counts[:projects_prepared]}"
-      say "  skills exported:            #{@counts[:skills_exported]}"
-      say "  skills already on disk:     #{@counts[:skills_skipped]}"
       say "  errors:                     #{@counts[:errors]}"
       say ""
       unless @dry_run

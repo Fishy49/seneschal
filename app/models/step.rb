@@ -123,9 +123,26 @@ class Step < ApplicationRecord
 
   def prompt_body(context = {})
     case step_type
-    when "skill"  then TemplateRenderer.new(skill.body, context).render if skill
+    when "skill"  then render_skill_body(context)
     when "prompt" then TemplateRenderer.new(body, context).render if body.present?
     end
+  end
+
+  # Skill bodies live in a SKILL.md on disk. Surface a precise error when
+  # the file is missing rather than silently returning nil and producing
+  # a "no prompt content" failure several layers down.
+  def render_skill_body(context)
+    return nil unless skill
+
+    body = skill.body
+    if body.blank?
+      path = skill.skill_md_path || "(unresolvable)"
+      raise "Skill '#{skill.name}' has no readable SKILL.md at #{path}. " \
+            "Make sure the file exists on disk (clone the project repo, " \
+            "re-run SkillImporter, or re-scaffold the skill)."
+    end
+
+    TemplateRenderer.new(body, context).render
   end
 
   private

@@ -2,7 +2,7 @@
 
 <h1 class="text-2xl font-semibold mb-6">Copy "<%= @source_workflow.name %>" to another project</h1>
 
-<% scoped_skills = @source_workflow.steps.includes(skill: [:project, :project_group]).filter_map { |s| s.skill if s.skill && !s.skill.shared? }.uniq %>
+<% scoped_skills = @source_workflow.steps.includes(skill: :project).filter_map { |s| s.skill if s.skill && !s.skill.shared? }.uniq %>
 <% if scoped_skills.any? %>
   <div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-6">
     <p class="text-sm font-semibold text-warning mb-2">Scoped skills detected</p>

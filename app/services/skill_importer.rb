@@ -6,9 +6,8 @@
 class SkillImporter
   attr_reader :imported, :skipped
 
-  def initialize(project, target: nil)
+  def initialize(project)
     @project = project
-    @target = target || project
     @imported = []
     @skipped = []
   end
@@ -33,25 +32,17 @@ class SkillImporter
     dir_name = File.basename(File.dirname(path))
     name = frontmatter["name"] || dir_name
 
-    existing = if @target.is_a?(ProjectGroup)
-                 Skill.find_by(project_group_id: @target.id, name: name)
-               else
-                 Skill.find_by(project_id: @target.id, name: name)
-               end
-
-    if existing
+    if Skill.find_by(project_id: @project.id, name: name)
       @skipped << name
       return
     end
 
-    attrs = {
+    skill = Skill.create!(
       name: name,
+      project: @project,
       source_kind: "project",
       relative_path: dir_name
-    }
-    attrs[@target.is_a?(ProjectGroup) ? :project_group : :project] = @target
-
-    skill = Skill.create!(attrs)
+    )
     skill.refresh_cached_metadata!
     @imported << name
   end

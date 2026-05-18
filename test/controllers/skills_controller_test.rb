@@ -19,29 +19,17 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "GET index displays group section with group name and skill" do
+  test "GET index renders shared and project sections" do
     get skills_path
     assert_response :success
-    assert_match "Frontend", response.body
-    assert_match "lint_check", response.body
-  end
-
-  test "GET index filters by group_id" do
-    get skills_path, params: { group_id: project_groups(:frontend).id }
-    assert_response :success
-    assert_match skills(:group_skill).name, response.body
-    assert_no_match skills(:shared_skill).name, response.body
+    assert_match "Shared", response.body
+    assert_match "ingest_feature", response.body
+    assert_match "deploy_check", response.body
   end
 
   test "GET show displays skill" do
     get skill_path(skills(:shared_skill))
     assert_response :success
-  end
-
-  test "GET show displays group designation for group skill" do
-    get skill_path(skills(:group_skill))
-    assert_response :success
-    assert_match "Group: Frontend", response.body
   end
 
   test "GET show surfaces on-disk path, frontmatter, scripts/, and references/ for filesystem-backed skills" do
@@ -96,7 +84,7 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
 
   test "POST create project skill scaffolds under <project>/.seneschal/skills/<name>/" do
     project = projects(:seneschal)
-    @scaffolded_project_dirs << File.join(project.local_path, ".seneschal")
+    @scaffolded_project_dirs << File.join(project.local_path, ".seneschal", "skills", "proj-new")
 
     assert_difference "Skill.count", 1 do
       post skills_path, params: {
@@ -109,17 +97,6 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_equal project.id, skill.project_id
     assert_equal "project_seneschal", skill.source_kind
     assert File.exist?(File.join(project.local_path, ".seneschal", "skills", "proj-new", "SKILL.md"))
-  end
-
-  test "POST create rejects group scope (no disk projection)" do
-    assert_no_difference "Skill.count" do
-      post skills_path, params: {
-        skill: { name: "group-skill", body: "x", description: "y",
-                 scope: "group:#{project_groups(:frontend).id}" }
-      }
-    end
-    assert_response :unprocessable_content
-    assert_match(/group/i, response.body)
   end
 
   test "POST create rejects non-kebab name" do
@@ -156,12 +133,6 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "GET edit pre-selects group scope" do
-    get edit_skill_path(skills(:group_skill))
-    assert_response :success
-    assert_select "option[selected][value=?]", "group:#{project_groups(:frontend).id}"
-  end
-
   test "PATCH update succeeds with scope-only params" do
     patch skill_path(skills(:shared_skill)), params: {
       skill: { scope: "" }
@@ -169,28 +140,15 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to skill_path(skills(:shared_skill))
   end
 
-  test "PATCH update reassigns from project to group" do
+  test "PATCH update reassigns from project to shared" do
     patch skill_path(skills(:project_skill)), params: {
-      skill: { scope: "group:#{project_groups(:frontend).id}" }
-    }
-    assert_redirected_to skill_path(skills(:project_skill))
-    skill = skills(:project_skill).reload
-    assert_nil skill.project_id
-    assert_equal project_groups(:frontend).id, skill.project_group_id
-  end
-
-  test "PATCH update reassigns from group to shared" do
-    patch skill_path(skills(:group_skill)), params: {
       skill: { scope: "" }
     }
-    skill = skills(:group_skill).reload
-    assert_nil skill.project_id
-    assert_nil skill.project_group_id
-    assert skill.shared?
+    assert_redirected_to skill_path(skills(:project_skill))
   end
 
   test "PATCH update updates default_output_variable" do
-    skill = skills(:group_skill)
+    skill = skills(:project_skill)
     patch skill_path(skill), params: {
       skill: { default_output_variable: "feature_plan" }
     }
@@ -199,7 +157,7 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "DELETE destroy" do
-    skill = Skill.create!(name: "disposable", body: "temp")
+    skill = Skill.create!(name: "disposable", source_kind: "global", relative_path: "disposable")
     assert_difference "Skill.count", -1 do
       delete skill_path(skill)
     end
