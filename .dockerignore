@@ -39,6 +39,20 @@
 # Ignore CI service files.
 /.github
 
+# Ignore host-built Python venv for the SDK runner. It's architecture-
+# specific (darwin/linux x86/arm), gets rebuilt inside the image, and
+# would otherwise clash with uv's "already exists" check.
+/lib/sdk_runner/.venv
+
+# Ignore docker-compose-mounted dirs so they don't fatten the build
+# context. The image creates these inside the container itself.
+/repos/*
+!/repos/.keep
+/skills/*
+!/skills/.keep
+/worktrees/*
+!/worktrees/.keep
+
 # Ignore development files
 /.devcontainer
 

@@ -40,12 +40,15 @@ WORKDIR /rails
 #   - git: every project lives in a worktree; gh + claude shell out to git
 #   - curl, ca-certificates: needed by Node install + downstream tooling
 #   - sqlite3 + libjemalloc2: app's database driver + memory allocator
-#   - python3 + venv: hosts the Claude Agent SDK sidecar (lib/sdk_runner/.venv)
+#   - python3: hosts the Claude Agent SDK sidecar (lib/sdk_runner/.venv)
 #   - gh: GitHub CLI, used by the `pr` step type and seeded workflows
+#   - uv: bootstraps the sidecar venv (Debian slim's `python3 -m venv` ships
+#     without working ensurepip, so we use uv — which the setup script
+#     already prefers when present)
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
       ca-certificates curl git sqlite3 libjemalloc2 \
-      python3 python3-venv python3-pip \
+      python3 \
       gnupg lsb-release && \
     # Node.js for Tailwind asset builds + claude CLI (npm package).
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash - && \
@@ -59,6 +62,8 @@ RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y gh && \
     # claude CLI (Anthropic's agent runtime).
     npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
+    # uv (Astral) — static binary, no python deps. Installs to /usr/local/bin.
+    curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     # libjemalloc preload — same as stock Rails Dockerfile.
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives ~/.npm

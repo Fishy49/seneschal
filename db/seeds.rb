@@ -15,7 +15,7 @@ end
 def seed_shared_skill(name:, description:, body:)
   result = SkillScaffolder.call(name: name, description: description, body: body)
 
-  skill = Skill.find_or_initialize_by(name: name, project: nil, project_group: nil)
+  skill = Skill.find_or_initialize_by(name: name, project: nil)
   skill.assign_attributes(source_kind: result.source_kind, relative_path: result.relative_path)
   skill.save!
   skill.refresh_cached_metadata!

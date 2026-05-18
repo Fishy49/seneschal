@@ -4,28 +4,51 @@
 # "you're in business" banner the first time the storage volume is
 # empty, and otherwise transparently exec's whatever command the
 # user passed.
+#
+# Server-startup checks (SECRET_KEY_BASE, db:prepare, seed banner) only
+# fire when the command is `./bin/rails server`. Ad-hoc shells, rails
+# console, runners, and one-shot tasks pass through untouched.
 
-# Refuse to start without a stable SECRET_KEY_BASE — Rails will silently
-# regenerate the dummy one we use at build time otherwise, invalidating
-# every session cookie on container restart.
-if [ -z "${SECRET_KEY_BASE:-}" ] && [ -z "${RAILS_MASTER_KEY:-}" ]; then
-  echo "ERROR: neither SECRET_KEY_BASE nor RAILS_MASTER_KEY is set." >&2
-  echo "Generate one with:  openssl rand -hex 64" >&2
-  echo "and pass it via -e SECRET_KEY_BASE=... (persist it across restarts)." >&2
-  exit 1
-fi
+is_server_startup() {
+  [ "${1:-}" = "./bin/rails" ] && [ "${2:-}" = "server" ]
+}
 
-# Detect "fresh storage volume" before db:prepare creates the SQLite files.
-FIRST_BOOT=0
-if [ ! -f /rails/storage/production.sqlite3 ]; then
-  FIRST_BOOT=1
-fi
+if is_server_startup "$@"; then
+  # Refuse to start without a stable SECRET_KEY_BASE — Rails will silently
+  # regenerate the dummy one we use at build time otherwise, invalidating
+  # every session cookie on container restart.
+  if [ -z "${SECRET_KEY_BASE:-}" ] && [ -z "${RAILS_MASTER_KEY:-}" ]; then
+    echo "ERROR: neither SECRET_KEY_BASE nor RAILS_MASTER_KEY is set." >&2
+    echo "Generate one with:  openssl rand -hex 64" >&2
+    echo "and pass it via -e SECRET_KEY_BASE=... (persist it across restarts)." >&2
+    exit 1
+  fi
 
-# Only run db:prepare when the rails server is about to start. Avoids
-# running migrations under `rails console`, `bin/rails runner`, etc.
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ] || \
-   [ "${1:-}" == "./bin/rails" ] && [ "${2:-}" == "server" ]; then
+  # Detect "fresh storage volume" before db:prepare creates the SQLite files.
+  FIRST_BOOT=0
+  if [ ! -f /rails/storage/production.sqlite3 ]; then
+    FIRST_BOOT=1
+  fi
+
   ./bin/rails db:prepare
+
+  # `db:prepare` won't load schemas for the auxiliary databases (queue,
+  # cache, cable) when their schema lives in `db/<name>_schema.rb` and the
+  # app's global schema_format is `:sql` — Rails goes looking for a non-
+  # existent `<name>_structure.sql` and silently does nothing. Backfill by
+  # establishing the connection ourselves and loading the .rb schema
+  # directly into each empty auxiliary DB. Idempotent: skipped once the
+  # tables exist.
+  for db in queue cache cable; do
+    schema_file="/rails/db/${db}_schema.rb"
+    [ -f "$schema_file" ] || continue
+    table_count=$(sqlite3 "/rails/storage/production_${db}.sqlite3" \
+      "SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';" 2>/dev/null || echo 0)
+    if [ "${table_count:-0}" -lt 1 ]; then
+      echo "==> Loading db/${db}_schema.rb into the ${db} database"
+      ./bin/rails runner "ActiveRecord::Base.establish_connection(:${db}); load('${schema_file}')"
+    fi
+  done
 
   if [ "$FIRST_BOOT" = "1" ]; then
     ./bin/rails db:seed
