@@ -83,14 +83,6 @@ class SkillScaffolderTest < ActiveSupport::TestCase
     assert_match(/frontmatter/i, err.message)
   end
 
-  test "rejects project_group scope" do
-    group = ProjectGroup.create!(name: "G")
-    err = assert_raises(SkillScaffolder::Error) do
-      SkillScaffolder.call(name: "g-skill", description: "x", project_group: group)
-    end
-    assert_match(/group/i, err.message)
-  end
-
   test "rollback removes the scaffolded SKILL.md and its enclosing directory" do
     result = SkillScaffolder.call(name: "ephemeral", description: "x")
     assert File.file?(result.skill_md_path)

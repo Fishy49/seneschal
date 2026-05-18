@@ -10,7 +10,6 @@ require "yaml"
 # Scope → target:
 #   project given             → <project.local_path>/.seneschal/skills/<name>/  (source_kind: "project_seneschal")
 #   no project (shared)       → <SkillLoader.global_root>/<name>/               (source_kind: "global")
-#   project_group given       → raises Error — group skills have no disk projection yet
 #
 # Frontmatter (`name`, `description`) is validated against the agentskills.io
 # schema via SkillMdValidator before any disk write. Idempotent: if SKILL.md
@@ -60,17 +59,14 @@ class SkillScaffolder
     allowed_roots.any? { |root| resolved.start_with?(root + File::SEPARATOR) }
   end
 
-  def initialize(name:, description:, body: nil, project: nil, project_group: nil)
+  def initialize(name:, description:, body: nil, project: nil)
     @name = name.to_s.strip
     @description = description.to_s.strip
     @body = body.to_s
     @project = project
-    @project_group = project_group
   end
 
   def call
-    raise Error, "Group-scoped skills have no on-disk location yet" if @project_group
-
     validate_name!
     validate_frontmatter!
 

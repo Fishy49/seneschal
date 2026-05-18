@@ -69,15 +69,7 @@ class DataImporter
     (@data[:skills] || []).each do |attrs|
       next if attrs[:project_name].present?
 
-      group = attrs[:project_group_name].present? ? @group_map[attrs[:project_group_name]] : nil
-      skill = Skill.create!(
-        name: attrs[:name],
-        description: attrs[:description],
-        body: attrs[:body],
-        project: nil,
-        project_group: group
-      )
-      @skill_map[skill_key(nil, attrs[:project_group_name], attrs[:name])] = skill
+      build_skill_from_attrs(attrs, project: nil)
       @stats[:skills] += 1
     end
   end
@@ -115,15 +107,41 @@ class DataImporter
     (@data[:skills] || []).each do |attrs|
       next unless attrs[:project_name] == project.name
 
-      skill = Skill.create!(
-        name: attrs[:name],
-        description: attrs[:description],
-        body: attrs[:body],
-        project: project
-      )
-      @skill_map[skill_key(project.name, nil, attrs[:name])] = skill
+      build_skill_from_attrs(attrs, project: project)
       @stats[:skills] += 1
     end
+  end
+
+  # Translates one Skill payload into an AR row + (optional) materialized
+  # SKILL.md on disk. Honors `source_kind`/`relative_path` from the export so
+  # the imported row resolves to the same on-disk path. When the export
+  # bundled the SKILL.md content via `skill_md_content`, this method writes
+  # it back so the imported install is self-contained even if the project
+  # repo isn't cloned locally yet.
+  def build_skill_from_attrs(attrs, project:)
+    skill = Skill.create!(
+      name: attrs[:name],
+      description: attrs[:description],
+      project: project,
+      source_kind: attrs[:source_kind],
+      relative_path: attrs[:relative_path]
+    )
+
+    materialize_skill_md(skill, attrs[:skill_md_content])
+    skill.refresh_cached_metadata!
+    @skill_map[skill_key(project&.name, attrs[:name])] = skill
+    skill
+  end
+
+  def materialize_skill_md(skill, content)
+    return if content.blank?
+
+    path = skill.skill_md_path
+    return if path.nil?
+    return if File.exist?(path)
+
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, content)
   end
 
   def import_workflow(project, wf_attrs)
@@ -143,7 +161,7 @@ class DataImporter
   end
 
   def import_step(workflow, attrs)
-    skill = find_skill(attrs[:skill_project_name], attrs[:skill_project_group_name], attrs[:skill_name])
+    skill = find_skill(attrs[:skill_project_name], attrs[:skill_name])
     config = (attrs[:config] || {}).dup
     if attrs[:json_schema_name].present? && (schema = @schema_map[attrs[:json_schema_name]])
       config = config.merge("json_schema_id" => schema.id)
@@ -179,7 +197,7 @@ class DataImporter
 
   def import_step_templates
     (@data[:step_templates] || []).each do |attrs|
-      skill = find_skill(attrs[:skill_project_name], attrs[:skill_project_group_name], attrs[:skill_name])
+      skill = find_skill(attrs[:skill_project_name], attrs[:skill_name])
       StepTemplate.create!(
         name: attrs[:name],
         step_type: attrs[:step_type],
@@ -194,13 +212,13 @@ class DataImporter
     end
   end
 
-  def find_skill(project_name, group_name, skill_name)
+  def find_skill(project_name, skill_name)
     return nil unless skill_name
 
-    @skill_map[skill_key(project_name, group_name, skill_name)]
+    @skill_map[skill_key(project_name, skill_name)]
   end
 
-  def skill_key(project_name, group_name, skill_name)
-    "#{project_name || "shared"}:#{group_name || "nogroup"}:#{skill_name}"
+  def skill_key(project_name, skill_name)
+    "#{project_name || "shared"}:#{skill_name}"
   end
 end

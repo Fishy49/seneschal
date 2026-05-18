@@ -2,42 +2,27 @@ class Skill < ApplicationRecord
   SOURCE_KINDS = SkillLoader::SOURCE_KINDS
 
   belongs_to :project, optional: true
-  belongs_to :project_group, optional: true
   belongs_to :skill_repo, optional: true
   belongs_to :default_json_schema, class_name: "JsonSchema", optional: true
   has_many :steps, dependent: :nullify
   has_many :step_templates, dependent: :nullify
 
-  validates :name, presence: true, uniqueness: { scope: [:project_id, :project_group_id, :skill_repo_id] }
-  validates :body, presence: true, unless: :filesystem_backed?
-  validates :source_kind, inclusion: { in: SOURCE_KINDS }, allow_nil: true
+  validates :name, presence: true, uniqueness: { scope: [:project_id, :skill_repo_id] }
+  validates :source_kind, presence: true, inclusion: { in: SOURCE_KINDS }
+  validates :relative_path, presence: true
   validates :default_output_variable,
             format: { with: /\A[a-z][a-z0-9_]*\z/, message: "must be snake_case (letters, digits, underscores; start with a letter)" },
             allow_blank: true
   validate :default_output_variable_present_when_schema_set
-  validate :scope_is_exclusive
 
   scope :active, -> { where(archived_at: nil) }
   scope :archived, -> { where.not(archived_at: nil) }
 
-  scope :shared, -> { where(project_id: nil, project_group_id: nil) }
-  scope :group_scoped, -> { where.not(project_group_id: nil) }
-  scope :for_group, ->(group) { where(project_group_id: group.id) }
-  scope :for_project, lambda { |project|
-    base = where(project_id: nil, project_group_id: nil).or(where(project_id: project.id))
-    if project.project_group_id.present?
-      base.or(where(project_group_id: project.project_group_id))
-    else
-      base
-    end
-  }
+  scope :shared, -> { where(project_id: nil) }
+  scope :for_project, ->(project) { where(project_id: nil).or(where(project_id: project.id)) }
 
   def shared?
-    project_id.nil? && project_group_id.nil?
-  end
-
-  def group_scoped?
-    project_group_id.present?
+    project_id.nil?
   end
 
   def project_scoped?
@@ -49,8 +34,6 @@ class Skill < ApplicationRecord
       "#{skill_repo.name}/#{name}"
     elsif shared?
       name
-    elsif group_scoped?
-      "#{project_group.name}/#{name}"
     else
       "#{project.name}/#{name}"
     end
@@ -61,25 +44,22 @@ class Skill < ApplicationRecord
   end
 
   def scope_value
-    if group_scoped?
-      "group:#{project_group_id}"
-    elsif project_scoped?
-      "project:#{project_id}"
-    else
-      ""
-    end
+    project_scoped? ? "project:#{project_id}" : ""
   end
 
   # --- Filesystem-backed (agentskills.io SKILL.md) ---
 
+  # Every Skill is filesystem-backed now; this predicate stays as a stable
+  # public API for callers that branch on the legacy DB-backed path. Defined
+  # by the same fields the create-path validators require.
   def filesystem_backed?
     relative_path.present? && source_kind.present?
   end
 
-  # Absolute path to the skill directory on disk. Returns nil if this skill is
-  # legacy DB-backed, if project_group-scoped (no disk projection yet), or if
-  # the owning project / SkillRepo isn't available. For "global" skills the
-  # path is resolved across SkillLoader.global_roots in priority order.
+  # Absolute path to the skill directory on disk. Returns nil when the
+  # owning project / SkillRepo isn't available (unclonded repo, missing
+  # skill repo, etc). For "global" skills the path is resolved across
+  # SkillLoader.global_roots in priority order.
   def absolute_path
     return nil unless filesystem_backed?
 
@@ -149,10 +129,9 @@ class Skill < ApplicationRecord
   end
 
   # Parsed SKILL.md (frontmatter + body). Memoized — both the `File.exist?`
-  # check and the parse happen at most once per instance. Returns nil if the
-  # skill isn't filesystem-backed or its SKILL.md is missing from disk; in
-  # that case `body` falls back to the legacy DB column. Call
-  # `refresh_cached_metadata!` (or re-instantiate the record) to invalidate.
+  # check and the parse happen at most once per instance. Returns nil when
+  # the SKILL.md is missing from disk. Call `refresh_cached_metadata!`
+  # (or re-instantiate the record) to invalidate.
   def parsed_skill_md
     return @parsed_skill_md if defined?(@parsed_skill_md)
 
@@ -162,27 +141,20 @@ class Skill < ApplicationRecord
 
   def frontmatter
     return cached_metadata if cached_metadata.present? && !defined?(@parsed_skill_md)
-    return {} unless filesystem_backed?
 
     parsed_skill_md&.frontmatter || {}
   end
 
-  # Returns the body content used as the prompt template. For filesystem-backed
-  # skills it's the post-frontmatter portion of SKILL.md; for legacy DB skills
-  # it's the body column. Callers (Step#prompt_body, TemplateRenderer) don't
-  # need to care which backing is in use.
+  # Returns the body content used as the prompt template — the post-
+  # frontmatter portion of SKILL.md on disk. Returns nil when the file is
+  # missing; callers that render the prompt (Step#prompt_body) raise a
+  # clear error in that case rather than silently propagating nil.
   def body
-    return super unless filesystem_backed?
-
-    parsed = parsed_skill_md
-    parsed ? parsed.body : super
+    parsed_skill_md&.body
   end
 
-  # Sha256 of the SKILL.md contents. nil for legacy DB skills or when the
-  # file is missing on disk.
+  # Sha256 of the SKILL.md contents. nil when the file is missing on disk.
   def compute_content_hash
-    return nil unless filesystem_backed?
-
     path = skill_md_path
     return nil unless path && File.exist?(path)
 
@@ -190,8 +162,6 @@ class Skill < ApplicationRecord
   end
 
   def refresh_cached_metadata! # rubocop:disable Naming/PredicateMethod
-    return false unless filesystem_backed?
-
     remove_instance_variable(:@parsed_skill_md) if defined?(@parsed_skill_md)
     fresh = parsed_skill_md
     return false unless fresh
@@ -220,12 +190,6 @@ class Skill < ApplicationRecord
       { name: relative, absolute: path, size: File.size(path) }
     end
     entries.sort_by { |f| f[:name] }
-  end
-
-  def scope_is_exclusive
-    return unless project_id.present? && project_group_id.present?
-
-    errors.add(:base, "Skill cannot belong to both a project and a project group")
   end
 
   # A schema without an output-variable name is unusable from a Step (we'd

@@ -68,14 +68,15 @@ class DataExporterTest < ActiveSupport::TestCase
     assert_equal 1, parsed["seneschal_export"]["version"]
   end
 
-  test "exports group-scoped skills with project_group_name" do
+  test "exports filesystem-backed skill metadata + SKILL.md content" do
     data = DataExporter.new.call
     skills = data[:seneschal_export][:skills]
 
-    group_skill = skills.find { |s| s[:name] == skills(:group_skill).name }
-    assert_not_nil group_skill
-    assert_nil group_skill[:project_name]
-    assert_equal "Frontend", group_skill[:project_group_name]
+    shared = skills.find { |s| s[:name] == skills(:shared_skill).name }
+    assert_not_nil shared
+    assert_equal "global", shared[:source_kind]
+    assert_equal "ingest_feature", shared[:relative_path]
+    assert_includes shared[:skill_md_content].to_s, "name: ingest_feature"
   end
 
   test "exporter includes project_groups and project skip_permissions" do

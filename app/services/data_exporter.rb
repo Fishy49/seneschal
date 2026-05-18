@@ -30,20 +30,26 @@ class DataExporter
     end
   end
 
+  # Skills are filesystem-backed (agentskills.io); the source-of-truth body
+  # lives in a SKILL.md on disk. Export captures enough metadata for the
+  # importer to recreate the AR row + scaffold a matching SKILL.md, so the
+  # export remains self-contained across hosts even if the target machine
+  # doesn't have the original project repos checked out.
   def export_skills
-    Skill.includes(:project, :project_group).order(:name).map do |skill|
+    Skill.includes(:project).order(:name).map do |skill|
       {
         name: skill.name,
         description: skill.description,
-        body: skill.body,
-        project_name: skill.project&.name,
-        project_group_name: skill.project_group&.name
+        source_kind: skill.source_kind,
+        relative_path: skill.relative_path,
+        skill_md_content: skill.skill_md_path && File.exist?(skill.skill_md_path) ? File.read(skill.skill_md_path) : nil,
+        project_name: skill.project&.name
       }
     end
   end
 
   def export_step_templates
-    StepTemplate.includes(skill: [:project, :project_group]).ordered.map do |t|
+    StepTemplate.includes(skill: :project).ordered.map do |t|
       {
         name: t.name,
         step_type: t.step_type,
@@ -51,7 +57,6 @@ class DataExporter
         config: t.config,
         skill_name: t.skill&.name,
         skill_project_name: t.skill&.project&.name,
-        skill_project_group_name: t.skill&.project_group&.name,
         max_retries: t.max_retries,
         timeout: t.timeout,
         input_context: t.input_context
@@ -97,7 +102,6 @@ class DataExporter
       config: step.config,
       skill_name: step.skill&.name,
       skill_project_name: step.skill&.project&.name,
-      skill_project_group_name: step.skill&.project_group&.name,
       json_schema_name: step.json_schema&.name,
       max_retries: step.max_retries,
       timeout: step.timeout,

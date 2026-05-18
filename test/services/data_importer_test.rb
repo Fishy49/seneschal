@@ -80,14 +80,14 @@ class DataImporterTest < ActiveSupport::TestCase
     assert_equal original_count, Project.count
   end
 
-  test "round-trip preserves group-scoped skills" do
+  test "round-trip preserves filesystem-backed skill metadata" do
     DataImporter.new(@export_data).call
 
-    skill = Skill.find_by(name: "lint_check")
+    skill = Skill.find_by(name: "ingest_feature")
     assert_not_nil skill
     assert_nil skill.project_id
-    assert_not_nil skill.project_group_id
-    assert_equal "Frontend", skill.project_group.name
+    assert_equal "global", skill.source_kind
+    assert_equal "ingest_feature", skill.relative_path
   end
 
   test "falls back to draft for tasks without workflow" do

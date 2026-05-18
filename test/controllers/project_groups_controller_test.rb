@@ -68,10 +68,10 @@ class ProjectGroupsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_groups_path
   end
 
-  test "GET show lists projects and skills" do
+  test "GET show lists projects in the group" do
+    projects(:seneschal).update!(project_group: project_groups(:frontend))
     get project_group_path(project_groups(:frontend))
     assert_response :success
-    assert_match "lint_check", response.body
     assert_match "Seneschal", response.body
   end
 
