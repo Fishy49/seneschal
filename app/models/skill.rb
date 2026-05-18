@@ -120,6 +120,34 @@ class Skill < ApplicationRecord
     abs && File.join(abs, "references")
   end
 
+  # Sorted relative-path strings for every file under scripts/ or references/.
+  # Returns [] when the directory is missing. Used by the show page to surface
+  # the auxiliary files that ship alongside SKILL.md as part of an
+  # agentskills.io-conformant skill.
+  def scripts_files
+    list_files_under(scripts_dir)
+  end
+
+  def references_files
+    list_files_under(references_dir)
+  end
+
+  def read_auxiliary_file(kind, relative_filename)
+    base = case kind.to_s
+           when "scripts" then scripts_dir
+           when "references" then references_dir
+           end
+    return nil if base.nil?
+
+    full = File.expand_path(relative_filename, base)
+    # Path-traversal guard: refuse anything that resolves outside the
+    # scripts/ or references/ subtree.
+    return nil unless full.start_with?(File.expand_path(base) + File::SEPARATOR)
+    return nil unless File.file?(full)
+
+    File.read(full)
+  end
+
   # Parsed SKILL.md (frontmatter + body). Memoized — both the `File.exist?`
   # check and the parse happen at most once per instance. Returns nil if the
   # skill isn't filesystem-backed or its SKILL.md is missing from disk; in
@@ -168,11 +196,31 @@ class Skill < ApplicationRecord
     fresh = parsed_skill_md
     return false unless fresh
 
-    update!(cached_metadata: fresh.frontmatter, content_hash: compute_content_hash)
+    # Mirror description from frontmatter into the dedicated column so list
+    # pages and search predicates don't have to disk-read on every render.
+    # cached_metadata stays the source of truth for everything else (allowed-
+    # tools, model, version, license, etc.).
+    update!(
+      cached_metadata: fresh.frontmatter,
+      content_hash: compute_content_hash,
+      description: fresh.frontmatter["description"].to_s.presence
+    )
     true
   end
 
   private
+
+  def list_files_under(dir)
+    return [] if dir.nil? || !File.directory?(dir)
+
+    entries = Dir.glob(File.join(dir, "**", "*")).filter_map do |path|
+      next unless File.file?(path)
+
+      relative = Pathname.new(path).relative_path_from(Pathname.new(dir)).to_s
+      { name: relative, absolute: path, size: File.size(path) }
+    end
+    entries.sort_by { |f| f[:name] }
+  end
 
   def scope_is_exclusive
     return unless project_id.present? && project_group_id.present?

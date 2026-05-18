@@ -6,10 +6,25 @@ User.find_or_create_by!(email: "admin@seneschal.dev") do |u|
 end
 
 # ── Shared skills ────────────────────────────────────────────
+#
+# Scaffolds an agentskills.io-conformant SKILL.md under SkillLoader.global_root
+# (default <rails_root>/skills/<name>/SKILL.md), then upserts a Skill row that
+# points at the file. Idempotent on both axes — the scaffolder leaves an
+# existing SKILL.md alone and `find_or_initialize_by` reuses an existing row.
 
-Skill.find_or_create_by!(name: "ingest_feature", project: nil) do |s|
-  s.description = "Create feature branch and draft PR from task"
-  s.body = <<~'PROMPT'
+def seed_shared_skill(name:, description:, body:)
+  result = SkillScaffolder.call(name: name, description: description, body: body)
+
+  skill = Skill.find_or_initialize_by(name: name, project: nil, project_group: nil)
+  skill.assign_attributes(source_kind: result.source_kind, relative_path: result.relative_path)
+  skill.save!
+  skill.refresh_cached_metadata!
+end
+
+seed_shared_skill(
+  name: "ingest_feature",
+  description: "Create feature branch and draft PR from task",
+  body: <<~'PROMPT'
     # Ingest Feature
 
     You are working in a project repository.
@@ -44,18 +59,17 @@ Skill.find_or_create_by!(name: "ingest_feature", project: nil) do |s|
     PR #<number> created on branch feature/<branch-name>
     ```
   PROMPT
-end
+)
 
-Skill.find_or_create_by!(name: "plan_feature", project: nil) do |s|
-  s.description = "Explore codebase and write a detailed implementation plan"
-  s.body = <<~PROMPT
+seed_shared_skill(
+  name: "plan_feature",
+  description: "Explore the codebase and produce a detailed implementation plan",
+  body: <<~PROMPT
     # Plan Feature Implementation
 
-    You are working in a project repository.
-
-    ## Task
-
-    Produce a detailed implementation plan for the following feature. The plan must be thorough enough that a separate agent can execute it without further codebase exploration.
+    You are working in a project repository. Produce an implementation plan
+    thorough enough that a separate implementer can execute it without
+    further codebase exploration.
 
     ## Feature
 
@@ -63,43 +77,28 @@ Skill.find_or_create_by!(name: "plan_feature", project: nil) do |s|
 
     ${task_body}
 
-    ## Exploration
+    ## How to work
 
     1. Examine the project structure — understand the frameworks, conventions, and directory layout.
-    2. Read files directly related to the feature area.
-    3. Use grep to find existing patterns, similar features, and relevant code.
+    2. Read files directly related to the feature area; follow imports and call sites as the feature demands.
+    3. Use `grep` to find existing patterns, similar features, and relevant code.
+    4. Identify the patterns from existing code you must mirror, and the project's lint/style rules.
+    5. Think through edge cases implied by the feature but not explicitly stated.
 
-    ## Plan Format
+    ## What the plan must cover
 
-    Output the plan with exactly these five sections:
-
-    ### 1. Files to create
-    Each new file: full path + one-line purpose.
-
-    ### 2. Files to modify
-    Each changed file: full path + specific changes (name the methods/constants being added or changed).
-
-    ### 3. Implementation steps
-    Ordered, atomic steps. For each: what to write/change, exact location (file + class/method), and why if non-obvious.
-
-    ### 4. Test plan
-    For each acceptance criterion: test name, setup, input, and expected output.
-
-    ### 5. Gotchas and constraints
-    - Patterns from existing code that must be followed
-    - Linting/style rules observed in the project
-    - Testing helpers and conventions
-    - Edge cases implied by the feature but not stated
-
-    ## Output
-
-    Output ONLY the implementation plan. Do not include any preamble, commentary, or summary lines.
+    - **New files** — for each, the path and a one-line reason it exists.
+    - **Files to modify** — for each, the specific methods, constants, or sections being added or changed.
+    - **Implementation steps** — ordered and atomic. Each step pins to a precise location (file + class/method) and includes the rationale when it isn't obvious from the change itself.
+    - **Tests** — one case per acceptance criterion, with setup, the input/command, and the exact expected output text or pattern.
+    - **Gotchas and constraints** — patterns to mirror, lint rules to respect, testing helpers available, and edge cases the feature implies but doesn't state.
   PROMPT
-end
+)
 
-Skill.find_or_create_by!(name: "implement_feature", project: nil) do |s|
-  s.description = "Write tests and code following the plan, then push"
-  s.body = <<~'PROMPT'
+seed_shared_skill(
+  name: "implement_feature",
+  description: "Write tests and code following the plan, then push",
+  body: <<~'PROMPT'
     # Implement Feature
 
     You are working in a project repository.
@@ -135,11 +134,12 @@ Skill.find_or_create_by!(name: "implement_feature", project: nil) do |s|
 
     Print: `Implementation complete for PR #${pr_number}`
   PROMPT
-end
+)
 
-Skill.find_or_create_by!(name: "fix_failing_tests", project: nil) do |s|
-  s.description = "Fix CI failures based on error output"
-  s.body = <<~'PROMPT'
+seed_shared_skill(
+  name: "fix_failing_tests",
+  description: "Fix CI failures based on error output",
+  body: <<~'PROMPT'
     # Fix Failing Tests
 
     You are working in a project repository.
@@ -171,6 +171,6 @@ Skill.find_or_create_by!(name: "fix_failing_tests", project: nil) do |s|
 
     Print: `Fixes pushed for PR #${pr_number}`
   PROMPT
-end
+)
 
 Rails.logger.debug { "Seeded #{User.count} user(s), #{Skill.where(project: nil).count} shared skill(s)" }

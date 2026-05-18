@@ -1,0 +1,28 @@
+<%# Renders a list of files under scripts/ or references/ for a Skill's show
+    page. Each file shows its relative name + byte size, and is collapsible
+    via <details> so multi-file directories don't dominate the page.
+    Content is read on render (no separate route); the path-traversal
+    guard lives in Skill#read_auxiliary_file. %>
+<div class="space-y-2">
+  <% files.each do |file| %>
+    <details class="border border-edge rounded-lg bg-surface-input/40">
+      <summary class="cursor-pointer px-3 py-2 flex items-center justify-between text-sm">
+        <code class="font-mono"><%= file[:name] %></code>
+        <span class="text-xs text-content-muted"><%= number_to_human_size(file[:size]) %></span>
+      </summary>
+      <div class="border-t border-edge bg-surface-card">
+        <%
+          content = @skill.read_auxiliary_file(kind, file[:name])
+          ext = File.extname(file[:name]).delete(".")
+        %>
+        <% if content.nil? %>
+          <p class="px-3 py-2 text-xs text-content-muted italic">Could not read file.</p>
+        <% elsif content.bytesize > 200_000 %>
+          <p class="px-3 py-2 text-xs text-content-muted italic">File too large to preview (<%= number_to_human_size(content.bytesize) %>). Open it from <code><%= file[:absolute] %></code>.</p>
+        <% else %>
+          <pre class="m-0 px-3 py-2 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words"><code class="language-<%= ext.presence || "text" %>"><%= content %></code></pre>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
+</div>

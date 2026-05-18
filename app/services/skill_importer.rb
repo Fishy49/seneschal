@@ -1,3 +1,8 @@
+# Scans a project's `.claude/skills/<name>/SKILL.md` files and creates the
+# matching Skill rows pointing at them. Filesystem-backed only — the rows
+# store `source_kind: "project"` + `relative_path` and resolve their body
+# from disk on access. We don't write into the legacy `body` column; the
+# row is a pointer, not a copy.
 class SkillImporter
   attr_reader :imported, :skipped
 
@@ -25,8 +30,8 @@ class SkillImporter
     parsed = SkillMdParser.parse(File.read(path))
     frontmatter = parsed.frontmatter
 
-    name = frontmatter["name"] || File.basename(File.dirname(path))
-    description = frontmatter["description"]
+    dir_name = File.basename(File.dirname(path))
+    name = frontmatter["name"] || dir_name
 
     existing = if @target.is_a?(ProjectGroup)
                  Skill.find_by(project_group_id: @target.id, name: name)
@@ -39,11 +44,15 @@ class SkillImporter
       return
     end
 
-    if @target.is_a?(ProjectGroup)
-      Skill.create!(name: name, description: description, body: parsed.body.strip, project_group: @target)
-    else
-      Skill.create!(name: name, description: description, body: parsed.body.strip, project: @target)
-    end
+    attrs = {
+      name: name,
+      source_kind: "project",
+      relative_path: dir_name
+    }
+    attrs[@target.is_a?(ProjectGroup) ? :project_group : :project] = @target
+
+    skill = Skill.create!(attrs)
+    skill.refresh_cached_metadata!
     @imported << name
   end
 end

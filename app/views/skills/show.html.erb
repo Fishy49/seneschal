@@ -17,15 +17,75 @@
   </div>
 </div>
 
+<% if @skill.filesystem_backed? && @skill.absolute_path %>
+  <div class="mb-4 p-4 border border-edge rounded-lg bg-surface-muted/40">
+    <div class="flex items-start gap-2 mb-2">
+      <span class="text-sm font-medium text-content-muted">On disk:</span>
+      <code class="text-xs text-content font-mono break-all"><%= @skill.absolute_path %></code>
+    </div>
+    <p class="text-xs text-content-muted">
+      Edit <code>SKILL.md</code> directly to change the body, frontmatter, or <code>allowed-tools</code>.
+      Drop helper files into <code>scripts/</code> (executable utilities that run without consuming context)
+      or <code>references/</code> (lazy-loaded docs the agent can read on demand).
+      Reloading this page re-syncs cached frontmatter from disk.
+    </p>
+  </div>
+<% end %>
+
 <% if @skill.description.present? %>
   <p class="text-content-muted mb-4"><%= @skill.description %></p>
 <% end %>
 
+<% if @skill.filesystem_backed? && @skill.frontmatter.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <h2 class="text-lg font-semibold mb-3">Frontmatter</h2>
+    <table class="w-full border-collapse">
+      <tbody>
+        <% @skill.frontmatter.each do |key, value| %>
+          <tr>
+            <th class="text-left px-3 py-2 border-b border-edge text-xs font-mono text-content-muted align-top w-40"><%= key %></th>
+            <td class="px-3 py-2 border-b border-edge text-sm">
+              <% if value.is_a?(Array) %>
+                <code class="text-xs font-mono"><%= value.join(", ") %></code>
+              <% else %>
+                <code class="text-xs font-mono whitespace-pre-wrap"><%= value %></code>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
 <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="markdown">
-  <h2 class="text-lg font-semibold mb-3">Prompt</h2>
+  <h2 class="text-lg font-semibold mb-3">Prompt body</h2>
   <div class="code-preview" data-markdown-target="output"></div>
   <template data-markdown-target="source"><%= @skill.body %></template>
 </div>
+
+<% scripts = @skill.scripts_files %>
+<% references = @skill.references_files %>
+
+<% if scripts.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <h2 class="text-lg font-semibold mb-3">
+      <code class="text-base font-mono">scripts/</code>
+      <span class="text-xs font-normal text-content-muted ml-2">deterministic helpers — run without consuming context</span>
+    </h2>
+    <%= render "aux_files", kind: "scripts", files: scripts, base: @skill.scripts_dir %>
+  </div>
+<% end %>
+
+<% if references.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <h2 class="text-lg font-semibold mb-3">
+      <code class="text-base font-mono">references/</code>
+      <span class="text-xs font-normal text-content-muted ml-2">lazy-loaded docs the agent can read on demand</span>
+    </h2>
+    <%= render "aux_files", kind: "references", files: references, base: @skill.references_dir %>
+  </div>
+<% end %>
 
 <% if @skill.steps.any? %>
   <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">

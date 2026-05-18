@@ -7,11 +7,20 @@
     </div>
   <% end %>
 
-  <div class="mb-4">
-    <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.text_field :name, placeholder: "ingest_feature",
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
-  </div>
+  <% if skill.new_record? %>
+    <div class="mb-4">
+      <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_field :name, placeholder: "ingest-feature",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent font-mono" %>
+      <p class="text-xs text-content-muted mt-1">Kebab-case identifier. Becomes the directory name on disk.</p>
+    </div>
+  <% else %>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-content-muted mb-1.5">Name</label>
+      <p class="px-3 py-2 bg-surface-muted/30 border border-edge rounded-lg text-content text-sm font-mono"><%= skill.name %></p>
+      <p class="text-xs text-content-muted mt-1">To rename, rename the directory + the <code>name:</code> field in <code>SKILL.md</code> on disk.</p>
+    </div>
+  <% end %>
 
   <% scope_options = [["Shared (available to all projects)", ""]] +
        ProjectGroup.ordered.map { |g| ["Group: #{g.name}", "group:#{g.id}"] } +
@@ -21,21 +30,35 @@
     <%= f.select :scope, options_for_select(scope_options, skill.scope_value),
           {},
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <% if skill.new_record? %>
+      <p class="text-xs text-content-muted mt-1">
+        <strong>Shared</strong> → <code><%= SkillLoader.global_root %>/&lt;name&gt;/SKILL.md</code><br>
+        <strong>Project</strong> → <code>&lt;project&gt;/.seneschal/skills/&lt;name&gt;/SKILL.md</code><br>
+        <em class="text-content-muted">Group-scoped skills don't have an on-disk location yet.</em>
+      </p>
+    <% end %>
   </div>
 
-  <div class="mb-4">
-    <%= f.label :description, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.text_area :description, rows: 2, placeholder: "What this skill instructs Claude to do",
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y" %>
-  </div>
-
-  <div class="mb-4" data-controller="code-editor">
-    <%= f.label :body, "Prompt", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <div class="codejar-wrap">
-      <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
+  <% if skill.new_record? %>
+    <div class="mb-4">
+      <%= f.label :description, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_area :description, rows: 2, placeholder: "When-to-use prose — how the agent decides whether to load this skill",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y" %>
+      <p class="text-xs text-content-muted mt-1">Goes into the SKILL.md frontmatter as <code>description:</code>. Edit on disk after scaffolding.</p>
     </div>
-    <%= f.hidden_field :body, data: { code_editor_target: "input" } %>
-  </div>
+
+    <div class="mb-4" data-controller="code-editor">
+      <%= f.label :body, "Starter body", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <div class="codejar-wrap">
+        <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
+      </div>
+      <%= f.hidden_field :body, data: { code_editor_target: "input" } %>
+      <p class="text-xs text-content-muted mt-1">
+        Optional initial body for the SKILL.md. After scaffolding, edit the file on disk and add
+        <code>scripts/</code> or <code>references/</code> alongside it as the skill grows.
+      </p>
+    </div>
+  <% end %>
 
   <%# When a skill declares a default output schema, every Step that uses it
       automatically inherits the schema + output variable (unless the step
