@@ -1,8 +1,57 @@
 #!/bin/bash -e
+#
+# Container entrypoint. Runs db:prepare on first boot, prints a short
+# "you're in business" banner the first time the storage volume is
+# empty, and otherwise transparently exec's whatever command the
+# user passed.
 
-# If running the rails server then create or migrate existing database
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+# Refuse to start without a stable SECRET_KEY_BASE — Rails will silently
+# regenerate the dummy one we use at build time otherwise, invalidating
+# every session cookie on container restart.
+if [ -z "${SECRET_KEY_BASE:-}" ] && [ -z "${RAILS_MASTER_KEY:-}" ]; then
+  echo "ERROR: neither SECRET_KEY_BASE nor RAILS_MASTER_KEY is set." >&2
+  echo "Generate one with:  openssl rand -hex 64" >&2
+  echo "and pass it via -e SECRET_KEY_BASE=... (persist it across restarts)." >&2
+  exit 1
+fi
+
+# Detect "fresh storage volume" before db:prepare creates the SQLite files.
+FIRST_BOOT=0
+if [ ! -f /rails/storage/production.sqlite3 ]; then
+  FIRST_BOOT=1
+fi
+
+# Only run db:prepare when the rails server is about to start. Avoids
+# running migrations under `rails console`, `bin/rails runner`, etc.
+if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ] || \
+   [ "${1:-}" == "./bin/rails" ] && [ "${2:-}" == "server" ]; then
   ./bin/rails db:prepare
+
+  if [ "$FIRST_BOOT" = "1" ]; then
+    ./bin/rails db:seed
+    cat <<'BANNER'
+
+================================================================
+  Seneschal is starting on http://localhost:3000
+
+  Storage volume looks fresh — seeded the shared skills and
+  prepared the SQLite databases.
+
+  First-run checklist:
+    1. Open http://localhost:3000 and create the admin account
+    2. Visit /skill_repos to clone any agentskills.io repos you use
+    3. Add a Project pointing at the path you mounted to /rails/repos
+
+  Toolchain auth (set these in your environment for the runner):
+    - ANTHROPIC_API_KEY=sk-ant-...   (preferred for headless containers)
+    - GH_TOKEN=gh_...                (alternative: mount ~/.config/gh)
+
+  Claude Pro / OAuth: mount your host's ~/.claude into the container
+  with -v ~/.claude:/home/rails/.claude:ro
+================================================================
+
+BANNER
+  fi
 fi
 
 exec "${@}"

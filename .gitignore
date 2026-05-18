@@ -34,6 +34,15 @@
 /repos/*
 !/repos/.keep
 
+# Filesystem-backed shared Skills are local user content. docker-compose
+# bind-mounts `./skills` into the container so host scaffolds land here.
+/skills/*
+!/skills/.keep
+
+# Per-run git worktrees. docker-compose optionally bind-mounts this dir.
+/worktrees/*
+!/worktrees/.keep
+
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 

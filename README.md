@@ -37,7 +37,43 @@ Streaming output from Claude skills is captured in real time and stored for hist
 
 ## Installation
 
-For development setup, production setup on a Raspberry Pi (or any Debian/Ubuntu server), and system requirements, see **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)**.
+### Docker quick start
+
+If you have Docker, this is the fastest way in:
+
+```sh
+docker run -p 3000:3000 \
+  -e SECRET_KEY_BASE=$(openssl rand -hex 64) \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e GH_TOKEN=gh_... \
+  -v $PWD/storage:/rails/storage \
+  -v $PWD/repos:/rails/repos \
+  -v $PWD/skills:/rails/skills \
+  ghcr.io/fishy49/seneschal:latest
+```
+
+Then open [http://localhost:3000](http://localhost:3000) and create the admin account. The image bundles Ruby + Node + Python + the Claude Agent SDK sidecar + the `claude` and `gh` CLIs, so nothing on the host is required besides Docker. Multi-arch — works on Intel and Apple Silicon / arm64 Linux servers.
+
+For a persistent setup, copy `.env.example` to `.env`, fill in the secrets, and run `docker compose up -d` against the [`docker-compose.yml`](docker-compose.yml) shipped in this repo.
+
+**Volume layout**
+
+| Mount | Purpose |
+|---|---|
+| `/rails/storage` | SQLite databases (projects, workflows, runs, skills metadata). **Back this up.** |
+| `/rails/repos` | One git clone per Project (your code lives here). |
+| `/rails/skills` | Filesystem-backed shared Skills (agentskills.io standard). Optional. |
+| `/rails/tmp/worktrees` | Per-run git worktrees. Ephemeral but bind-mounting keeps `git worktree` snappier than tmpfs. |
+
+**Auth options**
+
+- **Claude API key** (recommended for containers): set `ANTHROPIC_API_KEY`. Works headless.
+- **Claude Pro / OAuth**: run `claude auth login` on the host once, then mount `~/.claude` read-only into the container — `-v ~/.claude:/home/rails/.claude:ro`.
+- **GitHub**: set `GH_TOKEN` with `repo` scope, or mount `~/.config/gh:/home/rails/.config/gh:ro`.
+
+### Bare-metal install
+
+For dev setup, production install on a Raspberry Pi (or any Debian/Ubuntu server), and system requirements without Docker, see **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)**.
 
 ## How to use Seneschal
 
