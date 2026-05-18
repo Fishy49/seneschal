@@ -6,10 +6,14 @@ require "open3"
 #
 # Each worktree lives under Setting["worktree_root"] (default tmp/worktrees)
 # at <root>/<run_id>/ and is checked out on a deterministic branch named
-# `seneschal/run-<run_id>` branched off the project's currently-checked-out
-# branch HEAD. Worktrees share the project's git object database, so
-# branches and commits made in the worktree are visible from the canonical
-# clone after the fact.
+# `seneschal/run-<run_id>[-<task-slug>]` branched off the project's currently-
+# checked-out branch HEAD. The branch name is computed at allocate-time from
+# Run#id + the parameterized PipelineTask title (when present) and persisted
+# to `runs.branch_name` so cleanup + downstream PR steps see the exact same
+# string the worktree was created with — even if the task title is renamed
+# mid-flight. Worktrees share the project's git object database, so branches
+# and commits made in the worktree are visible from the canonical clone after
+# the fact.
 #
 # Lifecycle:
 #   - allocate(run): creates the worktree and the branch, stamps run.worktree_path
@@ -20,6 +24,7 @@ class WorktreeManager
   class WorktreeError < StandardError; end
 
   BRANCH_PREFIX = "seneschal/run-".freeze
+  SLUG_MAX_LENGTH = 40
   DEFAULT_RETENTION_DAYS = 7
 
   class << self
@@ -46,7 +51,7 @@ class WorktreeManager
       end
 
       start_point = detect_start_point(project)
-      branch = branch_for(run)
+      branch = ensure_branch_name(run)
 
       _stdout, stderr, status = Open3.capture3(
         "git", "-C", project.local_path,
@@ -134,8 +139,45 @@ class WorktreeManager
       File.join(worktree_root, run.id.to_s)
     end
 
+    # Returns the worktree branch name for `run`. Reads `runs.branch_name`
+    # when persisted (every run allocated after the
+    # AddBranchNameToRuns migration). Falls back to the legacy
+    # id-only formula for pre-migration runs so cleanup of historical
+    # worktrees keeps working.
     def branch_for(run)
-      "#{BRANCH_PREFIX}#{run.id}"
+      run.branch_name.presence || legacy_branch_name(run)
+    end
+
+    # Computes-and-persists the branch name. Idempotent: returns the existing
+    # `branch_name` when the run already has one (resumes, re-allocations after
+    # a worktree was reaped) so the same physical branch on disk is always
+    # referenced by the same string.
+    def ensure_branch_name(run)
+      return run.branch_name if run.branch_name.present?
+
+      name = compute_branch_name(run)
+      run.update!(branch_name: name)
+      name
+    end
+
+    # `seneschal/run-<id>[-<slugified-task-title>]`. The slug, when present,
+    # is `String#parameterize`'d (ASCII kebab-case), capped at SLUG_MAX_LENGTH,
+    # and stripped of any trailing hyphen left over from truncation. Returns
+    # the id-only form when no PipelineTask is attached or its title slugs
+    # to an empty string (e.g. emoji-only).
+    def compute_branch_name(run)
+      base = legacy_branch_name(run)
+      slug = slugify(run.pipeline_task&.title)
+      slug.present? ? "#{base}-#{slug}" : base
+    end
+
+    def slugify(title)
+      return nil if title.blank?
+
+      slug = title.to_s.parameterize
+      return nil if slug.blank?
+
+      slug.first(SLUG_MAX_LENGTH).sub(/-+\z/, "").presence
     end
 
     def worktree_root
@@ -148,6 +190,10 @@ class WorktreeManager
     end
 
     private
+
+    def legacy_branch_name(run)
+      "#{BRANCH_PREFIX}#{run.id}"
+    end
 
     def remove_worktree(repo_path, worktree_path)
       _stdout, stderr, status = Open3.capture3(

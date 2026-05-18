@@ -256,6 +256,76 @@ class WorktreeManagerTest < ActiveSupport::TestCase
     assert_equal "origin/main", WorktreeManager.detect_start_point(@project)
   end
 
+  # --- Deterministic branch naming (R9) ---
+
+  test "allocate persists a branch_name derived from id + slugified task title" do
+    task = @project.pipeline_tasks.create!(title: "Add user authentication", body: "x", kind: "feature", status: "draft")
+    run = create_run(pipeline_task: task)
+
+    WorktreeManager.allocate(run)
+
+    run.reload
+    assert_equal "seneschal/run-#{run.id}-add-user-authentication", run.branch_name
+
+    branches, _stderr, status = Open3.capture3("git", "-C", @repo_path, "branch", "--list")
+    assert status.success?
+    assert_includes branches, run.branch_name
+  end
+
+  test "allocate falls back to id-only when the run has no PipelineTask" do
+    run = create_run
+    WorktreeManager.allocate(run)
+
+    run.reload
+    assert_equal "seneschal/run-#{run.id}", run.branch_name
+  end
+
+  test "branch_for reads the persisted name even after the task title changes" do
+    task = @project.pipeline_tasks.create!(title: "Initial title", body: "x", kind: "feature", status: "draft")
+    run = create_run(pipeline_task: task)
+    WorktreeManager.allocate(run)
+    original = run.reload.branch_name
+
+    task.update!(title: "Renamed title")
+
+    assert_equal original, WorktreeManager.branch_for(run.reload)
+  end
+
+  test "branch_for falls back to the id-only formula for legacy runs without a stored branch_name" do
+    run = create_run
+    # Simulate a pre-migration run row.
+    run.update_columns(branch_name: nil) # rubocop:disable Rails/SkipsModelValidations
+
+    assert_equal "seneschal/run-#{run.id}", WorktreeManager.branch_for(run)
+  end
+
+  test "slugify produces ASCII kebab-case, caps length, and trims trailing hyphens" do
+    assert_equal "fix-bug-42-in-ci", WorktreeManager.slugify("Fix bug #42 in CI")
+    assert_nil WorktreeManager.slugify(nil)
+    assert_nil WorktreeManager.slugify("   ")
+    # parameterize strips non-ASCII; an emoji-only title slugs to empty.
+    assert_nil WorktreeManager.slugify("🚀")
+
+    long = "x" * 100
+    slugged = WorktreeManager.slugify(long)
+    assert_equal WorktreeManager::SLUG_MAX_LENGTH, slugged.length
+    assert_no_match(/-\z/, slugged, "trailing hyphens should be trimmed after truncation")
+  end
+
+  test "cleanup deletes the slug-augmented branch from the canonical clone" do
+    task = @project.pipeline_tasks.create!(title: "Cleanup me", body: "x", kind: "feature", status: "draft")
+    run = create_run(pipeline_task: task)
+    WorktreeManager.allocate(run)
+    branch = run.reload.branch_name
+    assert_match(/-cleanup-me\z/, branch)
+
+    WorktreeManager.cleanup(run)
+
+    branches, _stderr, status = Open3.capture3("git", "-C", @repo_path, "branch", "--list")
+    assert status.success?
+    assert_not_includes branches, branch
+  end
+
   private
 
   def in_dir(dir, *cmd)
@@ -263,8 +333,8 @@ class WorktreeManagerTest < ActiveSupport::TestCase
     raise "git command failed in #{dir}: #{cmd.inspect}" unless status.success?
   end
 
-  def create_run
-    @workflow.runs.create!(status: "pending", context: {}, input: {})
+  def create_run(pipeline_task: nil)
+    @workflow.runs.create!(status: "pending", context: {}, input: {}, pipeline_task: pipeline_task)
   end
 
   def in_repo(*cmd)
