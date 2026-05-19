@@ -67,9 +67,9 @@ For a persistent setup, copy `.env.example` to `.env`, fill in the secrets, and 
 
 **Auth options**
 
-- **Claude API key** (recommended for containers): set `ANTHROPIC_API_KEY`. Works headless.
-- **Claude Pro / OAuth**: run `claude auth login` on the host once, then mount `~/.claude` read-only into the container — `-v ~/.claude:/home/rails/.claude:ro`.
-- **GitHub**: set `GH_TOKEN` with `repo` scope, or mount `~/.config/gh:/home/rails/.config/gh:ro`.
+- **Claude API key** (works on every host, recommended): set `ANTHROPIC_API_KEY`. Headless, container-friendly. If you also have a Claude Pro/Max subscription, API usage is metered separately from the flat-rate subscription.
+- **Claude Pro / OAuth — Linux hosts only**: run `claude auth login` on the host once, then mount `~/.claude` read-only into the container — `-v ~/.claude:/home/rails/.claude:ro`. **macOS hosts can't do this** because `claude auth login` stores credentials in the system Keychain, not in a flat file the container can see. macOS users with Pro/Max either need to use an API key for the container's runner or run Seneschal on a Linux box (Pi, NAS, VM).
+- **GitHub**: set `GH_TOKEN` with `repo` scope (works everywhere), or — on Linux hosts — mount `~/.config/gh:/home/rails/.config/gh:ro`.
 
 ### Bare-metal install
 

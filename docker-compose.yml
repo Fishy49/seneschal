@@ -17,9 +17,14 @@ services:
     ports:
       - "${SENESCHAL_PORT:-3000}:3000"
     environment:
-      # Required — both must be non-empty.
+      # Required.
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:?run "openssl rand -hex 64" and set this in your .env}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?required for the Claude agent runner}
+      # Pick ONE of the two Claude auth paths:
+      #   - ANTHROPIC_API_KEY for headless / API-billed usage (default)
+      #   - mount ~/.claude into the container for Claude Pro/Max OAuth
+      #     (Linux hosts only — macOS Keychain isn't accessible from
+      #     containers, see the Volumes section below)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Optional — needed by the `pr` step type and the seeded workflows.
       GH_TOKEN: ${GH_TOKEN:-}
       # Optional — flips on by default in the image, keep explicit for clarity.
@@ -39,11 +44,15 @@ services:
       # Per-run git worktrees. Ephemeral but bind-mounting them onto host
       # storage keeps `git worktree` snappier than tmpfs and survives crashes.
       - ./worktrees:/rails/tmp/worktrees
-      # OPTIONAL: mount your host's Claude credentials read-only to use
-      # Claude Pro / OAuth instead of an API key. Comment out if you set
-      # ANTHROPIC_API_KEY above.
+      # OPTIONAL (Linux hosts only): mount your host's Claude credentials
+      # read-only to use Claude Pro/Max OAuth instead of an API key.
+      # ⚠️  This only works on Linux. On macOS, `claude auth login` stores
+      #     tokens in the system Keychain (not ~/.claude/), so the mount
+      #     is empty as far as `claude` inside the container is concerned.
+      #     macOS users: set ANTHROPIC_API_KEY above instead.
       # - ~/.claude:/home/rails/.claude:ro
-      # OPTIONAL: same idea for gh auth — comment out if you set GH_TOKEN.
+      # OPTIONAL (Linux hosts only): same idea for gh auth. macOS users
+      # set GH_TOKEN above instead.
       # - ~/.config/gh:/home/rails/.config/gh:ro
     restart: unless-stopped
     healthcheck:
