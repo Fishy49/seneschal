@@ -123,6 +123,79 @@ class SkillRepoSyncerTest < ActiveSupport::TestCase
     assert_match(/missingdesc/, captured)
   end
 
+  # --- Auto-import of references/*.schema.json ---
+
+  test "auto-imports a single schema-y reference and wires it as the default" do
+    add_reference_to_remote("alpha", "feature_plan.schema.json", <<~JSON)
+      {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Feature Plan",
+        "type": "object",
+        "required": ["headline"],
+        "properties": { "headline": { "type": "string" } }
+      }
+    JSON
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+
+    schema = JsonSchema.find_by(name: "alpha__feature_plan")
+    assert_not_nil schema, "expected the schema to be imported"
+    assert_not JSON.parse(schema.body).key?("$schema"), "$schema must be stripped"
+
+    skill = Skill.find_by(skill_repo_id: repo.id, name: "alpha")
+    assert_equal schema.id, skill.default_json_schema_id
+    assert_equal "feature_plan", skill.default_output_variable
+  end
+
+  test "auto-imports every schema but DOES NOT pick a default when there are multiple" do
+    add_reference_to_remote("alpha", "one.schema.json", '{"type":"object","properties":{"a":{"type":"string"}}}')
+    add_reference_to_remote("alpha", "two.schema.json", '{"type":"object","properties":{"b":{"type":"string"}}}')
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+
+    assert JsonSchema.exists?(name: "alpha__one"), "expected one.schema.json to be imported"
+    assert JsonSchema.exists?(name: "alpha__two"), "expected two.schema.json to be imported"
+
+    skill = Skill.find_by(skill_repo_id: repo.id, name: "alpha")
+    assert_nil skill.default_json_schema_id,
+               "multi-schema skills shouldn't auto-pick a default — operator wires one via the show page"
+  end
+
+  test "re-syncing doesn't clobber an explicit default set after a prior auto-link" do
+    add_reference_to_remote("alpha", "feature_plan.schema.json",
+                            '{"type":"object","properties":{"a":{"type":"string"}}}')
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+    skill = Skill.find_by(skill_repo_id: repo.id, name: "alpha")
+
+    # Operator manually wires a different schema. The next sync must not
+    # silently revert that choice back to the auto-detected one.
+    other = JsonSchema.create!(name: "operator-pick", body: '{"type":"object"}')
+    skill.update!(default_json_schema_id: other.id, default_output_variable: "operator")
+    SkillRepoSyncer.new(repo).call
+
+    assert_equal other.id, skill.reload.default_json_schema_id
+  end
+
+  test "re-syncing is idempotent — no duplicate JsonSchema rows" do
+    add_reference_to_remote("alpha", "feature_plan.schema.json",
+                            '{"type":"object","properties":{"a":{"type":"string"}}}')
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+
+    assert_no_difference "JsonSchema.count" do
+      SkillRepoSyncer.new(repo).call
+    end
+  end
+
+  test "non-schema JSON in references/ is left alone" do
+    add_reference_to_remote("alpha", "config.json", '{"host":"example.com","port":443}')
+    repo = SkillRepo.create!(name: "test-pack-#{SecureRandom.hex(3)}", repo_url: @remote)
+    SkillRepoSyncer.new(repo).call
+
+    assert_nil JsonSchema.find_by(name: "alpha__config")
+  end
+
   test "sync error is captured on the SkillRepo and returns :error status" do
     repo = SkillRepo.create!(
       name: "test-pack-#{SecureRandom.hex(3)}",
@@ -168,6 +241,15 @@ class SkillRepoSyncerTest < ActiveSupport::TestCase
     FileUtils.rm_rf(File.join(@seed, name))
     git_in(@seed, "add", "-A")
     git_in(@seed, "commit", "-q", "-m", "remove #{name}")
+    git_in(@seed, "push", "-q", "origin", "main")
+  end
+
+  def add_reference_to_remote(skill_name, filename, content)
+    refs_dir = File.join(@seed, skill_name, "references")
+    FileUtils.mkdir_p(refs_dir)
+    File.write(File.join(refs_dir, filename), content)
+    git_in(@seed, "add", ".")
+    git_in(@seed, "commit", "-q", "-m", "add #{skill_name}/references/#{filename}")
     git_in(@seed, "push", "-q", "origin", "main")
   end
 

@@ -88,51 +88,21 @@ class SkillsController < ApplicationController
   end
 
   # Imports a `references/<filename>.json` file as a top-level JsonSchema
-  # row and sets it as the skill's default. Idempotent on schema name
-  # (`<skill>__<basename>`): re-importing the same file overwrites the
-  # row's body in place so on-disk edits propagate. Strips the file's
-  # `$schema` keyword before persisting — the bundled `claude` CLI's
-  # `--json-schema` flag only registers the StructuredOutput tool when
-  # the schema either omits `$schema` or uses draft-07, and stripping it
-  # is the safe-everywhere default (see #24's PR description).
+  # row and sets it as the skill's default. The actual import lives in
+  # SchemaImporter (shared with SkillRepoSyncer's auto-import pass).
   def import_reference_schema
     reference = params.expect(:reference)
-    content = @skill.read_auxiliary_file("references", reference)
+    result = SchemaImporter.call(skill: @skill, reference: reference, set_default: :always)
 
-    return redirect_to(@skill, alert: "references/#{reference} not found.") if content.nil?
-
-    begin
-      body = JSON.parse(content)
-    rescue JSON::ParserError => e
-      return redirect_to(@skill, alert: "references/#{reference} is not valid JSON: #{e.message}")
-    end
-
-    body.delete("$schema") if body.is_a?(Hash)
-
-    schema = JsonSchema.find_or_initialize_by(name: "#{@skill.name}__#{File.basename(reference, ".*").delete_suffix(".schema")}")
-    schema.body = JSON.pretty_generate(body)
-    schema.description = imported_schema_description(body, reference)
-
-    if schema.save
-      @skill.update!(
-        default_json_schema_id: schema.id,
-        default_output_variable: @skill.default_output_variable.presence ||
-          File.basename(reference, ".*").delete_suffix(".schema")
-      )
-      redirect_to @skill, notice: "Imported references/#{reference} as default schema \"#{schema.name}\"."
+    case result.status
+    when :imported
+      redirect_to @skill, notice: "Imported references/#{reference} as default schema \"#{result.schema.name}\"."
     else
-      redirect_to @skill, alert: "Schema validation failed: #{schema.errors.full_messages.join(", ")}"
+      redirect_to @skill, alert: result.reason
     end
   end
 
   private
-
-  def imported_schema_description(body, reference)
-    return body["description"] if body.is_a?(Hash) && body["description"].present?
-    return body["title"] if body.is_a?(Hash) && body["title"].present?
-
-    "Imported from #{@skill.display_name} / references/#{reference}"
-  end
 
   def set_skill
     @skill = Skill.find(params.expect(:id))

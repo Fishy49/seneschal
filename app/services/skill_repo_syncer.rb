@@ -87,7 +87,40 @@ class SkillRepoSyncer
       )
       skill.save!
       skill.refresh_cached_metadata!
+      auto_import_reference_schemas(skill)
       name
+    end
+  end
+
+  # Scan a freshly-synced skill's `references/` directory for JSON Schema
+  # files (per JsonSchemaSniffer) and import each as a top-level JsonSchema
+  # row via the shared SchemaImporter service. Auto-links the skill's
+  # `default_json_schema_id` ONLY when there's exactly one schema-y
+  # reference AND the skill currently has no default — never clobbers an
+  # explicit pick. Multi-schema skills import every row but leave the
+  # default for the operator to wire up via the show page.
+  def auto_import_reference_schemas(skill)
+    schema_refs = skill.references_files.select { |f| f[:looks_like_schema] }
+    return if schema_refs.empty?
+
+    auto_link = schema_refs.size == 1
+    schema_refs.each do |ref|
+      result = SchemaImporter.call(skill: skill, reference: ref[:name],
+                                   set_default: auto_link ? :if_blank : :never)
+      log_schema_import(skill, ref[:name], result, linked: auto_link)
+    end
+  end
+
+  def log_schema_import(skill, filename, result, linked:)
+    label = "#{@repo.name}/#{skill.name}/references/#{filename}"
+    case result.status
+    when :imported
+      Rails.logger.info(
+        "SkillRepoSyncer: imported schema #{label} → JsonSchema \"#{result.schema.name}\"" \
+        "#{" (linked as default)" if linked}"
+      )
+    else
+      Rails.logger.warn("SkillRepoSyncer: skipped schema #{label} (#{result.status}): #{result.reason}")
     end
   end
 
