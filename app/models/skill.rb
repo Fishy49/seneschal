@@ -109,7 +109,11 @@ class Skill < ApplicationRecord
   end
 
   def references_files
-    list_files_under(references_dir)
+    list_files_under(references_dir).map do |entry|
+      next entry unless entry[:name].end_with?(".json")
+
+      entry.merge(looks_like_schema: JsonSchemaSniffer.looks_like_schema?(File.read(entry[:absolute])))
+    end
   end
 
   def read_auxiliary_file(kind, relative_filename)
