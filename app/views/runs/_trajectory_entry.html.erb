@@ -1,0 +1,83 @@
+<%# A single trajectory entry. Wrapped in a <li> tagged with
+    data-kind=<entry kind> so the replay-filter controller can toggle
+    visibility per chip. Inside, the rendering branches by kind:
+    tool_use cards expand to show input/output, thinking + text bubbles
+    drop into <details> for long content, result/system/error events
+    are one-liners. %>
+<li class="px-4 py-3" data-replay-filter-target="entry" data-kind="<%= entry[:kind] %>">
+  <% case entry[:kind] %>
+  <% when :tool_use %>
+    <details class="text-sm">
+      <summary class="cursor-pointer flex items-center justify-between gap-2 list-none [&::-webkit-details-marker]:hidden">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent shrink-0"><%= entry[:tool] %></span>
+          <span class="text-content-muted truncate"><%= tool_use_label(entry[:tool], entry[:input]) %></span>
+        </div>
+        <% if entry[:result] %>
+          <span class="text-xs shrink-0 <%= entry[:result][:is_error] ? "text-danger" : "text-success" %>">
+            <%= entry[:result][:is_error] ? "✗ error" : "✓ ok" %>
+          </span>
+        <% end %>
+      </summary>
+      <div class="mt-2 space-y-2">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Input</p>
+          <pre class="text-xs font-mono bg-surface-input/40 border border-edge rounded p-2 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"><%= JSON.pretty_generate(entry[:input]) %></pre>
+        </div>
+        <% if entry[:result] %>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Result</p>
+            <pre class="text-xs font-mono bg-surface-input/40 border border-edge rounded p-2 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"><%= entry[:result][:content].is_a?(String) ? entry[:result][:content] : JSON.pretty_generate(entry[:result][:content]) %></pre>
+          </div>
+        <% end %>
+      </div>
+    </details>
+
+  <% when :thinking %>
+    <details class="text-sm">
+      <summary class="cursor-pointer flex items-center gap-2 text-content-muted italic list-none [&::-webkit-details-marker]:hidden">
+        <span class="text-xs">🧠</span>
+        <span class="text-xs uppercase tracking-wide">Thinking</span>
+        <span class="text-xs text-content-muted/70">(<%= entry[:text].length %> chars)</span>
+      </summary>
+      <pre class="mt-2 text-xs font-mono bg-surface-input/40 border border-edge rounded p-2 whitespace-pre-wrap break-words"><%= entry[:text] %></pre>
+    </details>
+
+  <% when :text %>
+    <div class="text-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Assistant</p>
+      <div class="text-content whitespace-pre-wrap break-words"><%= entry[:text] %></div>
+    </div>
+
+  <% when :tool_result %>
+    <%# Orphan tool_result (no matching tool_use). Rare — usually means the
+        log was truncated mid-step. Still surface it. %>
+    <div class="text-sm">
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1 <%= "text-danger" if entry[:is_error] %>">
+        Orphan tool_result <%= "(error)" if entry[:is_error] %>
+      </p>
+      <pre class="text-xs font-mono bg-surface-input/40 border border-edge rounded p-2 whitespace-pre-wrap break-words max-h-48 overflow-y-auto"><%= entry[:content].is_a?(String) ? entry[:content] : JSON.pretty_generate(entry[:content]) %></pre>
+    </div>
+
+  <% when :result %>
+    <div class="flex items-center gap-3 text-xs text-content-muted">
+      <span class="font-semibold uppercase tracking-wide">Result</span>
+      <% if entry[:cost] %><span><%= format_cost(entry[:cost]) %></span><% end %>
+      <% if entry[:turns] %><span><%= entry[:turns] %> turns</span><% end %>
+      <% if entry[:duration_ms] %><span><%= (entry[:duration_ms] / 1000.0).round(1) %>s</span><% end %>
+      <% if entry[:stop_reason] %><span class="font-mono"><%= entry[:stop_reason] %></span><% end %>
+    </div>
+
+  <% when :system %>
+    <div class="text-xs text-content-muted">
+      <span class="font-semibold uppercase tracking-wide">System</span>
+      <% if entry[:model] %><span class="ml-2 font-mono"><%= entry[:model] %></span><% end %>
+    </div>
+
+  <% when :error %>
+    <div class="text-sm text-danger">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-1">Error</p>
+      <pre class="text-xs font-mono whitespace-pre-wrap break-words"><%= entry[:message] %></pre>
+    </div>
+  <% end %>
+</li>

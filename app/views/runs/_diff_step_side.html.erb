@@ -1,0 +1,45 @@
+<%# One side of a diff row. Variables: run_step (RunStep|nil). %>
+<% if run_step.nil? %>
+  <div class="p-4 text-sm text-content-muted italic bg-surface-muted/10">
+    (no step on this side)
+  </div>
+<% else %>
+  <% stats = run_step.usage_stats || {} %>
+  <% trajectory = stream_log_trajectory(run_step.stream_log) %>
+  <% counts = trajectory.group_by { |e| e[:kind] }.transform_values(&:size) %>
+  <div class="p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h4 class="font-semibold text-sm">
+        <%= run_step.step&.name || "(removed step)" %>
+        <%= status_badge(run_step.status) %>
+      </h4>
+      <span class="text-xs text-content-muted">
+        <% if run_step.duration %><%= run_step.duration.round(1) %>s<% end %>
+        <% if stats[:cost_usd] && stats[:cost_usd] > 0 %><span class="ml-2"><%= format_cost(stats[:cost_usd]) %></span><% end %>
+      </span>
+    </div>
+
+    <%# Compact per-kind tally so a glance shows what differs. %>
+    <div class="flex flex-wrap gap-2 text-xs text-content-muted mb-3">
+      <% [:tool_use, :text, :thinking, :tool_result, :result, :error].each do |kind| %>
+        <% next unless counts[kind] %>
+        <span class="px-1.5 py-0.5 rounded bg-surface-input/50 font-mono"><%= kind %>: <%= counts[kind] %></span>
+      <% end %>
+    </div>
+
+    <% if trajectory.any? %>
+      <details>
+        <summary class="cursor-pointer text-xs text-content-muted hover:text-content list-none [&::-webkit-details-marker]:hidden">
+          ▸ Show <%= pluralize(trajectory.size, "event") %>
+        </summary>
+        <ol class="mt-2 divide-y divide-edge border border-edge rounded">
+          <% trajectory.each do |entry| %>
+            <%= render "runs/trajectory_entry", entry: entry %>
+          <% end %>
+        </ol>
+      </details>
+    <% else %>
+      <p class="text-xs text-content-muted italic">No agent events.</p>
+    <% end %>
+  </div>
+<% end %>

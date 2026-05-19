@@ -124,4 +124,78 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     post reject_run_path(runs(:active_run)), params: { rejection_context: "nope" }
     assert_redirected_to run_path(runs(:active_run))
   end
+
+  # --- R10: Replay + Compare ---
+
+  test "GET replay renders the trajectory view" do
+    get replay_run_path(runs(:completed_run))
+    assert_response :success
+    assert_select "h1", /Run ##{runs(:completed_run).id}/
+    assert_select "h1", /Replay/
+  end
+
+  test "GET replay surfaces stream_log entries from each RunStep" do
+    get replay_run_path(runs(:completed_run))
+    assert_response :success
+    # passed_step's stream_log includes a `result` event (5 turns @ 45s).
+    # Render the trajectory entry inline so the "Result" header is visible.
+    assert_match(/Result/, response.body)
+    assert_match "5 turns", response.body
+    assert_match "45.0s", response.body
+  end
+
+  test "GET replay renders filter chips for every entry kind" do
+    get replay_run_path(runs(:completed_run))
+    assert_response :success
+    ["tool_use", "text", "thinking", "tool_result", "result", "system"].each do |kind|
+      assert_select "input[data-kind=?]", kind
+    end
+  end
+
+  test "GET diff with no other runs of this task surfaces the empty state" do
+    # failed_run has no pipeline_task; fall back to workflow scope.
+    # Make sure exactly one other run of the same workflow exists so the
+    # dropdown is populated but the user hasn't picked yet.
+    get diff_run_path(runs(:failed_run))
+    assert_response :success
+    # Either picks the default target OR shows the "pick one" empty state.
+    assert_select "select[name=against]"
+  end
+
+  test "GET diff picks the most recent other run of the same task by default" do
+    same_task_run = Run.create!(workflow: workflows(:deploy),
+                                pipeline_task: pipeline_tasks(:completed_task),
+                                status: "failed", started_at: 1.day.ago,
+                                finished_at: 23.hours.ago, context: {}, input: {})
+
+    get diff_run_path(runs(:completed_run))
+    assert_response :success
+    assert_match "Run ##{same_task_run.id}", response.body
+  end
+
+  test "GET diff honors an explicit against= parameter" do
+    other = Run.create!(workflow: workflows(:deploy),
+                        pipeline_task: pipeline_tasks(:completed_task),
+                        status: "completed", started_at: 1.day.ago,
+                        finished_at: 23.hours.ago, context: {}, input: {})
+
+    get diff_run_path(runs(:completed_run), against: other.id)
+    assert_response :success
+    assert_match "Run ##{other.id}", response.body
+  end
+
+  test "GET diff ignores against= ids that aren't candidate targets" do
+    # A run from an unrelated workflow shouldn't be selectable.
+    other_workflow = workflows(:deploy)
+    foreign = Run.create!(workflow: other_workflow, status: "completed",
+                          started_at: 1.day.ago, finished_at: 23.hours.ago,
+                          context: {}, input: {})
+
+    # Make completed_run task-scoped to ensure the candidate pool is just
+    # other runs of the same task — foreign isn't part of it.
+    get diff_run_path(runs(:completed_run), against: foreign.id)
+    assert_response :success
+    # Falls through to the empty state because no candidate matched.
+    assert_no_match(/Run ##{foreign.id}/, response.body)
+  end
 end

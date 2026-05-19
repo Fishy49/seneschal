@@ -28,6 +28,12 @@
 !/tmp/storage/
 !/tmp/storage/.keep
 
+# Stray SQLite files Rails sometimes drops under db/ (production
+# multi-DB setup, accidental migrations against the wrong env, etc).
+# The real ones live under /storage; anything else here is junk.
+/db/*.sqlite3
+/db/*.sqlite3-journal
+
 /public/assets
 
 # Ignore cloned repos, but keep the directory.

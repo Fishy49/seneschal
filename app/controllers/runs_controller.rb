@@ -1,5 +1,5 @@
 class RunsController < ApplicationController
-  before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up, :approve, :reject]
+  before_action :set_run, only: [:show, :stop, :resume, :retry_from, :follow_up, :approve, :reject, :replay, :diff]
 
   def index
     @runs = Run.includes(:pipeline_task, workflow: :project).recent
@@ -13,6 +13,31 @@ class RunsController < ApplicationController
   end
 
   def show; end
+
+  # Trajectory replay: a richer, drill-down view of a single Run's full
+  # stream_log across all its RunSteps. Static (no live polling) so it
+  # works equally well on completed runs as on still-running ones.
+  def replay
+    @run_steps = @run.run_steps.includes(:step).where(parent_run_step_id: nil).order(:position)
+  end
+
+  # Side-by-side diff of two Runs. The "other" Run is picked from the same
+  # PipelineTask by default (most useful — same task, different runs) but
+  # any other run of the same Workflow is accepted too. Diff alignment is
+  # by RunStep position; per-step trajectory entries are compared via
+  # `trajectory_signature` so cost/timing drift doesn't show up as a diff.
+  def diff
+    @against = pick_diff_target(params[:against])
+    @available_targets = candidate_diff_targets
+
+    if @against.nil?
+      flash.now[:alert] = "Pick another Run to diff against."
+      return
+    end
+
+    @left_steps = @run.run_steps.includes(:step).where(parent_run_step_id: nil).order(:position)
+    @right_steps = @against.run_steps.includes(:step).where(parent_run_step_id: nil).order(:position)
+  end
 
   def stop
     if @run.active?
@@ -147,5 +172,26 @@ class RunsController < ApplicationController
 
   def set_run
     @run = Run.includes(workflow: :project, run_steps: :step).find(params.expect(:id))
+  end
+
+  # Candidate diff targets, ordered most-useful first:
+  #   1. Other runs of the same PipelineTask (apples-to-apples — same task,
+  #      different attempts)
+  #   2. Other runs of the same Workflow (next-best — same pipeline, may
+  #      differ on input)
+  # `current_run` is excluded; the list is limited to a sensible UI cap.
+  def candidate_diff_targets
+    base = Run.where.not(id: @run.id).order(created_at: :desc)
+    if @run.pipeline_task_id
+      base.where(pipeline_task_id: @run.pipeline_task_id).limit(20)
+    else
+      base.where(workflow_id: @run.workflow_id).limit(20)
+    end
+  end
+
+  def pick_diff_target(against_id)
+    return candidate_diff_targets.first if against_id.blank?
+
+    candidate_diff_targets.find_by(id: against_id)
   end
 end
