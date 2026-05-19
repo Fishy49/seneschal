@@ -1,0 +1,63 @@
+# docker-compose for Seneschal — the easiest way to run a persistent
+# instance on a single host (Pi, NAS, dev box). Picks up env vars from a
+# sibling .env file or the parent shell.
+#
+#   1. cp .env.example .env  and fill in SECRET_KEY_BASE + ANTHROPIC_API_KEY
+#   2. docker compose up -d
+#   3. open http://localhost:3000
+
+services:
+  seneschal:
+    image: ghcr.io/fishy49/seneschal:latest
+    # Uncomment to build locally from a working copy instead of pulling the
+    # published image (handy for development against unmerged branches):
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    ports:
+      - "${SENESCHAL_PORT:-3000}:3000"
+    environment:
+      # Required.
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?run "openssl rand -hex 64" and set this in your .env}
+      # Pick ONE of the two Claude auth paths:
+      #   - ANTHROPIC_API_KEY for headless / API-billed usage (default)
+      #   - mount ~/.claude into the container for Claude Pro/Max OAuth
+      #     (Linux hosts only — macOS Keychain isn't accessible from
+      #     containers, see the Volumes section below)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Optional — needed by the `pr` step type and the seeded workflows.
+      GH_TOKEN: ${GH_TOKEN:-}
+      # Optional — flips on by default in the image, keep explicit for clarity.
+      SOLID_QUEUE_IN_PUMA: "1"
+    volumes:
+      # SQLite databases live here — the source of truth for projects,
+      # workflows, runs, skills metadata, etc. Back this up.
+      - ./storage:/rails/storage
+      # Each Project's local_path lives under this directory (one clone per
+      # project, shared across all of that project's runs).
+      - ./repos:/rails/repos
+      # Filesystem-backed Skill tree (agentskills.io standard). Maps to
+      # SkillLoader.global_root inside the container. Optional — leave the
+      # bind off if you only ever use project-scoped or skill_repo-backed
+      # skills.
+      - ./skills:/rails/skills
+      # Per-run git worktrees. Ephemeral but bind-mounting them onto host
+      # storage keeps `git worktree` snappier than tmpfs and survives crashes.
+      - ./worktrees:/rails/tmp/worktrees
+      # OPTIONAL (Linux hosts only): mount your host's Claude credentials
+      # read-only to use Claude Pro/Max OAuth instead of an API key.
+      # ⚠️  This only works on Linux. On macOS, `claude auth login` stores
+      #     tokens in the system Keychain (not ~/.claude/), so the mount
+      #     is empty as far as `claude` inside the container is concerned.
+      #     macOS users: set ANTHROPIC_API_KEY above instead.
+      # - ~/.claude:/home/rails/.claude:ro
+      # OPTIONAL (Linux hosts only): same idea for gh auth. macOS users
+      # set GH_TOKEN above instead.
+      # - ~/.config/gh:/home/rails/.config/gh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
