@@ -1,0 +1,51 @@
+<%# Single RunStep card: header strip with name + status + cost/duration,
+    then a chronological trajectory of every stream_log event. Built on
+    `stream_log_trajectory` which preserves thinking + pairs tool_use
+    with its tool_result, unlike the live ticker's `stream_log_entries`. %>
+<% step_label = run_step.step&.name || "(removed step)" %>
+<% step_stats = run_step.usage_stats || {} %>
+<% trajectory = stream_log_trajectory(run_step.stream_log) %>
+<div class="bg-surface-card border border-edge rounded-lg overflow-hidden">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface-muted/30">
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-mono text-content-muted">#<%= run_step.position %></span>
+      <h3 class="font-semibold text-sm"><%= step_label %></h3>
+      <%= status_badge(run_step.status) %>
+      <% if run_step.attempt && run_step.attempt > 1 %>
+        <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
+      <% end %>
+    </div>
+    <div class="text-xs text-content-muted">
+      <% if run_step.duration %>
+        <span><%= run_step.duration.round(1) %>s</span>
+      <% end %>
+      <% if step_stats[:cost_usd] && step_stats[:cost_usd] > 0 %>
+        <span class="ml-2"><%= format_cost(step_stats[:cost_usd]) %></span>
+      <% end %>
+      <% if step_stats[:num_turns] && step_stats[:num_turns] > 0 %>
+        <span class="ml-2"><%= step_stats[:num_turns] %> turns</span>
+      <% end %>
+    </div>
+  </div>
+
+  <% if trajectory.any? %>
+    <ol class="divide-y divide-edge">
+      <% trajectory.each do |entry| %>
+        <%= render "runs/trajectory_entry", entry: entry %>
+      <% end %>
+    </ol>
+  <% else %>
+    <p class="px-4 py-6 text-sm text-content-muted italic">No agent events recorded for this step.</p>
+  <% end %>
+
+  <% if run_step.child_run_steps.any? %>
+    <div class="border-t border-edge px-4 py-3 bg-surface-muted/20">
+      <p class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-2">Recovery attempts</p>
+      <div class="space-y-3">
+        <% run_step.child_run_steps.order(:created_at).each do |child| %>
+          <%= render "runs/replay_step", run_step: child %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

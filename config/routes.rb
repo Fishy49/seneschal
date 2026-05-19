@@ -103,6 +103,8 @@ Rails.application.routes.draw do
       post :follow_up
       post :approve
       post :reject
+      get :replay
+      get :diff
     end
   end
 

@@ -1,0 +1,28 @@
+<%# One side of the top-line summary. Variables: run, stats, side (:left|:right). %>
+<div class="bg-surface-card border border-edge rounded-lg p-4">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="font-semibold text-sm">
+      <%= link_to "Run ##{run.id}", run_path(run), class: "hover:underline" %>
+      <%= status_badge(run.status) %>
+    </h3>
+    <span class="text-xs text-content-muted"><%= run.created_at.strftime("%Y-%m-%d %H:%M") %></span>
+  </div>
+  <dl class="grid grid-cols-2 gap-2 text-sm">
+    <div>
+      <dt class="text-xs text-content-muted uppercase tracking-wide">Cost</dt>
+      <dd class="text-content font-semibold"><%= format_cost(stats[:cost_usd]) %></dd>
+    </div>
+    <div>
+      <dt class="text-xs text-content-muted uppercase tracking-wide">Duration</dt>
+      <dd class="text-content font-semibold"><%= number_with_delimiter((run.duration || 0).round) %>s</dd>
+    </div>
+    <div>
+      <dt class="text-xs text-content-muted uppercase tracking-wide">Turns</dt>
+      <dd class="text-content font-semibold"><%= stats[:num_turns] %></dd>
+    </div>
+    <div>
+      <dt class="text-xs text-content-muted uppercase tracking-wide">Steps</dt>
+      <dd class="text-content font-semibold"><%= run.run_steps.where(parent_run_step_id: nil).count %></dd>
+    </div>
+  </dl>
+</div>

@@ -1,0 +1,83 @@
+<%= render "shared/project_bar",
+     project: @run.workflow.project,
+     workflow: @run.workflow,
+     task: @run.pipeline_task,
+     run: @run %>
+
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-semibold">
+      Run #<%= @run.id %> <%= status_badge(@run.status) %>
+      <span class="ml-2 text-base font-normal text-content-muted">/ Replay</span>
+    </h1>
+  </div>
+  <div class="flex items-center gap-2">
+    <%= link_to "Live view", run_path(@run),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+    <%= link_to "Compare", diff_run_path(@run),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+</div>
+
+<%# Top-line metrics + filter chips + per-step trajectory all live under
+    one replay-filter controller so its `entryTargets` can find the
+    timeline entries (Stimulus only sees targets within the controller's
+    own subtree). %>
+<div data-controller="replay-filter">
+<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+  <% if (stats = @run.usage_stats) %>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
+      <div>
+        <div class="text-xs text-content-muted uppercase tracking-wide">Cost</div>
+        <div class="text-content font-semibold"><%= format_cost(stats[:cost_usd]) %></div>
+      </div>
+      <div>
+        <div class="text-xs text-content-muted uppercase tracking-wide">Tokens</div>
+        <div class="text-content font-semibold"><%= format_tokens(stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens]) %></div>
+      </div>
+      <div>
+        <div class="text-xs text-content-muted uppercase tracking-wide">Turns</div>
+        <div class="text-content font-semibold"><%= stats[:num_turns] %></div>
+      </div>
+      <div>
+        <div class="text-xs text-content-muted uppercase tracking-wide">Duration</div>
+        <div class="text-content font-semibold"><%= number_with_delimiter((@run.duration || 0).round) %>s</div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    <span class="text-content-muted">Show:</span>
+    <% [
+      ["tool_use", "Tool calls", true],
+      ["text", "Assistant text", true],
+      ["thinking", "Thinking", false],
+      ["tool_result", "Tool results", true],
+      ["result", "Result events", true],
+      ["system", "System", false]
+    ].each do |kind, label, default_on| %>
+      <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+        <input type="checkbox" data-action="change->replay-filter#toggle"
+               data-replay-filter-target="checkbox"
+               data-kind="<%= kind %>"
+               <%= "checked" if default_on %>>
+        <span><%= label %></span>
+      </label>
+    <% end %>
+  </div>
+</div>
+
+<%# Per-step trajectory. Parent run_steps only; child steps from the
+    on-fail recovery path nest under their parents inside the partial. %>
+<div class="space-y-4" data-replay-filter-target="timeline">
+  <% @run_steps.each do |run_step| %>
+    <%= render "runs/replay_step", run_step: run_step %>
+  <% end %>
+
+  <% if @run_steps.none? %>
+    <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+      <p>This run has no RunSteps yet.</p>
+    </div>
+  <% end %>
+</div>
+</div>

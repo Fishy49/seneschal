@@ -1,0 +1,22 @@
+<%# One row of the per-step diff. Variables: left (RunStep|nil), right (RunStep|nil), position. %>
+<%
+  left_signatures = left ? stream_log_trajectory(left.stream_log).map { |e| trajectory_signature(e) } : []
+  right_signatures = right ? stream_log_trajectory(right.stream_log).map { |e| trajectory_signature(e) } : []
+  diverged = left.nil? || right.nil? || left.step_id != right.step_id || left_signatures != right_signatures
+%>
+<div class="bg-surface-card border <%= diverged ? "border-warning" : "border-edge" %> rounded-lg overflow-hidden">
+  <div class="flex items-center justify-between px-4 py-2 border-b border-edge bg-surface-muted/30">
+    <div class="flex items-center gap-2">
+      <span class="text-xs font-mono text-content-muted">#<%= position %></span>
+      <% if diverged %>
+        <span class="inline-block px-1.5 py-0.5 rounded text-[0.65rem] font-semibold uppercase tracking-wide bg-warning/20 text-warning">Diverged</span>
+      <% else %>
+        <span class="inline-block px-1.5 py-0.5 rounded text-[0.65rem] font-semibold uppercase tracking-wide bg-success/20 text-success">Match</span>
+      <% end %>
+    </div>
+  </div>
+  <div class="grid grid-cols-2 divide-x divide-edge">
+    <%= render "runs/diff_step_side", run_step: left %>
+    <%= render "runs/diff_step_side", run_step: right %>
+  </div>
+</div>

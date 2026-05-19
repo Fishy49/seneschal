@@ -91,6 +91,53 @@ module StreamLogHelper
   def todo_status_class(status) = TODO_STATUS_CLASSES[status] || TODO_STATUS_CLASSES["pending"]
   def tool_icon_class(tool) = TOOL_ICONS[tool] || "zap"
 
+  # A richer view of stream_log for the trajectory replay + diff surfaces.
+  # Differs from `stream_log_entries` in three ways:
+  #   - preserves `thinking` blocks (the live ticker hides them; replay wants
+  #     them as a collapsible drill-down)
+  #   - pairs `tool_use` blocks with their matching `tool_result` from the
+  #     follow-up user message, so the timeline can render the call + its
+  #     outcome as one collapsible card
+  #   - tags every entry with the raw `event_idx` it came from so the diff
+  #     view can align by stream-log position
+  def stream_log_trajectory(stream_log)
+    return [] unless stream_log.is_a?(Array)
+
+    pending_tool_uses = {}
+    entries = []
+
+    stream_log.each_with_index do |event, idx|
+      append_trajectory_event(event, idx, entries, pending_tool_uses)
+    end
+
+    entries
+  end
+
+  # Stable signature of a trajectory entry, ignoring volatile fields (cost,
+  # timing, tool_use_id) so two runs that did "the same thing" produce
+  # matching signatures. Used by the diff view to align rows.
+  def trajectory_signature(entry)
+    case entry[:kind]
+    when :tool_use
+      input = entry[:input].is_a?(Hash) ? entry[:input].sort.to_h.to_s.truncate(120) : entry[:input].to_s.truncate(120)
+      "tool_use:#{entry[:tool]}:#{input}"
+    when :text
+      "text:#{entry[:text].to_s.strip.truncate(80)}"
+    when :thinking
+      "thinking" # ignore the body — too noisy to compare verbatim
+    when :tool_result
+      "tool_result:#{entry[:is_error] ? "error" : "ok"}"
+    when :result
+      "result:#{entry[:stop_reason]}"
+    when :system
+      "system:#{entry[:model]}"
+    when :error
+      "error"
+    else
+      entry[:kind].to_s
+    end
+  end
+
   def stream_log_cost_summary(stream_log)
     return nil unless stream_log.is_a?(Array)
 
@@ -112,6 +159,58 @@ module StreamLogHelper
   end
 
   private
+
+  def append_trajectory_event(event, idx, entries, pending_tool_uses)
+    case event["type"]
+    when "system"
+      entries << { event_idx: idx, kind: :system, model: event["model"] }
+    when "assistant"
+      assistant_blocks(event).each { |block| append_assistant_block(block, idx, entries, pending_tool_uses) }
+    when "user"
+      assistant_blocks(event).each { |block| append_tool_result_block(block, idx, entries, pending_tool_uses) }
+    when "result"
+      entries << {
+        event_idx: idx, kind: :result, cost: event["total_cost_usd"],
+        turns: event["num_turns"], duration_ms: event["duration_ms"],
+        stop_reason: event["stop_reason"]
+      }
+    when "error"
+      entries << { event_idx: idx, kind: :error, message: event["message"].to_s }
+    end
+  end
+
+  def assistant_blocks(event)
+    event.dig("message", "content") || []
+  end
+
+  def append_assistant_block(block, idx, entries, pending_tool_uses)
+    case block["type"]
+    when "thinking"
+      text = block["thinking"].to_s
+      entries << { event_idx: idx, kind: :thinking, text: text } if text.present?
+    when "tool_use"
+      entry = {
+        event_idx: idx, kind: :tool_use, tool: block["name"],
+        input: block["input"] || {}, tool_use_id: block["id"], result: nil
+      }
+      entries << entry
+      pending_tool_uses[block["id"]] = entry if block["id"]
+    when "text"
+      entries << { event_idx: idx, kind: :text, text: block["text"] } if block["text"].present?
+    end
+  end
+
+  def append_tool_result_block(block, idx, entries, pending_tool_uses)
+    return unless block["type"] == "tool_result"
+
+    pending = pending_tool_uses.delete(block["tool_use_id"])
+    payload = { content: block["content"], is_error: block["is_error"] ? true : false }
+    if pending
+      pending[:result] = payload
+    else
+      entries << { event_idx: idx, kind: :tool_result, tool_use_id: block["tool_use_id"], **payload }
+    end
+  end
 
   def short_path(path)
     return "" if path.blank?
