@@ -572,21 +572,22 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
   end
 
   # Structured-outputs short-circuit: when the runner returns a result with
-  # a non-nil structured_output, execute_skill must (a) splice it into
-  # stdout as a fenced ```output block so PipelineExtractor sees it via
-  # the normal path and (b) skip validate_with_session_retry's prompt-
-  # engineered retry loop entirely (the SDK already enforced the schema).
-  test "execute_skill splices structured_output into stdout and skips the validation retry loop" do
+  # a non-nil structured_output, execute_skill must (a) leave the Result's
+  # structured_output channel intact so PipelineExtractor routes it into
+  # produces.first without re-encoding and (b) skip validate_with_session_retry's
+  # prompt-engineered retry loop entirely (the SDK already enforced the schema).
+  test "execute_skill preserves structured_output and skips the validation retry loop" do
     schema = json_schemas(:person_schema)
     @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
     executor = StepExecutor.new(@step, {}, @ready.local_path)
 
     calls = 0
+    original_stdout = "All done."
     structured = { "name" => "Rick", "age" => 42 }
     executor.runner.define_singleton_method(:execute) do |**_kwargs, &_block|
       calls += 1
       StepExecutor::Result.new(
-        exit_code: 0, stdout: "All done.", stderr: "",
+        exit_code: 0, stdout: original_stdout, stderr: "",
         stream_events: [{ "session_id" => "sess-x" }], session_id: "sess-x",
         structured_output: structured
       )
@@ -596,9 +597,8 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
 
     assert_equal 1, calls, "runner should be called once — no retry loop"
     assert final.passed?, final.stderr
-    assert_includes final.stdout, "```output"
-    assert_includes final.stdout, "person:"
-    assert_includes final.stdout, JSON.generate(structured)
+    assert_equal original_stdout, final.stdout, "stdout must NOT be re-encoded — that path truncated when payloads contained ``` characters"
+    assert_equal structured, final.structured_output
   end
 
   test "runner_call_kwargs defaults hooks.confine_writes_to_cwd=true when nothing's set" do

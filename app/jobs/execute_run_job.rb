@@ -98,7 +98,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       if result.passed?
         mark_passed(run_step, result)
 
-        extracted = PipelineExtractor.new(step, result.stdout).extract
+        extracted = PipelineExtractor.new(step, result).extract
         run.update!(context: run.context.merge(extracted)) if extracted.any?
 
         missing = step.produces - extracted.keys
@@ -193,7 +193,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       if recovery_result.passed?
         mark_passed(child_run_step, recovery_result)
 
-        extracted = PipelineExtractor.new(recovery_step, recovery_result.stdout).extract
+        extracted = PipelineExtractor.new(recovery_step, recovery_result).extract
         run.update!(context: run.context.merge(extracted)) if extracted.any?
       else
         mark_failed(child_run_step, recovery_result)
@@ -229,7 +229,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     if result.passed?
       mark_passed(parent_run_step, result)
 
-      extracted = PipelineExtractor.new(step, result.stdout).extract
+      extracted = PipelineExtractor.new(step, result).extract
       run.update!(context: run.context.merge(extracted)) if extracted.any?
 
       missing = step.produces - extracted.keys
@@ -301,7 +301,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         prev_run_step.update!(claude_session_id: child_run_step.claude_session_id) if child_run_step.claude_session_id.present?
 
         # Re-extract pipeline variables from the resumed output
-        extracted = PipelineExtractor.new(prev_step, resume_result.stdout).extract
+        extracted = PipelineExtractor.new(prev_step, resume_result).extract
         run.update!(context: run.context.merge(extracted)) if extracted.any?
       else
         mark_failed(child_run_step, resume_result)

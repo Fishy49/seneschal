@@ -97,7 +97,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     # produces ```output``` block instructions — otherwise the model follows
     # the prompt and emits text instead of calling the injected tool, leaving
     # structured_output null. produces extraction still works downstream via
-    # splice_structured_output.
+    # PipelineExtractor reading result.structured_output directly.
     if @step.json_schema
       prompt = if runner.supports_structured_outputs?
                  append_structured_output_tool_nudge(prompt)
@@ -116,21 +116,12 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
     # SDK structured-output path: the runner already enforced the schema
     # upstream (via Claude Agent SDK's `output_format` → `--json-schema`),
-    # so the parsed object is sitting on `result.structured_output`. Splice
-    # it into stdout as a fenced ```output block so PipelineExtractor + the
-    # rest of the pipeline see it via the normal path, and short-circuit
-    # the prompt-engineered retry loop.
-    return splice_structured_output(result) unless result.structured_output.nil?
+    # so the parsed object is sitting on `result.structured_output`.
+    # PipelineExtractor routes that straight into produces.first downstream,
+    # short-circuiting the prompt-engineered retry loop.
+    return result unless result.structured_output.nil?
 
     validate_with_session_retry(result, &)
-  end
-
-  def splice_structured_output(result)
-    produced_var = @step.produces.first
-    return result if produced_var.blank?
-
-    block = "```output\n#{produced_var}: #{JSON.generate(result.structured_output)}\n```\n"
-    result.with(stdout: [result.stdout.to_s, block].reject(&:empty?).join("\n\n"))
   end
 
   # self_review: run Claude over the diff with read-only tools and a
@@ -152,7 +143,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     # Same schema-validated short-circuit + retry-loop fallback as
     # execute_skill, so a self_review step can also be schema-bound.
     return result unless @step.json_schema
-    return splice_structured_output(result) unless result.structured_output.nil?
+    return result unless result.structured_output.nil?
 
     validate_with_session_retry(result, &)
   end
