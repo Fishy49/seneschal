@@ -32,31 +32,15 @@ module StreamLogHelper
 
   def tool_use_label(tool, input)
     case tool
-    when "Read"
-      short_path(input["file_path"])
-    when "Edit"
-      short_path(input["file_path"])
-    when "Write"
-      short_path(input["file_path"])
-    when "Bash"
-      input["command"].to_s.truncate(100)
-    when "Glob"
-      input["pattern"].to_s
-    when "Grep"
-      "#{input["pattern"]}#{" in #{short_path(input["path"])}" if input["path"].present?}"
-    when "WebSearch", "WebFetch"
-      input["query"].to_s.truncate(80)
-    when "TodoWrite"
-      todos = input["todos"]
-      if todos.is_a?(Array) && todos.any?
-        c = todos.group_by { |t| t["status"].to_s }.transform_values(&:size)
-        "#{todos.size} todos (#{c["in_progress"].to_i} in progress, " \
-          "#{c["pending"].to_i} pending, #{c["completed"].to_i} completed)"
-      else
-        input.to_s.truncate(80)
-      end
-    else
-      input.to_s.truncate(80)
+    when "Read", "Edit", "Write"  then short_path(input["file_path"])
+    when "Bash"                   then input["command"].to_s.truncate(100)
+    when "Glob"                   then input["pattern"].to_s
+    when "Grep"                   then grep_label(input)
+    when "WebSearch", "WebFetch"  then input["query"].to_s.truncate(80)
+    when "TodoWrite"              then todo_write_label(input)
+    when "TaskCreate"             then input["subject"].to_s.presence&.truncate(80) || input.to_s.truncate(80)
+    when "TaskUpdate"             then task_update_label(input)
+    else input.to_s.truncate(80)
     end
   end
 
@@ -64,7 +48,12 @@ module StreamLogHelper
     "Read" => "eye", "Edit" => "pencil", "Write" => "file-plus",
     "Bash" => "terminal", "Glob" => "search", "Grep" => "search",
     "Agent" => "cpu", "WebSearch" => "globe", "WebFetch" => "globe",
-    "TodoWrite" => "check-square"
+    "TodoWrite" => "check-square",
+    # The SDK-bundled `claude` CLI exposes the task tools instead of TodoWrite
+    # (TaskCreate adds one entry, TaskUpdate mutates by taskId). They serve the
+    # same "running todo list" role from the operator's perspective, so we
+    # group them under the same icon family.
+    "TaskCreate" => "check-square", "TaskUpdate" => "check-square"
   }.freeze
 
   TODO_STATUS_ICONS = { "completed" => "✓", "in_progress" => "▸", "pending" => "○" }.freeze
@@ -73,18 +62,27 @@ module StreamLogHelper
     "pending" => "text-content-muted"
   }.freeze
 
+  # Reconstruct the running todo list from a stream_log, supporting both event
+  # styles the harness can emit:
+  #
+  # - TodoWrite (Claude CLI runner): each call carries the FULL list under
+  #   `input.todos`. We treat each TodoWrite as a snapshot that replaces the
+  #   list.
+  # - TaskCreate / TaskUpdate (SDK runner — its bundled CLI exposes the task
+  #   tools instead): TaskCreate adds one row at a time with `subject` /
+  #   `activeForm`, TaskUpdate mutates an existing row's `status` by `taskId`.
+  #   The harness assigns sequential ids to tasks (1, 2, 3, …) in the order
+  #   they're created, so we mirror that and look up updates by index.
+  #
+  # Returns a TodoWrite-shaped array (`{"content":, "status":, "activeForm":}`)
+  # so the existing `_todo_list` partial doesn't need to know which tool
+  # family produced the data.
   def latest_todo_list(stream_log)
     return nil unless stream_log.is_a?(Array)
 
-    stream_log.reverse_each do |event|
-      next unless event["type"] == "assistant"
-
-      content = event.dig("message", "content") || []
-      block = content.reverse.find { |b| b["type"] == "tool_use" && b["name"] == "TodoWrite" }
-      todos = block&.dig("input", "todos")
-      return todos if todos.is_a?(Array) && todos.any?
-    end
-    nil
+    state = { todos: [], tasks_by_id: {}, next_task_id: 1 }
+    stream_log.each { |event| apply_todo_events(event, state) }
+    state[:todos].any? ? state[:todos] : nil
   end
 
   def todo_status_icon(status) = TODO_STATUS_ICONS[status] || TODO_STATUS_ICONS["pending"]
@@ -159,6 +157,73 @@ module StreamLogHelper
   end
 
   private
+
+  def grep_label(input)
+    "#{input["pattern"]}#{" in #{short_path(input["path"])}" if input["path"].present?}"
+  end
+
+  def todo_write_label(input)
+    todos = input["todos"]
+    return input.to_s.truncate(80) unless todos.is_a?(Array) && todos.any?
+
+    c = todos.group_by { |t| t["status"].to_s }.transform_values(&:size)
+    "#{todos.size} todos (#{c["in_progress"].to_i} in progress, " \
+      "#{c["pending"].to_i} pending, #{c["completed"].to_i} completed)"
+  end
+
+  def task_update_label(input)
+    id = input["taskId"].to_s.presence
+    status = input["status"].to_s.presence
+    id && status ? "##{id} → #{status}" : input.to_s.truncate(80)
+  end
+
+  # `state` is a mutable hash carrying { todos:, tasks_by_id:, next_task_id: }
+  # so the per-event helpers can append, mutate by id, or snapshot-replace
+  # without threading three return values back through each call.
+  def apply_todo_events(event, state)
+    return unless event["type"] == "assistant"
+
+    (event.dig("message", "content") || []).each do |block|
+      next unless block["type"] == "tool_use"
+
+      case block["name"]
+      when "TodoWrite"  then apply_todo_write_snapshot(block, state)
+      when "TaskCreate" then apply_task_create(block, state)
+      when "TaskUpdate" then apply_task_update(block, state)
+      end
+    end
+  end
+
+  def apply_todo_write_snapshot(block, state)
+    snapshot = block.dig("input", "todos")
+    return unless snapshot.is_a?(Array) && snapshot.any?
+
+    state[:todos] = snapshot.map { |t| t.is_a?(Hash) ? t.dup : t }
+    state[:tasks_by_id].clear # TodoWrite owns the whole list; drop any Task* state
+  end
+
+  def apply_task_create(block, state)
+    subject = block.dig("input", "subject").to_s
+    return if subject.empty?
+
+    entry = {
+      "content" => subject,
+      "activeForm" => block.dig("input", "activeForm").to_s.presence || subject,
+      "status" => "pending"
+    }
+    state[:todos] << entry
+    state[:tasks_by_id][state[:next_task_id].to_s] = entry
+    state[:next_task_id] += 1
+  end
+
+  def apply_task_update(block, state)
+    id = block.dig("input", "taskId").to_s
+    status = block.dig("input", "status").to_s
+    return if id.empty? || status.empty?
+
+    entry = state[:tasks_by_id][id]
+    entry["status"] = status if entry
+  end
 
   def append_trajectory_event(event, idx, entries, pending_tool_uses)
     case event["type"]
