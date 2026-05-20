@@ -1,5 +1,5 @@
 class SkillsController < ApplicationController
-  before_action :set_skill, only: [:show, :edit, :update, :destroy]
+  before_action :set_skill, only: [:show, :edit, :update, :destroy, :import_reference_schema]
 
   def index
     @skills = Skill.includes(:project).order(:name)
@@ -85,6 +85,21 @@ class SkillsController < ApplicationController
   def destroy
     @skill.destroy
     redirect_to skills_path, notice: "Skill deleted."
+  end
+
+  # Imports a `references/<filename>.json` file as a top-level JsonSchema
+  # row and sets it as the skill's default. The actual import lives in
+  # SchemaImporter (shared with SkillRepoSyncer's auto-import pass).
+  def import_reference_schema
+    reference = params.expect(:reference)
+    result = SchemaImporter.call(skill: @skill, reference: reference, set_default: :always)
+
+    case result.status
+    when :imported
+      redirect_to @skill, notice: "Imported references/#{reference} as default schema \"#{result.schema.name}\"."
+    else
+      redirect_to @skill, alert: result.reason
+    end
   end
 
   private

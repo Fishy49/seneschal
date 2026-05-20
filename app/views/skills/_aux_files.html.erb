@@ -7,10 +7,31 @@
   <% files.each do |file| %>
     <details class="border border-edge rounded-lg bg-surface-input/40">
       <summary class="cursor-pointer px-3 py-2 flex items-center justify-between text-sm">
-        <code class="font-mono"><%= file[:name] %></code>
+        <div class="flex items-center gap-2 min-w-0">
+          <code class="font-mono"><%= file[:name] %></code>
+          <% if file[:looks_like_schema] %>
+            <span class="inline-block px-1.5 py-0.5 rounded text-[0.65rem] font-semibold uppercase tracking-wide bg-info/20 text-info">JSON Schema</span>
+          <% end %>
+        </div>
         <span class="text-xs text-content-muted"><%= number_to_human_size(file[:size]) %></span>
       </summary>
       <div class="border-t border-edge bg-surface-card">
+        <% if file[:looks_like_schema] %>
+          <% already_imported = @skill.default_json_schema && @skill.default_json_schema.body.to_s.include?(file[:name].sub(/\.schema\.json\z|\.json\z/, "")) %>
+          <div class="px-3 py-2 border-b border-edge bg-info/5 flex items-center justify-between gap-2">
+            <p class="text-xs text-content-muted">
+              Detected JSON Schema. Import as this skill's default output schema?
+              <% if @skill.default_json_schema %>
+                <span class="text-warning">Will replace current default "<%= @skill.default_json_schema.name %>".</span>
+              <% end %>
+            </p>
+            <%= button_to "Import as default schema",
+                  import_reference_schema_skill_path(@skill, reference: file[:name]),
+                  method: :post,
+                  class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
+                  data: { turbo_confirm: @skill.default_json_schema ? "Replace the current default schema with this one?" : nil } %>
+          </div>
+        <% end %>
         <%
           content = @skill.read_auxiliary_file(kind, file[:name])
           ext = File.extname(file[:name]).delete(".")

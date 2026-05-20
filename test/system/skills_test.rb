@@ -208,4 +208,34 @@ class SkillsTest < ApplicationSystemTestCase
     assert_current_path skills_path
     assert_no_text "deploy_check"
   end
+
+  test "import reference schema button creates the schema and sets it as default" do
+    skill_dir = File.join(@tmp_global_root, "schema-importer")
+    FileUtils.mkdir_p(File.join(skill_dir, "references"))
+    File.write(File.join(skill_dir, "SKILL.md"), "---\nname: schema-importer\ndescription: x\n---\n\nbody\n")
+    File.write(File.join(skill_dir, "references", "feature_plan.schema.json"), <<~JSON)
+      {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Feature Plan",
+        "type": "object",
+        "required": ["headline"],
+        "properties": { "headline": { "type": "string" } }
+      }
+    JSON
+    skill = Skill.create!(name: "schema-importer", source_kind: "global", relative_path: "schema-importer")
+    skill.refresh_cached_metadata!
+
+    visit skill_path(skill)
+    assert_text "feature_plan.schema.json"
+    # The "JSON Schema" badge renders with `uppercase` Tailwind styling.
+    assert_text "JSON SCHEMA"
+    # The references file is collapsed; expand it to reveal the import button.
+    find("summary", text: "feature_plan.schema.json").click
+    click_on "Import as default schema"
+
+    assert_text "Imported references/feature_plan.schema.json"
+    # The show page now shows the new schema as the default — its name
+    # surfaces in the auto-discovered references-already-imported callout.
+    assert_text "schema-importer__feature_plan"
+  end
 end

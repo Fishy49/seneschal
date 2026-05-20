@@ -163,4 +163,82 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     end
     assert_redirected_to skills_path
   end
+
+  # --- POST import_reference_schema ---
+
+  test "import_reference_schema creates a JsonSchema and sets it as the skill's default" do # rubocop:disable Metrics/BlockLength
+    skill_dir = File.join(@tmp_global_root, "schema-haver")
+    FileUtils.mkdir_p(File.join(skill_dir, "references"))
+    File.write(File.join(skill_dir, "SKILL.md"), "---\nname: schema-haver\ndescription: x\n---\n\nbody\n")
+    File.write(File.join(skill_dir, "references", "feature_plan.schema.json"), <<~JSON)
+      {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Feature Plan",
+        "description": "A plan, but typed.",
+        "type": "object",
+        "required": ["headline"],
+        "properties": {
+          "headline": { "type": "string" }
+        }
+      }
+    JSON
+    skill = Skill.create!(name: "schema-haver", source_kind: "global", relative_path: "schema-haver")
+    skill.refresh_cached_metadata!
+
+    assert_difference "JsonSchema.count", 1 do
+      post import_reference_schema_skill_path(skill, reference: "feature_plan.schema.json")
+    end
+    assert_redirected_to skill_path(skill)
+
+    new_schema = JsonSchema.find_by(name: "schema-haver__feature_plan")
+    assert_not_nil new_schema
+    parsed = JSON.parse(new_schema.body)
+    assert_equal "Feature Plan", parsed["title"]
+    assert_not parsed.key?("$schema"), "$schema must be stripped to keep the CLI happy"
+
+    skill.reload
+    assert_equal new_schema.id, skill.default_json_schema_id
+    assert_equal "feature_plan", skill.default_output_variable
+  end
+
+  test "import_reference_schema is idempotent — re-importing overwrites in place" do
+    skill_dir = File.join(@tmp_global_root, "idem-skill")
+    FileUtils.mkdir_p(File.join(skill_dir, "references"))
+    File.write(File.join(skill_dir, "SKILL.md"), "---\nname: idem-skill\ndescription: x\n---\n\nbody\n")
+    ref = File.join(skill_dir, "references", "out.schema.json")
+    File.write(ref, '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}')
+    skill = Skill.create!(name: "idem-skill", source_kind: "global", relative_path: "idem-skill")
+    skill.refresh_cached_metadata!
+
+    post import_reference_schema_skill_path(skill, reference: "out.schema.json")
+    File.write(ref, '{"type":"object","properties":{"b":{"type":"string"}},"required":["b"]}')
+
+    assert_no_difference "JsonSchema.count" do
+      post import_reference_schema_skill_path(skill, reference: "out.schema.json")
+    end
+    new_body = JSON.parse(JsonSchema.find_by(name: "idem-skill__out").body)
+    assert new_body["properties"].key?("b"), "second import should update the body in place"
+  end
+
+  test "import_reference_schema rejects missing reference files" do
+    skill = skills(:shared_skill)
+    post import_reference_schema_skill_path(skill, reference: "does_not_exist.json")
+    assert_redirected_to skill_path(skill)
+    assert_match(/not found/i, flash[:alert])
+  end
+
+  test "import_reference_schema rejects malformed JSON" do
+    skill_dir = File.join(@tmp_global_root, "bad-json")
+    FileUtils.mkdir_p(File.join(skill_dir, "references"))
+    File.write(File.join(skill_dir, "SKILL.md"), "---\nname: bad-json\ndescription: x\n---\n\nbody\n")
+    File.write(File.join(skill_dir, "references", "broken.json"), "not even json")
+    skill = Skill.create!(name: "bad-json", source_kind: "global", relative_path: "bad-json")
+    skill.refresh_cached_metadata!
+
+    assert_no_difference "JsonSchema.count" do
+      post import_reference_schema_skill_path(skill, reference: "broken.json")
+    end
+    assert_redirected_to skill_path(skill)
+    assert_match(/not valid JSON/i, flash[:alert])
+  end
 end

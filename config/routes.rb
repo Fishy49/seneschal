@@ -69,7 +69,11 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :skills
+  resources :skills do
+    member do
+      post :import_reference_schema
+    end
+  end
   resources :skill_repos do
     member do
       post :sync
