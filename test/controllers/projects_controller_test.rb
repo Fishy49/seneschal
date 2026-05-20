@@ -70,6 +70,24 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_path(projects(:seneschal))
   end
 
+  test "POST refetch enqueues job and flips status" do
+    project = projects(:seneschal)
+    assert_enqueued_with(job: RefetchRepoJob) do
+      post refetch_project_path(project)
+    end
+    assert_redirected_to project_path(project)
+    assert_equal "refetching", project.reload.repo_status
+  end
+
+  test "POST refetch on un-cloned project redirects with alert" do
+    project = projects(:other_project) # repo_status: not_cloned
+    assert_no_enqueued_jobs only: RefetchRepoJob do
+      post refetch_project_path(project)
+    end
+    assert_redirected_to project_path(project)
+    assert_equal "not_cloned", project.reload.repo_status
+  end
+
   test "requires authentication" do
     delete logout_path
     get projects_path

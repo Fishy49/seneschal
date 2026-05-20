@@ -42,6 +42,7 @@ Rails.application.routes.draw do
   resources :projects do
     member do
       post :clone
+      post :refetch
       get :repo_status
       post :import_skills
     end

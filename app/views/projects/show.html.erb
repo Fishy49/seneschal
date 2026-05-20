@@ -9,6 +9,9 @@
   <div class="flex items-center gap-2">
     <%= render "repo_status", project: @project %>
     <% if @project.repo_ready? %>
+      <%= button_to "Refetch", refetch_project_path(@project),
+            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
+            data: { turbo_confirm: "Fetch the latest default branch from origin and reset the local clone to it?" } %>
       <%= button_to "Import Skills", import_skills_project_path(@project),
             class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
     <% end %>

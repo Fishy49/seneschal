@@ -1,5 +1,5 @@
 class ProjectsController < ApplicationController
-  before_action :set_project, only: [:show, :edit, :update, :destroy, :clone]
+  before_action :set_project, only: [:show, :edit, :update, :destroy, :clone, :refetch]
 
   def index
     @project_groups = ProjectGroup.ordered
@@ -47,6 +47,17 @@ class ProjectsController < ApplicationController
     @project.update!(repo_status: "cloning")
     CloneRepoJob.perform_later(@project)
     redirect_to @project, notice: "Repository cloning started..."
+  end
+
+  def refetch
+    unless @project.repo_ready?
+      redirect_to @project, alert: "Clone the repository before refetching."
+      return
+    end
+
+    @project.update!(repo_status: "refetching")
+    RefetchRepoJob.perform_later(@project)
+    redirect_to @project, notice: "Refetching latest from origin..."
   end
 
   def repo_status
