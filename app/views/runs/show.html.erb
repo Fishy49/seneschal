@@ -8,14 +8,14 @@
 <%= render "run_header", run: @run %>
 
 <div class="grid grid-cols-[2fr_1fr] gap-4">
-  <div>
+  <div class="min-w-0">
     <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="preserve-details">
       <h2 class="text-lg font-semibold mb-3">Steps</h2>
       <%= render "run_steps_list", run: @run %>
     </div>
   </div>
 
-  <div>
+  <div class="min-w-0">
     <%= render "run_info", run: @run %>
     <%= render "run_context", run: @run %>
 
@@ -26,7 +26,7 @@
           <% @run.input.each do |key, value| %>
             <tr>
               <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted"><%= key %></th>
-              <td class="px-3 py-2 border-b border-edge text-sm"><code class="font-mono text-[0.8125rem]"><%= value %></code></td>
+              <td class="px-3 py-2 border-b border-edge text-sm"><code class="font-mono text-[0.8125rem] break-all"><%= value %></code></td>
             </tr>
           <% end %>
         </table>

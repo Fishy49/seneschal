@@ -9,13 +9,13 @@
             <% text = value.to_s %>
             <% if text.length > 200 %>
               <div data-controller="content-modal" data-content-modal-title-value="<%= key %>">
-                <code class="font-mono text-[0.8125rem]"><%= truncate(text, length: 200) %></code>
+                <code class="font-mono text-[0.8125rem] break-all"><%= truncate(text, length: 200) %></code>
                 <button type="button" data-action="content-modal#open"
                         class="ml-1 text-xs text-accent hover:text-accent-hover cursor-pointer bg-transparent border-none">View</button>
                 <script type="text/plain" data-content-modal-target="source"><%= text %></script>
               </div>
             <% else %>
-              <code class="font-mono text-[0.8125rem]"><%= text %></code>
+              <code class="font-mono text-[0.8125rem] break-all"><%= text %></code>
             <% end %>
           </td>
         </tr>
