@@ -612,12 +612,34 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   # --- Helpers ---
 
   def env_vars
-    vars = @context.transform_keys { |k| k.to_s.upcase }.merge(
-      "REPO_PATH" => @repo_path
-    )
+    vars = @context.each_with_object({}) do |(k, v), h|
+      h[k.to_s.upcase] = stringify_env_value(v)
+    end
+    vars["REPO_PATH"] = @repo_path
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
     vars.merge!(queryable_env_vars) if active_queryable_schemas.any?
     vars
+  end
+
+  # Open3 / Process.spawn rejects non-String env values with
+  # `TypeError: no implicit conversion of Hash into String`. The run
+  # context now legitimately holds Hash / Array values (when a schema-
+  # bound step's structured_output gets stored as the parsed payload),
+  # so we JSON-encode anything non-scalar on the way out. Scripts that
+  # interpolate `$VAR` see the same compact-JSON shape they got back
+  # when structured outputs were spliced through stdout.
+  def stringify_env_value(value)
+    case value
+    when nil then ""
+    when String then value
+    when Numeric, TrueClass, FalseClass then value.to_s
+    else
+      begin
+        JSON.generate(value)
+      rescue JSON::GeneratorError, TypeError
+        value.to_s
+      end
+    end
   end
 
   def queryable_env_vars

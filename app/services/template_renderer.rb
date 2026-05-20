@@ -7,7 +7,14 @@ class TemplateRenderer
   def render
     @body.gsub(/\$\{(\w+)\}/) do
       key = ::Regexp.last_match(1).to_sym
-      @context.fetch(key) { "${#{::Regexp.last_match(1)}}" }
+      if @context.key?(key)
+        # Hash / Array context values (parsed structured_output payloads)
+        # must render as JSON rather than Ruby's `Hash#to_s` (`{"a"=>1}`)
+        # so prompt bodies stay readable and machine-consumable.
+        JsonPathResolver.format(@context[key])
+      else
+        "${#{::Regexp.last_match(1)}}"
+      end
     end
   end
 end

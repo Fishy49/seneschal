@@ -438,6 +438,36 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_not env.key?("SENESCHAL_DB_PATH")
   end
 
+  # Regression: Open3 / Process.spawn rejects non-String env values with
+  # `TypeError: no implicit conversion of Hash into String`. The run
+  # context now legitimately holds Hash / Array values from schema-bound
+  # steps, so env_vars must JSON-encode them on the way out — otherwise
+  # the next step crashes before it can even call Claude.
+  test "env_vars JSON-encodes Hash and Array context values so Open3 doesn't choke" do
+    ctx = {
+      "game" => { "title" => "Driver Out!", "schema_version" => 1 },
+      "items" => [{ "id" => 1 }, { "id" => 2 }],
+      "task_title" => "scaffold",
+      "pr_number" => 42
+    }
+    executor = StepExecutor.new(@step, ctx, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    env.each_value { |v| assert_kind_of String, v, "env value must be a String for Open3" }
+    assert_equal({ "title" => "Driver Out!", "schema_version" => 1 }, JSON.parse(env["GAME"]))
+    assert_equal([{ "id" => 1 }, { "id" => 2 }], JSON.parse(env["ITEMS"]))
+    assert_equal "scaffold", env["TASK_TITLE"]
+    assert_equal "42", env["PR_NUMBER"]
+  end
+
+  test "env_vars converts nil context values to empty strings" do
+    executor = StepExecutor.new(@step, { "absent" => nil, "present" => "x" }, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    assert_equal "", env["ABSENT"]
+    assert_equal "x", env["PRESENT"]
+  end
+
   test "context_fetch project_file reads file from project repo" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "config.json"), '{"flag":true}')
