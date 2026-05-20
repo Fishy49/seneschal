@@ -235,8 +235,7 @@ module Runners
       result = @runner.execute(prompt: "x", cwd: @cwd, json_schema: { "type" => "object" })
 
       assert_not_predicate result, :passed?
-      assert_match(/StructuredOutput tool was not registered/, result.stderr)
-      assert_match(/queryable context/, result.stderr)
+      assert_match(/StructuredOutput tool was not registered.*queryable context/m, result.stderr)
     end
 
     # ---- hooks passthrough ----
