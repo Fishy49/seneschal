@@ -55,6 +55,12 @@ module StreamLogHelper
       else
         input.to_s.truncate(80)
       end
+    when "TaskCreate"
+      input["subject"].to_s.presence&.truncate(80) || input.to_s.truncate(80)
+    when "TaskUpdate"
+      id = input["taskId"].to_s.presence
+      status = input["status"].to_s.presence
+      id && status ? "##{id} → #{status}" : input.to_s.truncate(80)
     else
       input.to_s.truncate(80)
     end
@@ -64,7 +70,12 @@ module StreamLogHelper
     "Read" => "eye", "Edit" => "pencil", "Write" => "file-plus",
     "Bash" => "terminal", "Glob" => "search", "Grep" => "search",
     "Agent" => "cpu", "WebSearch" => "globe", "WebFetch" => "globe",
-    "TodoWrite" => "check-square"
+    "TodoWrite" => "check-square",
+    # The SDK-bundled `claude` CLI exposes the task tools instead of TodoWrite
+    # (TaskCreate adds one entry, TaskUpdate mutates by taskId). They serve the
+    # same "running todo list" role from the operator's perspective, so we
+    # group them under the same icon family.
+    "TaskCreate" => "check-square", "TaskUpdate" => "check-square"
   }.freeze
 
   TODO_STATUS_ICONS = { "completed" => "✓", "in_progress" => "▸", "pending" => "○" }.freeze
@@ -73,18 +84,65 @@ module StreamLogHelper
     "pending" => "text-content-muted"
   }.freeze
 
+  # Reconstruct the running todo list from a stream_log, supporting both event
+  # styles the harness can emit:
+  #
+  # - TodoWrite (Claude CLI runner): each call carries the FULL list under
+  #   `input.todos`. We treat each TodoWrite as a snapshot that replaces the
+  #   list.
+  # - TaskCreate / TaskUpdate (SDK runner — its bundled CLI exposes the task
+  #   tools instead): TaskCreate adds one row at a time with `subject` /
+  #   `activeForm`, TaskUpdate mutates an existing row's `status` by `taskId`.
+  #   The harness assigns sequential ids to tasks (1, 2, 3, …) in the order
+  #   they're created, so we mirror that and look up updates by index.
+  #
+  # Returns a TodoWrite-shaped array (`{"content":, "status":, "activeForm":}`)
+  # so the existing `_todo_list` partial doesn't need to know which tool
+  # family produced the data.
   def latest_todo_list(stream_log)
     return nil unless stream_log.is_a?(Array)
 
-    stream_log.reverse_each do |event|
+    todos = []
+    tasks_by_id = {}
+    next_task_id = 1
+
+    stream_log.each do |event|
       next unless event["type"] == "assistant"
 
-      content = event.dig("message", "content") || []
-      block = content.reverse.find { |b| b["type"] == "tool_use" && b["name"] == "TodoWrite" }
-      todos = block&.dig("input", "todos")
-      return todos if todos.is_a?(Array) && todos.any?
+      (event.dig("message", "content") || []).each do |block|
+        next unless block["type"] == "tool_use"
+
+        case block["name"]
+        when "TodoWrite"
+          snapshot = block.dig("input", "todos")
+          if snapshot.is_a?(Array) && snapshot.any?
+            todos = snapshot.map { |t| t.is_a?(Hash) ? t.dup : t }
+            tasks_by_id.clear # TodoWrite owns the whole list; drop any Task* state
+          end
+        when "TaskCreate"
+          subject = block.dig("input", "subject").to_s
+          next if subject.empty?
+
+          entry = {
+            "content" => subject,
+            "activeForm" => block.dig("input", "activeForm").to_s.presence || subject,
+            "status" => "pending"
+          }
+          todos << entry
+          tasks_by_id[next_task_id.to_s] = entry
+          next_task_id += 1
+        when "TaskUpdate"
+          id = block.dig("input", "taskId").to_s
+          status = block.dig("input", "status").to_s
+          next if id.empty? || status.empty?
+
+          entry = tasks_by_id[id]
+          entry["status"] = status if entry
+        end
+      end
     end
-    nil
+
+    todos.any? ? todos : nil
   end
 
   def todo_status_icon(status) = TODO_STATUS_ICONS[status] || TODO_STATUS_ICONS["pending"]

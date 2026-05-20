@@ -229,6 +229,90 @@ class StreamLogHelperTest < ActionView::TestCase
     assert_equal "check-square", tool_icon_class("TodoWrite")
   end
 
+  test "tool_icon_class maps TaskCreate and TaskUpdate to the same icon family" do
+    assert_equal "check-square", tool_icon_class("TaskCreate")
+    assert_equal "check-square", tool_icon_class("TaskUpdate")
+  end
+
+  test "tool_use_label for TaskCreate surfaces the subject" do
+    input = { "subject" => "Save audio manifest to disk", "activeForm" => "Saving audio manifest" }
+    assert_equal "Save audio manifest to disk", tool_use_label("TaskCreate", input)
+  end
+
+  test "tool_use_label for TaskUpdate shows the task id and new status" do
+    label = tool_use_label("TaskUpdate", { "taskId" => "3", "status" => "completed" })
+    assert_equal "#3 → completed", label
+  end
+
+  # SDK-runner sessions emit TaskCreate/TaskUpdate instead of TodoWrite —
+  # latest_todo_list must reconstruct the same {content, status, activeForm}
+  # shape that the _todo_list partial renders.
+  test "latest_todo_list reconstructs a list from TaskCreate / TaskUpdate events" do
+    log = [
+      task_create_event(subject: "Save audio manifest", active_form: "Saving audio manifest"),
+      task_create_event(subject: "Generate music tracks", active_form: "Generating music"),
+      task_create_event(subject: "Verify audio tree", active_form: "Verifying audio"),
+      task_update_event(id: "1", status: "in_progress"),
+      task_update_event(id: "1", status: "completed"),
+      task_update_event(id: "2", status: "in_progress")
+    ]
+
+    todos = latest_todo_list(log)
+    assert_equal 3, todos.size
+
+    assert_equal "Save audio manifest", todos[0]["content"]
+    assert_equal "completed", todos[0]["status"]
+    assert_equal "Saving audio manifest", todos[0]["activeForm"]
+
+    assert_equal "Generate music tracks", todos[1]["content"]
+    assert_equal "in_progress", todos[1]["status"]
+
+    assert_equal "Verify audio tree", todos[2]["content"]
+    assert_equal "pending", todos[2]["status"], "TaskCreate entries default to pending until updated"
+  end
+
+  test "latest_todo_list ignores TaskUpdate for unknown task ids" do
+    log = [
+      task_create_event(subject: "Real task"),
+      task_update_event(id: "99", status: "completed")
+    ]
+    todos = latest_todo_list(log)
+    assert_equal 1, todos.size
+    assert_equal "pending", todos[0]["status"]
+  end
+
+  test "latest_todo_list falls back to subject when activeForm is missing" do
+    log = [task_create_event(subject: "Lonely task", active_form: nil)]
+    todos = latest_todo_list(log)
+    assert_equal "Lonely task", todos[0]["activeForm"]
+  end
+
+  test "latest_todo_list returns nil for a Task-tool session with no creates" do
+    log = [task_update_event(id: "1", status: "completed")]
+    assert_nil latest_todo_list(log)
+  end
+
+  def task_create_event(subject:, active_form: nil)
+    input = { "subject" => subject }
+    input["activeForm"] = active_form if active_form
+    {
+      "type" => "assistant",
+      "message" => {
+        "content" => [{ "type" => "tool_use", "name" => "TaskCreate", "input" => input }]
+      }
+    }
+  end
+
+  def task_update_event(id:, status:)
+    {
+      "type" => "assistant",
+      "message" => {
+        "content" => [{ "type" => "tool_use", "name" => "TaskUpdate",
+                        "input" => { "taskId" => id, "status" => status } }]
+      }
+    }
+  end
+
   test "run_step view renders todo list from stream_log" do
     run_step = run_steps(:passed_step_with_todos)
     run = runs(:completed_run)
