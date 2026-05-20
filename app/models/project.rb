@@ -12,7 +12,7 @@ class Project < ApplicationRecord
     group_id == "none" ? where(project_group_id: nil) : where(project_group_id: group_id)
   }
 
-  REPO_STATUSES = ["not_cloned", "cloning", "ready", "error"].freeze
+  REPO_STATUSES = ["not_cloned", "cloning", "refetching", "ready", "error"].freeze
 
   validates :name, presence: true, uniqueness: true
   validates :repo_url, presence: true

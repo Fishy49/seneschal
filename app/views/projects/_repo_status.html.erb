@@ -1,5 +1,5 @@
 <span id="repo_status"
-      <% if project.repo_status == "cloning" %>
+      <% if project.repo_status.in?(["cloning", "refetching"]) %>
         data-controller="poll-status"
         data-poll-status-url-value="<%= repo_status_project_path(project) %>"
       <% end %>>
@@ -16,6 +16,8 @@
     <% end %>
   <% when "cloning" %>
     <span class="text-xs text-content-muted">Cloning...</span>
+  <% when "refetching" %>
+    <span class="text-xs text-content-muted">Refetching...</span>
   <% when "ready" %>
     <span class="text-xs text-content-muted">Repo cloned</span>
   <% when "error" %>
