@@ -474,6 +474,38 @@ def resolve_prompt(config: dict[str, Any]) -> str:
     return config.get("prompt") or ""
 
 
+def structured_output_missing_error(message: Any, tools_seen: list[Any] | None = None) -> str | None:
+    """Return a human-readable error when a schema was configured but the
+    CLI didn't actually register the StructuredOutput tool. Otherwise None.
+
+    Background: under large prompts the bundled `claude` CLI can defer
+    tool registration to manage context budget. When the SDK-injected
+    StructuredOutput tool is the casualty, the agent has nowhere to
+    deliver its schema-validated payload — it flails through ToolSearch
+    looking for a tool the harness never made callable, then either gives
+    up or emits unstructured text that downstream parsers can't read.
+    Catching the absence at session-init turns a mystery failure
+    ("Output variable was missing") into an actionable diagnostic.
+    """
+    data = getattr(message, "data", None) or {}
+    tools = data.get("tools")
+    if tools_seen is not None and isinstance(tools, list):
+        tools_seen[:] = tools
+    if not isinstance(tools, list) or not tools:
+        return None
+    if "StructuredOutput" in tools:
+        return None
+    return (
+        "StructuredOutput tool was not registered for this session even "
+        "though a json_schema was configured. The bundled `claude` CLI "
+        f"exposed these tools instead: {tools!r}. This typically means "
+        "the prompt is large enough that the CLI deferred the "
+        "structured-output tool. Shrink the prompt — for example, route "
+        "large `consumes` payloads through queryable context "
+        "(seneschal-context CLI) instead of inlining them — and re-run."
+    )
+
+
 async def run(config: dict[str, Any]) -> int:
     try:
         from claude_agent_sdk import query
@@ -489,13 +521,29 @@ async def run(config: dict[str, Any]) -> int:
 
     options = build_options(config)
     prompt = resolve_prompt(config)
+    schema_configured = bool(config.get("json_schema"))
 
     session_id: str | None = None
     saw_result = False
+    init_checked = False
 
     try:
         async for message in query(prompt=prompt, options=options):
             session_id = extract_session_id(message) or session_id
+
+            if (
+                schema_configured
+                and not init_checked
+                and type(message).__name__ == "SystemMessage"
+            ):
+                err = structured_output_missing_error(message)
+                if err is not None:
+                    emit({"type": "error", "message": err})
+                    return 1
+                # Only check once — later SystemMessages don't carry the
+                # full tool list, and we don't want to re-flag.
+                init_checked = True
+
             event = serialize_message(message, session_id)
             if event is None:
                 continue
