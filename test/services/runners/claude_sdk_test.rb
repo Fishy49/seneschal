@@ -221,6 +221,23 @@ module Runners
       assert_nil result.structured_output
     end
 
+    # When the bundled CLI doesn't register StructuredOutput (typically
+    # because prompt size pushed it into the deferred-tool set), the
+    # sidecar bails at session-init with an explicit error event. The
+    # runner must surface that as a failed Result with the explanation
+    # in stderr — otherwise the symptom resurfaces downstream as the
+    # generic "Output variable was missing" message.
+    test "sidecar's structured-output-missing error propagates as a failed Result with diagnostic stderr" do
+      fake_python, = install_fake_python(:missing_structured_output)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      result = @runner.execute(prompt: "x", cwd: @cwd, json_schema: { "type" => "object" })
+
+      assert_not_predicate result, :passed?
+      assert_match(/StructuredOutput tool was not registered.*queryable context/m, result.stderr)
+    end
+
     # ---- hooks passthrough ----
 
     test "build_config carries the hooks dict to the wire payload" do
@@ -363,6 +380,12 @@ module Runners
             "structured_output"=>{"pr_number"=>42, "branch"=>"feat/x"}
           })
           exit 0
+        when "missing_structured_output"
+          STDOUT.puts JSON.dump({
+            "type"=>"error",
+            "message"=>"StructuredOutput tool was not registered for this session even though a json_schema was configured. The bundled `claude` CLI exposed these tools instead: [\\"Read\\", \\"Edit\\"]. This typically means the prompt is large enough that the CLI deferred the structured-output tool. Shrink the prompt — for example, route large `consumes` payloads through queryable context (seneschal-context CLI) instead of inlining them — and re-run."
+          })
+          exit 1
         end
       RUBY
     end

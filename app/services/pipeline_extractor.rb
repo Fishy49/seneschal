@@ -1,7 +1,12 @@
 class PipelineExtractor
   # Extracts declared output variables from step results.
   #
-  # For AI steps (skill/prompt):
+  # For schema-bound AI steps where the runner returned a parsed structured_output:
+  #   Routes that object straight into produces.first. Never re-encoded through
+  #   text — round-tripping through a ```output fence has been a source of
+  #   truncation bugs when the payload itself contains triple backticks.
+  #
+  # For AI steps (skill/prompt) without structured_output:
   #   Parses ```output blocks from the result text
   #
   # For script/command steps:
@@ -10,22 +15,34 @@ class PipelineExtractor
   # For context_fetch steps:
   #   Stores fetched content under the configured context_key
 
-  def initialize(step, stdout)
+  def initialize(step, result_or_stdout)
     @step = step
-    @stdout = stdout || ""
+    if result_or_stdout.respond_to?(:stdout)
+      @stdout = result_or_stdout.stdout || ""
+      @structured_output = result_or_stdout.structured_output
+    else
+      @stdout = result_or_stdout.to_s
+      @structured_output = nil
+    end
   end
 
   def extract
-    case @step.step_type
-    when "skill", "prompt"
-      extract_output_block
-    when "script", "command", "pr"
-      extract_set_output
-    when "context_fetch"
-      key = @step.config["context_key"]
-      key.present? ? { key => @stdout } : {}
+    text_extracted = case @step.step_type
+                     when "skill", "prompt"
+                       extract_output_block
+                     when "script", "command", "pr"
+                       extract_set_output
+                     when "context_fetch"
+                       key = @step.config["context_key"]
+                       key.present? ? { key => @stdout } : {}
+                     else
+                       {}
+                     end
+
+    if @structured_output && @step.produces.any?
+      text_extracted.merge(@step.produces.first => @structured_output)
     else
-      {}
+      text_extracted
     end
   end
 
