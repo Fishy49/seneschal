@@ -41,4 +41,27 @@ class TemplateRendererTest < ActiveSupport::TestCase
     result = TemplateRenderer.new(body, { x: "hello" }).render
     assert_equal "hello and hello", result
   end
+
+  # Schema-bound steps now leave their parsed payload in `run.context` as a
+  # Hash. Before this fix, `${var}` interpolated `Hash#to_s` ("{\"a\"=>1}"),
+  # which made the prompt unreadable and broke any downstream JSON parsing.
+  test "renders Hash values as JSON, not Ruby's Hash#to_s" do
+    body = "Config: ${cfg}"
+    result = TemplateRenderer.new(body, { cfg: { "title" => "Driver Out!", "version" => 1 } }).render
+    parsed = JSON.parse(result.delete_prefix("Config: "))
+    assert_equal({ "title" => "Driver Out!", "version" => 1 }, parsed)
+  end
+
+  test "renders Array values as JSON" do
+    body = "items=${items}"
+    result = TemplateRenderer.new(body, { items: [{ "id" => 1 }, { "id" => 2 }] }).render
+    parsed = JSON.parse(result.delete_prefix("items="))
+    assert_equal([{ "id" => 1 }, { "id" => 2 }], parsed)
+  end
+
+  test "renders nil values as empty string" do
+    body = "x=${x};y=${y}"
+    result = TemplateRenderer.new(body, { x: nil, y: "set" }).render
+    assert_equal "x=;y=set", result
+  end
 end
