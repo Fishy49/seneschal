@@ -273,13 +273,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       last_broadcast = monotonic_now
 
-      stdout.each_line do |line|
-        stdout_acc << line
+      begin
+        stdout.each_line do |line|
+          stdout_acc << line
 
-        if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-          yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
-          last_broadcast = monotonic_now
+          if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
+            yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
+            last_broadcast = monotonic_now
+          end
         end
+      rescue Runners::Aborted
+        # Caller bailed out (orphaned ExecuteRunJob). Kill the child so
+        # popen3's ensure-block doesn't hang on wait_thr.join.
+        begin; Process.kill("TERM", wait_thr.pid) if wait_thr.alive?; rescue Errno::ESRCH, Errno::EPERM; end
+        raise
       end
 
       stderr_thread.join
@@ -289,6 +296,8 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       Result.new(exit_code: exit_code, stdout: stdout_acc, stderr: stderr_acc)
     end
+  rescue Runners::Aborted
+    raise # propagate to ExecuteRunJob
   rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
   end

@@ -43,6 +43,26 @@ class StreamLogHelperTest < ActionView::TestCase
     assert_equal 0.05, entries[0][:cost]
   end
 
+  test "stream_log_entries flags SDK auto-compaction boundary" do
+    log = [
+      { "type" => "user", "message" => { "content" => [
+        { "type" => "text", "text" => "This session is being continued from a previous conversation that ran out of context. The summary below..." }
+      ] } }
+    ]
+    entries = stream_log_entries(log)
+    assert_equal 1, entries.length
+    assert_equal :compaction, entries[0][:type]
+  end
+
+  test "stream_log_entries ignores ordinary tool_result user messages" do
+    log = [
+      { "type" => "user", "message" => { "content" => [
+        { "type" => "tool_result", "tool_use_id" => "x", "content" => "ok" }
+      ] } }
+    ]
+    assert_equal [], stream_log_entries(log)
+  end
+
   test "stream_log_entries returns empty for nil" do
     assert_equal [], stream_log_entries(nil)
   end

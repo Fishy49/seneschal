@@ -199,6 +199,77 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "superseded? sees mismatched token as superseded" do
+    workflow = setup_workflow_with_ready_project!
+    run = workflow.runs.create!(status: "running", context: {}, input: {},
+                                system_flags: { "job_token" => "other-job" })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "superseded? sees cleared token as superseded" do
+    workflow = setup_workflow_with_ready_project!
+    # RunRecoveryJob's `except("job_token")` leaves the column as {} or
+    # with other keys but no job_token entry; the orphan should bail.
+    run = workflow.runs.create!(status: "failed", context: {}, input: {},
+                                system_flags: { "auto_recovered" => true })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "superseded? sees matching token as live" do
+    workflow = setup_workflow_with_ready_project!
+    run = workflow.runs.create!(status: "running", context: {}, input: {},
+                                system_flags: { "job_token" => "mine" })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert_not job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "execute bails cleanly when superseded mid-stream via on_progress" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "long", step_type: "command", body: "echo hi",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    # Stub the executor: when .execute is called with a block, simulate a
+    # progress tick after wiping the job_token (mirroring what RunRecoveryJob
+    # would do). The block should raise Runners::Aborted, ExecuteRunJob's
+    # rescue should swallow it, and no further steps should run.
+    factory = lambda do |*_args, **_kwargs|
+      executor = Object.new
+      executor.define_singleton_method(:execute) do |&blk|
+        run.update!(system_flags: run.reload.system_flags.except("job_token"))
+        blk&.call({ output: "partial" }) # raises Runners::Aborted
+        StepExecutor::Result.new(exit_code: 0, stdout: "unreached", stderr: "", stream_events: nil)
+      end
+      executor
+    end
+
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    # The run was left in "running" (the orphan bailed without writing) —
+    # the recovery flow elsewhere is what would re-enqueue. The point is
+    # we didn't blow up, didn't mark completed, and didn't keep iterating.
+    assert_equal "running", run.status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
