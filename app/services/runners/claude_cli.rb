@@ -108,29 +108,36 @@ module Runners
 
         last_broadcast = monotonic_now
 
-        stdout.each_line do |line|
-          line = line.strip
-          next if line.empty?
+        begin
+          stdout.each_line do |line|
+            line = line.strip
+            next if line.empty?
 
-          event = begin; JSON.parse(line); rescue StandardError; next; end
-          events << event
+            event = begin; JSON.parse(line); rescue StandardError; next; end
+            events << event
 
-          session_id ||= event["session_id"]
-
-          case event["type"]
-          when "result"
-            result_text = event["result"].to_s
             session_id ||= event["session_id"]
-          when "assistant"
-            (event.dig("message", "content") || []).each do |block|
-              result_text = block["text"] if block["type"] == "text"
+
+            case event["type"]
+            when "result"
+              result_text = event["result"].to_s
+              session_id ||= event["session_id"]
+            when "assistant"
+              (event.dig("message", "content") || []).each do |block|
+                result_text = block["text"] if block["type"] == "text"
+              end
+            end
+
+            if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
+              yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
+              last_broadcast = monotonic_now
             end
           end
-
-          if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-            yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
-            last_broadcast = monotonic_now
-          end
+        rescue Aborted
+          # See claude_sdk.rb for rationale — kill the subprocess so the
+          # popen3 ensure-block doesn't hang joining a still-alive child.
+          kill_subprocess(wait_thr)
+          raise
         end
 
         stderr_thread.join
@@ -143,8 +150,19 @@ module Runners
           stream_events: events, session_id: session_id
         )
       end
+    rescue Aborted
+      raise # propagate to ExecuteRunJob — this isn't a runner-level failure
     rescue StandardError => e
       Result.new(exit_code: 1, stdout: "", stderr: e.message)
+    end
+
+    def kill_subprocess(wait_thr)
+      return unless wait_thr.alive?
+
+      Process.kill("TERM", wait_thr.pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      # Child already exited (or was reaped) between our `.alive?` check
+      # and the kill — exactly what we wanted, just race-induced.
     end
 
     def run_command(cmd, env:, cwd:)

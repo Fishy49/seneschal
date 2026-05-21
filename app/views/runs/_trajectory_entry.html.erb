@@ -74,6 +74,13 @@
       <% if entry[:model] %><span class="ml-2 font-mono"><%= entry[:model] %></span><% end %>
     </div>
 
+  <% when :compaction %>
+    <div class="flex items-center gap-2 text-xs text-warning">
+      <span>&#9851;</span>
+      <span class="font-semibold uppercase tracking-wide">Context compacted</span>
+      <span class="text-content-muted">Claude is continuing from a summary; expect re-reads.</span>
+    </div>
+
   <% when :error %>
     <div class="text-sm text-danger">
       <p class="text-xs font-semibold uppercase tracking-wide mb-1">Error</p>

@@ -1,4 +1,12 @@
 module StreamLogHelper
+  # Prefix of the user-message text the Python SDK injects when its
+  # internal conversation hits its context budget and gets auto-compacted.
+  # Spotting this prefix lets us render a visible "context compacted"
+  # marker so the operator understands why the trajectory appears to
+  # restart with file re-reads — instead of mistaking it for a loop.
+  COMPACTION_TEXT_PREFIX =
+    "This session is being continued from a previous conversation that ran out of context".freeze
+
   def stream_log_entries(stream_log)
     return [] unless stream_log.is_a?(Array)
 
@@ -17,6 +25,8 @@ module StreamLogHelper
             entries << { type: :text, text: block["text"] } if block["text"].present?
           end
         end
+      when "user"
+        entries << { type: :compaction } if compaction_boundary?(event)
       when "result"
         entries << {
           type: :result,
@@ -28,6 +38,19 @@ module StreamLogHelper
     end
 
     entries
+  end
+
+  # True when this `user` event is the SDK's post-compaction continuation
+  # message (a single text block whose body starts with the well-known
+  # prefix). Ordinary tool_result user messages don't match.
+  def compaction_boundary?(event)
+    blocks = event.dig("message", "content")
+    return false unless blocks.is_a?(Array)
+
+    blocks.any? do |block|
+      block.is_a?(Hash) && block["type"] == "text" &&
+        block["text"].to_s.start_with?(COMPACTION_TEXT_PREFIX)
+    end
   end
 
   def tool_use_label(tool, input)
@@ -129,6 +152,8 @@ module StreamLogHelper
       "result:#{entry[:stop_reason]}"
     when :system
       "system:#{entry[:model]}"
+    when :compaction
+      "compaction"
     when :error
       "error"
     else
@@ -232,7 +257,11 @@ module StreamLogHelper
     when "assistant"
       assistant_blocks(event).each { |block| append_assistant_block(block, idx, entries, pending_tool_uses) }
     when "user"
-      assistant_blocks(event).each { |block| append_tool_result_block(block, idx, entries, pending_tool_uses) }
+      if compaction_boundary?(event)
+        entries << { event_idx: idx, kind: :compaction }
+      else
+        assistant_blocks(event).each { |block| append_tool_result_block(block, idx, entries, pending_tool_uses) }
+      end
     when "result"
       entries << {
         event_idx: idx, kind: :result, cost: event["total_cost_usd"],

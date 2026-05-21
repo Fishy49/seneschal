@@ -273,13 +273,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       last_broadcast = monotonic_now
 
-      stdout.each_line do |line|
-        stdout_acc << line
+      begin
+        stdout.each_line do |line|
+          stdout_acc << line
 
-        if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-          yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
-          last_broadcast = monotonic_now
+          if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
+            yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
+            last_broadcast = monotonic_now
+          end
         end
+      rescue Runners::Aborted
+        # Caller bailed out (orphaned ExecuteRunJob). Kill the child so
+        # popen3's ensure-block doesn't hang on wait_thr.join.
+        kill_subprocess(wait_thr)
+        raise
       end
 
       stderr_thread.join
@@ -289,8 +296,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       Result.new(exit_code: exit_code, stdout: stdout_acc, stderr: stderr_acc)
     end
+  rescue Runners::Aborted
+    raise # propagate to ExecuteRunJob
   rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
+  end
+
+  def kill_subprocess(wait_thr)
+    return unless wait_thr.alive?
+
+    Process.kill("TERM", wait_thr.pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    # ESRCH: child already exited between our `.alive?` check and the
+    # kill. EPERM: child died and was reaped under us. Either way it's
+    # gone — exactly what we wanted.
   end
 
   # --- Runner dispatch ---

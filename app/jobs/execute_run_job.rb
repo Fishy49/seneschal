@@ -82,10 +82,15 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       if queued_run_step_id
         run_step = run.run_steps.find(queued_run_step_id)
         resolved_context = append_rejection_context(resolved_context, run_step.rejection_context)
+        # Don't wipe stream_log: if the new attempt crashes before its runner
+        # emits anything (e.g. another MCP cold-start hang), the prior
+        # attempt's trajectory stays visible. The first broadcast from the
+        # new SDK runner will replace it organically.
         run_step.update!(status: "running", started_at: Time.current,
+                         attempt: run_step.attempt + 1,
                          position: position, resolved_input_context: resolved_context,
                          rejection_context: nil, output: nil, error_output: nil,
-                         finished_at: nil, duration: nil, exit_code: nil, stream_log: nil)
+                         finished_at: nil, duration: nil, exit_code: nil)
       else
         run_step = run.run_steps.create!(step: step, status: "running", attempt: 1,
                                          position: position, started_at: Time.current,
@@ -145,6 +150,15 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     WorktreeManager.cleanup(run)
     sync_task_status(run)
     broadcast_run(run)
+  rescue Runners::Aborted
+    # Another ExecuteRunJob has claimed this Run (e.g. RunRecoveryJob saw
+    # our worker had gone quiet long enough to look stale, marked the
+    # RunStep failed, and re-enqueued). Bail out silently — the new job
+    # owns the trajectory now, and any DB writes we'd do here would race
+    # with it. The Aborted was raised by on_progress / broadcast_child_progress
+    # after they checked job_token; the runner's rescue clause has already
+    # killed our SDK subprocess.
+    Rails.logger.info("[ExecuteRunJob] Run ##{run.id} job_token #{@job_token} superseded — bailing")
   end
 
   private
@@ -383,6 +397,12 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                                 run_step_id: run_step.id)
 
     on_progress = lambda { |update|
+      # Detect being superseded: if RunRecoveryJob (or another path)
+      # handed this run off to a fresh ExecuteRunJob, our job_token no
+      # longer matches the one on the Run row. Bail before clobbering
+      # the new attempt's stream_log with ours.
+      raise Runners::Aborted if superseded?(run)
+
       attrs = { updated_at: Time.current }
       attrs[:output] = update[:output] if update.key?(:output)
       attrs[:error_output] = update[:error_output] if update.key?(:error_output)
@@ -418,12 +438,26 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   # --- Broadcasts ---
 
   def broadcast_child_progress(run_step, update)
+    raise Runners::Aborted if superseded?(run_step.run)
+
     attrs = { updated_at: Time.current }
     attrs[:output] = update[:output] if update.key?(:output)
     attrs[:error_output] = update[:error_output] if update.key?(:error_output)
     attrs[:stream_log] = update[:stream_log] if update.key?(:stream_log)
     attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
     RunStep.where(id: run_step.id).update_all(attrs)
+  end
+
+  # True when this job's `@job_token` no longer matches the one stamped on
+  # the Run row — meaning either a newer ExecuteRunJob has claimed the Run
+  # (token rewritten) or RunRecoveryJob has cleared it in preparation for
+  # one. Either way our writes would race; bail. Cheap one-column read on
+  # every progress tick; SQLite handles thousands of these without strain.
+  def superseded?(run)
+    fresh_flags = Run.where(id: run.id).limit(1).pick(:system_flags)
+    return false unless fresh_flags.is_a?(Hash)
+
+    fresh_flags["job_token"] != @job_token
   end
 
   def broadcast_step(run, run_step)

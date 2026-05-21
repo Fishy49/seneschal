@@ -140,7 +140,7 @@ module Runners
             "Run bin/setup_sdk_runner."
     end
 
-    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity
       events = []
       result_text = +""
       stderr_acc = +""
@@ -153,34 +153,43 @@ module Runners
 
         last_broadcast = monotonic_now
 
-        stdout.each_line do |line|
-          line = line.strip
-          next if line.empty?
+        begin
+          stdout.each_line do |line|
+            line = line.strip
+            next if line.empty?
 
-          event = begin
-            JSON.parse(line)
-          rescue StandardError
-            next
-          end
-          events << event
-          session_id ||= event["session_id"]
-
-          case event["type"]
-          when "result"
-            result_text = event["result"].to_s
-            session_id ||= event["session_id"]
-          when "assistant"
-            (event.dig("message", "content") || []).each do |block|
-              result_text = block["text"] if block["type"] == "text"
+            event = begin
+              JSON.parse(line)
+            rescue StandardError
+              next
             end
-          when "error"
-            stderr_acc = [stderr_acc, event["message"]].compact.reject(&:empty?).join("\n")
-          end
+            events << event
+            session_id ||= event["session_id"]
 
-          if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-            yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
-            last_broadcast = monotonic_now
+            case event["type"]
+            when "result"
+              result_text = event["result"].to_s
+              session_id ||= event["session_id"]
+            when "assistant"
+              (event.dig("message", "content") || []).each do |block|
+                result_text = block["text"] if block["type"] == "text"
+              end
+            when "error"
+              stderr_acc = [stderr_acc, event["message"]].compact.reject(&:empty?).join("\n")
+            end
+
+            if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
+              yield({ stream_log: events.dup, output: result_text.dup, claude_session_id: session_id })
+              last_broadcast = monotonic_now
+            end
           end
+        rescue Aborted
+          # The caller's progress block raised — tear down the Python sidecar
+          # eagerly so popen3's ensure-block `wait_thr.join` doesn't sit
+          # waiting on a now-orphaned subprocess. Open3 doesn't kill children
+          # on block-exception by itself.
+          kill_subprocess(wait_thr)
+          raise
         end
 
         stderr_thread.join
@@ -194,8 +203,20 @@ module Runners
           structured_output: structured_output_from(events)
         )
       end
+    rescue Aborted
+      raise # propagate to ExecuteRunJob — this isn't a runner-level failure
     rescue StandardError => e
       Result.new(exit_code: 1, stdout: "", stderr: e.message)
+    end
+
+    def kill_subprocess(wait_thr)
+      return unless wait_thr.alive?
+
+      Process.kill("TERM", wait_thr.pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      # ESRCH: child already exited between our `.alive?` check and the
+      # kill. EPERM: child died and was reaped under us. Either way the
+      # subprocess is gone, which is what we wanted.
     end
 
     def execute_buffered(config, env:, cwd:)
