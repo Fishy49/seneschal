@@ -285,7 +285,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       rescue Runners::Aborted
         # Caller bailed out (orphaned ExecuteRunJob). Kill the child so
         # popen3's ensure-block doesn't hang on wait_thr.join.
-        begin; Process.kill("TERM", wait_thr.pid) if wait_thr.alive?; rescue Errno::ESRCH, Errno::EPERM; end
+        kill_subprocess(wait_thr)
         raise
       end
 
@@ -300,6 +300,16 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     raise # propagate to ExecuteRunJob
   rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
+  end
+
+  def kill_subprocess(wait_thr)
+    return unless wait_thr.alive?
+
+    Process.kill("TERM", wait_thr.pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    # ESRCH: child already exited between our `.alive?` check and the
+    # kill. EPERM: child died and was reaped under us. Either way it's
+    # gone — exactly what we wanted.
   end
 
   # --- Runner dispatch ---

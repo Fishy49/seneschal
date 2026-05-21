@@ -140,7 +140,7 @@ module Runners
             "Run bin/setup_sdk_runner."
     end
 
-    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    def execute_streaming(config, env:, cwd:) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity
       events = []
       result_text = +""
       stderr_acc = +""

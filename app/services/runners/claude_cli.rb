@@ -161,6 +161,8 @@ module Runners
 
       Process.kill("TERM", wait_thr.pid)
     rescue Errno::ESRCH, Errno::EPERM
+      # Child already exited (or was reaped) between our `.alive?` check
+      # and the kill — exactly what we wanted, just race-induced.
     end
 
     def run_command(cmd, env:, cwd:)

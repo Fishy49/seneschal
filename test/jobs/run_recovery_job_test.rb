@@ -13,7 +13,7 @@ class RunRecoveryJobTest < ActiveJob::TestCase
     # Bypass the timestamp callback so updated_at stays stale even after
     # the implicit touch from create!. Using update_columns sidesteps Rails'
     # auto-touch behavior.
-    run_step.update_columns(updated_at: 1.hour.ago)
+    run_step.update_columns(updated_at: 1.hour.ago) # rubocop:disable Rails/SkipsModelValidations
 
     assert_enqueued_with(job: ExecuteRunJob) do
       RunRecoveryJob.new.perform
@@ -53,7 +53,7 @@ class RunRecoveryJobTest < ActiveJob::TestCase
       step: step, status: "running", attempt: 1, position: 1,
       started_at: 1.hour.ago
     )
-    run_step.update_columns(updated_at: 1.hour.ago)
+    run_step.update_columns(updated_at: 1.hour.ago) # rubocop:disable Rails/SkipsModelValidations
 
     assert_no_enqueued_jobs(only: ExecuteRunJob) do
       RunRecoveryJob.new.perform
