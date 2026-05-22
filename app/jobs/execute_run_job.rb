@@ -52,7 +52,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     elsif resume && resume_from_step_id.present?
       position = run.run_steps.maximum(:position) || 0
       queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
-      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: ["failed", "awaiting_approval"]).last
+      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id,
+                                              status: ["failed", "awaiting_approval", "waiting_for_tokens"]).last
       queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       position = 0
@@ -126,6 +127,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         broadcast_step(run, run_step)
         result = StepExecutor::Result.new(exit_code: 1, stdout: result.stdout, stderr: validation_msg)
       else
+        limit = Runners::LimitDetector.detect(result)
+        if limit[:limit_hit]
+          park_for_tokens(run, run_step, step, result, limit)
+          return
+        end
         mark_failed(run_step, result)
       end
 
@@ -358,6 +364,37 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     }
     attrs[:stream_log] = result.stream_events if result.stream_events.present?
     run_step.update!(attrs)
+  end
+
+  # Park a run + step in "waiting_for_tokens" when Claude reports a usage /
+  # session / rate limit. We deliberately leave WorktreeManager.retain (we
+  # need the worktree intact for resume) and skip the on-fail recovery path
+  # — recovery only makes sense for actionable failures, not "wait it out".
+  # TokenWaitJob will fire at waiting_until (or sooner if the operator
+  # reschedules) and re-enqueue ExecuteRunJob to resume from this step.
+  def park_for_tokens(run, run_step, step, result, limit)
+    reset_at = limit[:reset_at] || (Time.current + TokenWaitJob::FALLBACK_INTERVAL)
+    msg = limit[:message] || "Claude session/usage limit reached; waiting for reset"
+
+    run_step.update!(
+      status: "waiting_for_tokens",
+      waiting_until: reset_at,
+      output: result.stdout,
+      error_output: [run_step.error_output, result.stderr, msg].compact.reject(&:empty?).uniq.join("\n"),
+      stream_log: result.stream_events.presence,
+      finished_at: nil
+    )
+    run.update!(status: "waiting_for_tokens", waiting_until: reset_at, error_message: msg)
+
+    WorktreeManager.retain(run) if defined?(WorktreeManager) && WorktreeManager.respond_to?(:retain)
+
+    broadcast_step(run, run_step)
+    broadcast_run(run)
+
+    TokenWaitJob.schedule(run, step.id, reset_at)
+    Rails.logger.info(
+      "[ExecuteRunJob] Run ##{run.id} parked waiting_for_tokens until #{reset_at.iso8601} (step '#{step.name}')"
+    )
   end
 
   def sync_task_status(run)
