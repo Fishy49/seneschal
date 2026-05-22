@@ -11,13 +11,22 @@ module Runners
   module LimitDetector
     module_function
 
+    # Each pattern requires both the noun ("rate limit", "usage limit", etc.)
+    # AND a verb / state ("reached", "exceeded", "error", ...). The verb gate
+    # is what keeps us from false-positive-parking a real failure whose output
+    # just *mentions* limits — test names, doc strings, "we have a rate limit
+    # of N/sec" log lines. A false positive here is expensive: the parked
+    # run will resume → fail with the same output → re-park, burning tokens
+    # in a 10-minute loop until MAX_AGE.
     LIMIT_PATTERNS = [
-      /usage limit reached/i,
-      /rate limit/i,
-      /session limit/i,
-      /5[- ]?hour limit/i,
-      /quota (?:exceeded|exhausted)/i,
-      /too many requests/i
+      /usage limit\s+(?:reached|exceeded|hit)/i,
+      /rate[\s-]?limit\s+(?:reached|exceeded|error|hit)/i,
+      /rate_?limit_?error/i, # anthropic.RateLimitError / "rate_limit_error"
+      /session limit\s+(?:reached|exceeded|hit)/i,
+      /5[\s-]?hour limit\s+(?:reached|exceeded|hit)/i,
+      /quota\s+(?:exceeded|exhausted)/i,
+      /too many requests/i,
+      /429\s+(?:too many requests|client error)/i
     ].freeze
 
     # ISO 8601 timestamps the CLI sometimes embeds: "...resets at 2026-05-22T18:30:00Z"

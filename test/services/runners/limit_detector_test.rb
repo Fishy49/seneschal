@@ -50,5 +50,29 @@ module Runners
       assert out[:limit_hit]
       assert_equal Time.zone.at(1_716_400_200), out[:reset_at]
     end
+
+    test "does not false-positive on incidental mentions of 'rate limit'" do
+      [
+        "ArgumentError: configure a rate limit of at most 100/sec",
+        "test 'enforces rate limit' failed: expected 429 got 200",
+        "# we have a rate limit budget per minute"
+      ].each do |stderr|
+        r = result_with(stderr: stderr)
+        out = LimitDetector.detect(r)
+        assert_equal false, out[:limit_hit], "expected #{stderr.inspect} not to trip"
+      end
+    end
+
+    test "still trips on real rate-limit phrasings" do
+      [
+        "anthropic.RateLimitError: 429 rate_limit_error",
+        "Rate limit exceeded, please retry",
+        "rate-limit reached"
+      ].each do |stderr|
+        r = result_with(stderr: stderr)
+        out = LimitDetector.detect(r)
+        assert out[:limit_hit], "expected #{stderr.inspect} to trip"
+      end
+    end
   end
 end

@@ -19,7 +19,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       started_at: run.started_at || Time.current,
       system_flags: (run.system_flags || {}).merge("job_token" => @job_token)
     )
-    run.update!(error_message: nil, finished_at: nil) if resume
+    run.update!(error_message: nil, finished_at: nil, waiting_until: nil) if resume
     broadcast_run(run)
 
     # Refresh the canonical clone before branching a worktree off it.
@@ -91,7 +91,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                          attempt: run_step.attempt + 1,
                          position: position, resolved_input_context: resolved_context,
                          rejection_context: nil, output: nil, error_output: nil,
-                         finished_at: nil, duration: nil, exit_code: nil)
+                         finished_at: nil, duration: nil, exit_code: nil,
+                         waiting_until: nil)
       else
         run_step = run.run_steps.create!(step: step, status: "running", attempt: 1,
                                          position: position, started_at: Time.current,
@@ -386,7 +387,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     )
     run.update!(status: "waiting_for_tokens", waiting_until: reset_at, error_message: msg)
 
-    WorktreeManager.retain(run) if defined?(WorktreeManager) && WorktreeManager.respond_to?(:retain)
+    WorktreeManager.retain(run)
 
     broadcast_step(run, run_step)
     broadcast_run(run)
@@ -453,12 +454,16 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     result = executor.execute(&on_progress)
 
     return result if result.passed? || step.max_retries.zero?
+    # Don't burn retries against a known token wall — bubble up so the caller
+    # can park the run instead of spamming Claude through the same outage.
+    return result if Runners::LimitDetector.detect(result)[:limit_hit]
 
     (2..(step.max_retries + 1)).each do |attempt|
       run_step.update!(status: "retrying", attempt: attempt)
       broadcast_step(run, run_step)
       result = executor.execute(&on_progress)
       return result if result.passed?
+      return result if Runners::LimitDetector.detect(result)[:limit_hit]
     end
 
     result

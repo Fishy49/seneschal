@@ -41,18 +41,15 @@ class TokenWaitJob < ApplicationJob
   private
 
   def resume_run(run, step_id)
-    run_step = run.run_steps.where(step_id: step_id, status: "waiting_for_tokens").order(:position).last
-    if run_step.nil?
+    # The resume branch in ExecuteRunJob accepts waiting_for_tokens directly
+    # (see the crashed_run_step query) and immediately transitions it to
+    # "running", so we don't need to flip status here.
+    unless run.run_steps.exists?(step_id: step_id, status: "waiting_for_tokens")
       Rails.logger.warn("[TokenWaitJob] Run ##{run.id} has no waiting_for_tokens step for ##{step_id}; skipping resume")
       return
     end
 
     Rails.logger.info("[TokenWaitJob] Resuming run ##{run.id} at step ##{step_id}")
-    # Flip the step back to "failed" so the resume branch in ExecuteRunJob
-    # finds it as a "crashed" step and replays it in-place (incrementing
-    # attempt, clearing prior output). The flip is invisible to the UI
-    # because ExecuteRunJob immediately moves it to "running".
-    run_step.update!(status: "failed")
     ExecuteRunJob.perform_later(run, step_id, resume: true)
   end
 end
