@@ -98,6 +98,34 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_includes prompt, "<review.meta.author>\nrick\n</review.meta.author>"
   end
 
+  # Regression: prompt steps used to silently drop their `consumes` because
+  # the executor's prepend was gated to `step_type == "skill"`. The form
+  # offers consumes for prompt steps too, so this would leave the model
+  # staring at the prompt body with none of the declared inputs.
+  test "execute_skill injects consumes block for prompt steps" do
+    prompt_step = @step.workflow.steps.create!(
+      name: "Commit", step_type: "prompt", position: 99,
+      body: "Commit code logically and push to current pr.",
+      timeout: 300, max_retries: 0,
+      config: { "consumes" => ["pr_number", "branch_name"] }
+    )
+    context = { "pr_number" => "42", "branch_name" => "feature/foo" }
+    executor = StepExecutor.new(prompt_step, context, @ready.local_path)
+
+    captured_prompt = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_prompt = kwargs[:prompt]
+      StepExecutor::Result.new(exit_code: 0, stdout: "done", stderr: "")
+    end
+
+    executor.send(:execute_skill)
+
+    assert_includes captured_prompt, "Input Variables"
+    assert_includes captured_prompt, "<pr_number>\n42\n</pr_number>"
+    assert_includes captured_prompt, "<branch_name>\nfeature/foo\n</branch_name>"
+    assert_includes captured_prompt, "Commit code logically and push to current pr."
+  end
+
   test "interpolate_string resolves dotted JSON paths in ${var.path}" do
     context = { "review" => '{"summary":"ok","meta":{"author":"rick"}}' }
     executor = StepExecutor.new(@step, context, @ready.local_path)
