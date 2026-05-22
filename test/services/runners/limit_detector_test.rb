@@ -48,7 +48,7 @@ module Runners
       r = result_with(stderr: "usage limit reached, resets at 1716400200")
       out = LimitDetector.detect(r)
       assert out[:limit_hit]
-      assert_equal Time.zone.at(1716400200), out[:reset_at]
+      assert_equal Time.zone.at(1_716_400_200), out[:reset_at]
     end
   end
 end

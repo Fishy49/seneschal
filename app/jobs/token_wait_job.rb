@@ -11,7 +11,7 @@ class TokenWaitJob < ApplicationJob
 
   # Schedule this job to fire at +reset_at+ (clamped to a sane window).
   def self.schedule(run, step_id, reset_at)
-    fire_at = [reset_at || (Time.current + FALLBACK_INTERVAL), Time.current + 30.seconds].max
+    fire_at = [reset_at || (Time.current + FALLBACK_INTERVAL), 30.seconds.from_now].max
     set(wait_until: fire_at).perform_later(run.id, step_id)
   end
 

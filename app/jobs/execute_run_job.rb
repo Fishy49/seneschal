@@ -53,7 +53,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       position = run.run_steps.maximum(:position) || 0
       queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
       crashed_run_step = run.run_steps.where(step_id: resume_from_step_id,
-                                              status: ["failed", "awaiting_approval", "waiting_for_tokens"]).last
+                                             status: ["failed", "awaiting_approval", "waiting_for_tokens"]).last
       queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       position = 0

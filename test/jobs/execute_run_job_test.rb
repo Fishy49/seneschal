@@ -293,8 +293,6 @@ class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLen
     cleanup_workflow_with_ready_project!(workflow)
   end
 
-  private
-
   test "step failure with usage-limit text parks run and step in waiting_for_tokens" do
     workflow = setup_workflow_with_ready_project!
     workflow.steps.create!(
@@ -309,11 +307,8 @@ class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLen
     )
     factory = ->(*_a, **_k) { fake_executor(fake_result) }
 
-    enqueued = nil
     ActiveJob::Base.queue_adapter.enqueued_jobs.clear
-    stub_step_executor_new(factory) do
-      ExecuteRunJob.new.perform(run)
-    end
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
 
     run.reload
     assert_equal "waiting_for_tokens", run.status
@@ -328,6 +323,8 @@ class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLen
   ensure
     cleanup_workflow_with_ready_project!(workflow)
   end
+
+  private
 
   def setup_workflow_with_ready_project!
     project = projects(:seneschal)

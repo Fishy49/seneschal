@@ -83,7 +83,7 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 

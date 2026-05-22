@@ -21,13 +21,13 @@ module Runners
     ].freeze
 
     # ISO 8601 timestamps the CLI sometimes embeds: "...resets at 2026-05-22T18:30:00Z"
-    ISO_RESET = /resets?\s*(?:at\s*)?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i.freeze
+    ISO_RESET = /resets?\s*(?:at\s*)?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i
 
     # Epoch seconds variant: "resets at 1716400200"
-    EPOCH_RESET = /resets?\s*(?:at\s*)?(\d{10})/i.freeze
+    EPOCH_RESET = /resets?\s*(?:at\s*)?(\d{10})/i
 
     # Relative: "resets in 4h 23m" / "try again in 2 hours"
-    RELATIVE_RESET = /(?:resets?|try again)\s*in\s*((?:\d+\s*(?:h|hours?|m|mins?|minutes?|s|secs?|seconds?)\s*)+)/i.freeze
+    RELATIVE_RESET = /(?:resets?|try again)\s*in\s*((?:\d+\s*(?:h|hours?|m|mins?|minutes?|s|secs?|seconds?)\s*)+)/i
 
     # Examine a Result; returns { limit_hit: bool, reset_at: Time|nil, message: String|nil }
     def detect(result)
@@ -48,16 +48,21 @@ module Runners
         parts << ev["message"].to_s if ev["type"] == "error"
         parts << ev["result"].to_s if ev["type"] == "result" && ev["subtype"].to_s.include?("error")
       end
-      parts.reject(&:blank?).join("\n")
+      parts.compact_blank.join("\n")
     end
 
     def parse_reset_at(text)
       if (m = text.match(ISO_RESET))
-        return Time.zone.parse(m[1]) rescue nil
+        begin
+          return Time.zone.parse(m[1])
+        rescue StandardError
+          nil
+        end
       end
       if (m = text.match(EPOCH_RESET))
         return Time.zone.at(m[1].to_i)
       end
+
       if (m = text.match(RELATIVE_RESET))
         seconds = relative_to_seconds(m[1])
         return Time.current + seconds if seconds.positive?
