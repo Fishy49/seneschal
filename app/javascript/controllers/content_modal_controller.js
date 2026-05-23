@@ -5,7 +5,9 @@ export default class extends Controller {
   static values = { title: String }
 
   open() {
-    const text = this.sourceTarget.textContent
+    const source = this.sourceTarget
+    const raw = (source.content ? source.content.textContent : source.textContent) ?? ""
+    const { text, language } = this.formatContent(raw)
 
     this.overlay = document.createElement("div")
     this.overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-150"
@@ -29,7 +31,7 @@ export default class extends Controller {
     const pre = document.createElement("pre")
     pre.className = "whitespace-pre-wrap break-words text-sm font-mono text-content"
     const code = document.createElement("code")
-    code.className = "language-markdown"
+    code.className = `language-${language}`
     code.textContent = text
     pre.appendChild(code)
     body.appendChild(pre)
@@ -41,6 +43,22 @@ export default class extends Controller {
 
     this.escHandler = (e) => { if (e.key === "Escape") this.close() }
     document.addEventListener("keydown", this.escHandler)
+  }
+
+  formatContent(raw) {
+    const trimmed = raw.trim()
+    const first = trimmed[0]
+    if (first === "{" || first === "[") {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (parsed !== null && typeof parsed === "object") {
+          return { text: JSON.stringify(parsed, null, 2), language: "json" }
+        }
+      } catch (_) {
+        // fall through to markdown rendering
+      }
+    }
+    return { text: raw, language: "markdown" }
   }
 
   close() {
