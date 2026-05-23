@@ -19,7 +19,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       started_at: run.started_at || Time.current,
       system_flags: (run.system_flags || {}).merge("job_token" => @job_token)
     )
-    run.update!(error_message: nil, finished_at: nil) if resume
+    run.update!(error_message: nil, finished_at: nil, waiting_until: nil) if resume
     broadcast_run(run)
 
     # Refresh the canonical clone before branching a worktree off it.
@@ -52,7 +52,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     elsif resume && resume_from_step_id.present?
       position = run.run_steps.maximum(:position) || 0
       queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
-      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: ["failed", "awaiting_approval"]).last
+      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id,
+                                             status: ["failed", "awaiting_approval", "waiting_for_tokens"]).last
       queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       position = 0
@@ -82,10 +83,16 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       if queued_run_step_id
         run_step = run.run_steps.find(queued_run_step_id)
         resolved_context = append_rejection_context(resolved_context, run_step.rejection_context)
+        # Don't wipe stream_log: if the new attempt crashes before its runner
+        # emits anything (e.g. another MCP cold-start hang), the prior
+        # attempt's trajectory stays visible. The first broadcast from the
+        # new SDK runner will replace it organically.
         run_step.update!(status: "running", started_at: Time.current,
+                         attempt: run_step.attempt + 1,
                          position: position, resolved_input_context: resolved_context,
                          rejection_context: nil, output: nil, error_output: nil,
-                         finished_at: nil, duration: nil, exit_code: nil, stream_log: nil)
+                         finished_at: nil, duration: nil, exit_code: nil,
+                         waiting_until: nil)
       else
         run_step = run.run_steps.create!(step: step, status: "running", attempt: 1,
                                          position: position, started_at: Time.current,
@@ -121,6 +128,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         broadcast_step(run, run_step)
         result = StepExecutor::Result.new(exit_code: 1, stdout: result.stdout, stderr: validation_msg)
       else
+        limit = Runners::LimitDetector.detect(result)
+        if limit[:limit_hit]
+          park_for_tokens(run, run_step, step, result, limit)
+          return
+        end
         mark_failed(run_step, result)
       end
 
@@ -145,6 +157,15 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     WorktreeManager.cleanup(run)
     sync_task_status(run)
     broadcast_run(run)
+  rescue Runners::Aborted
+    # Another ExecuteRunJob has claimed this Run (e.g. RunRecoveryJob saw
+    # our worker had gone quiet long enough to look stale, marked the
+    # RunStep failed, and re-enqueued). Bail out silently — the new job
+    # owns the trajectory now, and any DB writes we'd do here would race
+    # with it. The Aborted was raised by on_progress / broadcast_child_progress
+    # after they checked job_token; the runner's rescue clause has already
+    # killed our SDK subprocess.
+    Rails.logger.info("[ExecuteRunJob] Run ##{run.id} job_token #{@job_token} superseded — bailing")
   end
 
   private
@@ -346,6 +367,37 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     run_step.update!(attrs)
   end
 
+  # Park a run + step in "waiting_for_tokens" when Claude reports a usage /
+  # session / rate limit. We deliberately leave WorktreeManager.retain (we
+  # need the worktree intact for resume) and skip the on-fail recovery path
+  # — recovery only makes sense for actionable failures, not "wait it out".
+  # TokenWaitJob will fire at waiting_until (or sooner if the operator
+  # reschedules) and re-enqueue ExecuteRunJob to resume from this step.
+  def park_for_tokens(run, run_step, step, result, limit)
+    reset_at = limit[:reset_at] || (Time.current + TokenWaitJob::FALLBACK_INTERVAL)
+    msg = limit[:message] || "Claude session/usage limit reached; waiting for reset"
+
+    run_step.update!(
+      status: "waiting_for_tokens",
+      waiting_until: reset_at,
+      output: result.stdout,
+      error_output: [run_step.error_output, result.stderr, msg].compact.reject(&:empty?).uniq.join("\n"),
+      stream_log: result.stream_events.presence,
+      finished_at: nil
+    )
+    run.update!(status: "waiting_for_tokens", waiting_until: reset_at, error_message: msg)
+
+    WorktreeManager.retain(run)
+
+    broadcast_step(run, run_step)
+    broadcast_run(run)
+
+    TokenWaitJob.schedule(run, step.id, reset_at)
+    Rails.logger.info(
+      "[ExecuteRunJob] Run ##{run.id} parked waiting_for_tokens until #{reset_at.iso8601} (step '#{step.name}')"
+    )
+  end
+
   def sync_task_status(run)
     task = run.pipeline_task
     return unless task
@@ -383,6 +435,12 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                                 run_step_id: run_step.id)
 
     on_progress = lambda { |update|
+      # Detect being superseded: if RunRecoveryJob (or another path)
+      # handed this run off to a fresh ExecuteRunJob, our job_token no
+      # longer matches the one on the Run row. Bail before clobbering
+      # the new attempt's stream_log with ours.
+      raise Runners::Aborted if superseded?(run)
+
       attrs = { updated_at: Time.current }
       attrs[:output] = update[:output] if update.key?(:output)
       attrs[:error_output] = update[:error_output] if update.key?(:error_output)
@@ -396,12 +454,16 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     result = executor.execute(&on_progress)
 
     return result if result.passed? || step.max_retries.zero?
+    # Don't burn retries against a known token wall — bubble up so the caller
+    # can park the run instead of spamming Claude through the same outage.
+    return result if Runners::LimitDetector.detect(result)[:limit_hit]
 
     (2..(step.max_retries + 1)).each do |attempt|
       run_step.update!(status: "retrying", attempt: attempt)
       broadcast_step(run, run_step)
       result = executor.execute(&on_progress)
       return result if result.passed?
+      return result if Runners::LimitDetector.detect(result)[:limit_hit]
     end
 
     result
@@ -418,12 +480,26 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
   # --- Broadcasts ---
 
   def broadcast_child_progress(run_step, update)
+    raise Runners::Aborted if superseded?(run_step.run)
+
     attrs = { updated_at: Time.current }
     attrs[:output] = update[:output] if update.key?(:output)
     attrs[:error_output] = update[:error_output] if update.key?(:error_output)
     attrs[:stream_log] = update[:stream_log] if update.key?(:stream_log)
     attrs[:claude_session_id] = update[:claude_session_id] if update[:claude_session_id].present?
     RunStep.where(id: run_step.id).update_all(attrs)
+  end
+
+  # True when this job's `@job_token` no longer matches the one stamped on
+  # the Run row — meaning either a newer ExecuteRunJob has claimed the Run
+  # (token rewritten) or RunRecoveryJob has cleared it in preparation for
+  # one. Either way our writes would race; bail. Cheap one-column read on
+  # every progress tick; SQLite handles thousands of these without strain.
+  def superseded?(run)
+    fresh_flags = Run.where(id: run.id).limit(1).pick(:system_flags)
+    return false unless fresh_flags.is_a?(Hash)
+
+    fresh_flags["job_token"] != @job_token
   end
 
   def broadcast_step(run, run_step)

@@ -22,6 +22,11 @@
           <% if entry[:duration_ms] %>&middot; <%= format_duration(entry[:duration_ms] / 1000.0) %><% end %>
         </span>
       </div>
+    <% when :compaction %>
+      <div class="flex items-center gap-2 text-xs my-1 py-1 border-y border-dashed border-warning/60 text-warning">
+        <span class="shrink-0">&#9851;</span>
+        <span>Context compacted &mdash; Claude is continuing from a summary, so re-reads below are expected.</span>
+      </div>
     <% end %>
   <% end %>
   <% if run_step.status == "running" && entries.none? { |e| e[:type] == :result } %>

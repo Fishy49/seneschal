@@ -83,12 +83,12 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
     prompt = prepend_project_context(prompt)
-    prompt = prepend_consumes_context(prompt) if @step.step_type == "skill" && @step.consumes.any?
+    prompt = prepend_consumes_context(prompt) if @step.consumes.any?
     prompt = prepend_queryable_context(prompt) if @step.queries.any? && queryable_schemas.any?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
@@ -273,13 +273,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       last_broadcast = monotonic_now
 
-      stdout.each_line do |line|
-        stdout_acc << line
+      begin
+        stdout.each_line do |line|
+          stdout_acc << line
 
-        if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
-          yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
-          last_broadcast = monotonic_now
+          if monotonic_now - last_broadcast >= BROADCAST_INTERVAL
+            yield({ output: stdout_acc.dup, error_output: stderr_acc.dup })
+            last_broadcast = monotonic_now
+          end
         end
+      rescue Runners::Aborted
+        # Caller bailed out (orphaned ExecuteRunJob). Kill the child so
+        # popen3's ensure-block doesn't hang on wait_thr.join.
+        kill_subprocess(wait_thr)
+        raise
       end
 
       stderr_thread.join
@@ -289,8 +296,20 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       Result.new(exit_code: exit_code, stdout: stdout_acc, stderr: stderr_acc)
     end
+  rescue Runners::Aborted
+    raise # propagate to ExecuteRunJob
   rescue StandardError => e
     Result.new(exit_code: 1, stdout: "", stderr: e.message)
+  end
+
+  def kill_subprocess(wait_thr)
+    return unless wait_thr.alive?
+
+    Process.kill("TERM", wait_thr.pid)
+  rescue Errno::ESRCH, Errno::EPERM
+    # ESRCH: child already exited between our `.alive?` check and the
+    # kill. EPERM: child died and was reaped under us. Either way it's
+    # gone — exactly what we wanted.
   end
 
   # --- Runner dispatch ---
@@ -612,12 +631,34 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
   # --- Helpers ---
 
   def env_vars
-    vars = @context.transform_keys { |k| k.to_s.upcase }.merge(
-      "REPO_PATH" => @repo_path
-    )
+    vars = @context.each_with_object({}) do |(k, v), h|
+      h[k.to_s.upcase] = stringify_env_value(v)
+    end
+    vars["REPO_PATH"] = @repo_path
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
     vars.merge!(queryable_env_vars) if active_queryable_schemas.any?
     vars
+  end
+
+  # Open3 / Process.spawn rejects non-String env values with
+  # `TypeError: no implicit conversion of Hash into String`. The run
+  # context now legitimately holds Hash / Array values (when a schema-
+  # bound step's structured_output gets stored as the parsed payload),
+  # so we JSON-encode anything non-scalar on the way out. Scripts that
+  # interpolate `$VAR` see the same compact-JSON shape they got back
+  # when structured outputs were spliced through stdout.
+  def stringify_env_value(value)
+    case value
+    when nil then ""
+    when String then value
+    when Numeric, TrueClass, FalseClass then value.to_s
+    else
+      begin
+        JSON.generate(value)
+      rescue JSON::GeneratorError, TypeError
+        value.to_s
+      end
+    end
   end
 
   def queryable_env_vars

@@ -98,6 +98,34 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert_includes prompt, "<review.meta.author>\nrick\n</review.meta.author>"
   end
 
+  # Regression: prompt steps used to silently drop their `consumes` because
+  # the executor's prepend was gated to `step_type == "skill"`. The form
+  # offers consumes for prompt steps too, so this would leave the model
+  # staring at the prompt body with none of the declared inputs.
+  test "execute_skill injects consumes block for prompt steps" do
+    prompt_step = @step.workflow.steps.create!(
+      name: "Commit", step_type: "prompt", position: 99,
+      body: "Commit code logically and push to current pr.",
+      timeout: 300, max_retries: 0,
+      config: { "consumes" => ["pr_number", "branch_name"] }
+    )
+    context = { "pr_number" => "42", "branch_name" => "feature/foo" }
+    executor = StepExecutor.new(prompt_step, context, @ready.local_path)
+
+    captured_prompt = nil
+    executor.runner.define_singleton_method(:execute) do |**kwargs, &_block|
+      captured_prompt = kwargs[:prompt]
+      StepExecutor::Result.new(exit_code: 0, stdout: "done", stderr: "")
+    end
+
+    executor.send(:execute_skill)
+
+    assert_includes captured_prompt, "Input Variables"
+    assert_includes captured_prompt, "<pr_number>\n42\n</pr_number>"
+    assert_includes captured_prompt, "<branch_name>\nfeature/foo\n</branch_name>"
+    assert_includes captured_prompt, "Commit code logically and push to current pr."
+  end
+
   test "interpolate_string resolves dotted JSON paths in ${var.path}" do
     context = { "review" => '{"summary":"ok","meta":{"author":"rick"}}' }
     executor = StepExecutor.new(@step, context, @ready.local_path)
@@ -436,6 +464,36 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
 
     assert_not env.key?("SENESCHAL_QUERYABLE_VARS")
     assert_not env.key?("SENESCHAL_DB_PATH")
+  end
+
+  # Regression: Open3 / Process.spawn rejects non-String env values with
+  # `TypeError: no implicit conversion of Hash into String`. The run
+  # context now legitimately holds Hash / Array values from schema-bound
+  # steps, so env_vars must JSON-encode them on the way out — otherwise
+  # the next step crashes before it can even call Claude.
+  test "env_vars JSON-encodes Hash and Array context values so Open3 doesn't choke" do
+    ctx = {
+      "game" => { "title" => "Driver Out!", "schema_version" => 1 },
+      "items" => [{ "id" => 1 }, { "id" => 2 }],
+      "task_title" => "scaffold",
+      "pr_number" => 42
+    }
+    executor = StepExecutor.new(@step, ctx, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    env.each_value { |v| assert_kind_of String, v, "env value must be a String for Open3" }
+    assert_equal({ "title" => "Driver Out!", "schema_version" => 1 }, JSON.parse(env["GAME"]))
+    assert_equal([{ "id" => 1 }, { "id" => 2 }], JSON.parse(env["ITEMS"]))
+    assert_equal "scaffold", env["TASK_TITLE"]
+    assert_equal "42", env["PR_NUMBER"]
+  end
+
+  test "env_vars converts nil context values to empty strings" do
+    executor = StepExecutor.new(@step, { "absent" => nil, "present" => "x" }, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    assert_equal "", env["ABSENT"]
+    assert_equal "x", env["PRESENT"]
   end
 
   test "context_fetch project_file reads file from project repo" do

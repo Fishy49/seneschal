@@ -120,8 +120,12 @@ module RunStepContextHelper # rubocop:disable Metrics/ModuleLength
     return nil if step.consumes.blank?
 
     blocks = step.consumes.map do |name|
-      value = run.context[name] || run.context[name.to_s]
-      "<#{name}>\n#{value.presence || "(empty — not yet produced)"}\n</#{name}>"
+      # JsonPathResolver handles dotted paths AND Hash/Array values that
+      # parsed-structured-output steps now legitimately leave in context.
+      # Going through `run.context[name]` directly only worked when every
+      # value was a String and consume names were top-level.
+      formatted = JsonPathResolver.format(JsonPathResolver.lookup(run.context, name))
+      "<#{name}>\n#{formatted.presence || "(empty — not yet produced)"}\n</#{name}>"
     end
 
     {

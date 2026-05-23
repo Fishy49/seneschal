@@ -6,6 +6,7 @@ module ApplicationHelper
     "queued" => "bg-info/15 text-info",
     "running" => "bg-accent/15 text-accent",
     "awaiting_approval" => "bg-warning/15 text-warning",
+    "waiting_for_tokens" => "bg-warning/15 text-warning",
     "completed" => "bg-success/15 text-success",
     "passed" => "bg-success/15 text-success",
     "failed" => "bg-danger/15 text-danger",
@@ -32,7 +33,7 @@ module ApplicationHelper
   def status_badge(status)
     classes = "#{BADGE_BASE} #{STATUS_CLASSES[status] || STATUS_CLASSES["pending"]}"
     display = status.to_s.tr("_", " ")
-    if status.in?(["running", "retrying"])
+    if status.in?(["running", "retrying", "waiting_for_tokens"])
       dot = content_tag(:span, "", class: "inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse mr-1 align-middle")
       content_tag(:span, dot + display, class: "#{classes} flex items-center gap-0")
     else

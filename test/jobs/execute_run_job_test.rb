@@ -2,7 +2,7 @@ require "test_helper"
 require "tmpdir"
 require "fileutils"
 
-class ExecuteRunJobTest < ActiveJob::TestCase
+class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLength
   setup do
     @job = ExecuteRunJob.new
     @step = steps(:skill_step)
@@ -199,6 +199,77 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "superseded? sees mismatched token as superseded" do
+    workflow = setup_workflow_with_ready_project!
+    run = workflow.runs.create!(status: "running", context: {}, input: {},
+                                system_flags: { "job_token" => "other-job" })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "superseded? sees cleared token as superseded" do
+    workflow = setup_workflow_with_ready_project!
+    # RunRecoveryJob's `except("job_token")` leaves the column as {} or
+    # with other keys but no job_token entry; the orphan should bail.
+    run = workflow.runs.create!(status: "failed", context: {}, input: {},
+                                system_flags: { "auto_recovered" => true })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "superseded? sees matching token as live" do
+    workflow = setup_workflow_with_ready_project!
+    run = workflow.runs.create!(status: "running", context: {}, input: {},
+                                system_flags: { "job_token" => "mine" })
+
+    job = ExecuteRunJob.new
+    job.instance_variable_set(:@job_token, "mine")
+    assert_not job.send(:superseded?, run)
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "execute bails cleanly when superseded mid-stream via on_progress" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "long", step_type: "command", body: "echo hi",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    # Stub the executor: when .execute is called with a block, simulate a
+    # progress tick after wiping the job_token (mirroring what RunRecoveryJob
+    # would do). The block should raise Runners::Aborted, ExecuteRunJob's
+    # rescue should swallow it, and no further steps should run.
+    factory = lambda do |*_args, **_kwargs|
+      executor = Object.new
+      executor.define_singleton_method(:execute) do |&blk|
+        run.update!(system_flags: run.reload.system_flags.except("job_token"))
+        blk&.call({ output: "partial" }) # raises Runners::Aborted
+        StepExecutor::Result.new(exit_code: 0, stdout: "unreached", stderr: "", stream_events: nil)
+      end
+      executor
+    end
+
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    # The run was left in "running" (the orphan bailed without writing) —
+    # the recovery flow elsewhere is what would re-enqueue. The point is
+    # we didn't blow up, didn't mark completed, and didn't keep iterating.
+    assert_equal "running", run.status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "after_approval queue retains pipeline context for subsequent steps" do
     workflow = setup_workflow_with_ready_project!
     step1, step2 = create_two_step_workflow(workflow,
@@ -218,6 +289,68 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     assert_not captured.key?(step1.id), "step1 should not be re-executed after approval"
     assert_equal "hello", captured[step2.id]&.fetch("greeting", nil)
     assert_equal "passed", run.run_steps.find_by(step: step2).status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "limit hit on a step with max_retries does not burn through retries" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "ClaudeStep", step_type: "command", body: "echo limited",
+      position: 1, timeout: 30, max_retries: 5, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    call_count = 0
+    fake_result = StepExecutor::Result.new(
+      exit_code: 1, stdout: "", stderr: "Claude AI usage limit reached. resets in 1h",
+      stream_events: nil
+    )
+    factory = lambda do |*_a, **_k|
+      exec = Object.new
+      exec.define_singleton_method(:execute) do |&_blk|
+        call_count += 1
+        fake_result
+      end
+      exec
+    end
+
+    ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    assert_equal 1, call_count, "executor should only run once when limit is hit (no retries)"
+    assert_equal "waiting_for_tokens", run.reload.status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "step failure with usage-limit text parks run and step in waiting_for_tokens" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "ClaudeStep", step_type: "command", body: "echo limited",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    fake_result = StepExecutor::Result.new(
+      exit_code: 1, stdout: "", stderr: "Claude AI usage limit reached. resets in 1h",
+      stream_events: nil
+    )
+    factory = ->(*_a, **_k) { fake_executor(fake_result) }
+
+    ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    assert_equal "waiting_for_tokens", run.status
+    assert run.waiting_until.present?
+
+    rs = run.run_steps.last
+    assert_equal "waiting_for_tokens", rs.status
+    assert rs.waiting_until.present?
+
+    enqueued = ActiveJob::Base.queue_adapter.enqueued_jobs.find { |j| j["job_class"] == "TokenWaitJob" }
+    assert_not_nil enqueued, "expected TokenWaitJob to be scheduled"
   ensure
     cleanup_workflow_with_ready_project!(workflow)
   end

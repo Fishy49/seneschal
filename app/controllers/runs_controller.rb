@@ -48,27 +48,26 @@ class RunsController < ApplicationController
   end
 
   def resume
-    unless @run.status.in?(["failed", "stopped"])
-      redirect_to run_path(@run), alert: "Can only resume failed or stopped runs."
+    unless @run.status.in?(["failed", "stopped", "waiting_for_tokens"])
+      redirect_to run_path(@run), alert: "Can only resume failed, stopped, or waiting runs."
       return
     end
 
-    failed_step = @run.run_steps.find_by(status: "failed")&.step
-    unless failed_step
-      redirect_to run_path(@run), alert: "No failed step to resume from."
+    resumable_run_step = @run.run_steps.find_by(status: ["failed", "waiting_for_tokens"])
+    unless resumable_run_step
+      redirect_to run_path(@run), alert: "No failed or waiting step to resume from."
       return
     end
 
-    # Inject failure context so the injection logic can use it
-    failed_run_step = @run.run_steps.find_by(status: "failed")
-    failure_output = [failed_run_step.output, failed_run_step.error_output].compact.join("\n")
+    resumable_step = resumable_run_step.step
+    failure_output = [resumable_run_step.output, resumable_run_step.error_output].compact.join("\n")
     @run.update!(context: @run.context.merge(
       "previous_failure" => failure_output.presence,
-      "previous_failure_step" => failed_step.name
+      "previous_failure_step" => resumable_step.name
     ).compact)
 
-    ExecuteRunJob.perform_later(@run, failed_step.id, resume: true)
-    redirect_to run_path(@run), notice: "Resuming from '#{failed_step.name}'."
+    ExecuteRunJob.perform_later(@run, resumable_step.id, resume: true)
+    redirect_to run_path(@run), notice: "Resuming from '#{resumable_step.name}'."
   end
 
   def follow_up
@@ -121,7 +120,7 @@ class RunsController < ApplicationController
     step = @run.workflow.steps.find(params.expect(:step_id))
 
     failure_context = @run.context.dup
-    failed_run_step = @run.run_steps.find_by(status: "failed")
+    failed_run_step = @run.run_steps.find_by(status: ["failed", "waiting_for_tokens"])
     if failed_run_step
       failure_output = [failed_run_step.output, failed_run_step.error_output].compact.join("\n")
       failure_context["previous_failure"] = failure_output if failure_output.present?
