@@ -19,7 +19,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       started_at: run.started_at || Time.current,
       system_flags: (run.system_flags || {}).merge("job_token" => @job_token)
     )
-    run.update!(error_message: nil, finished_at: nil) if resume
+    run.update!(error_message: nil, finished_at: nil, waiting_until: nil) if resume
     broadcast_run(run)
 
     # Refresh the canonical clone before branching a worktree off it.
@@ -52,7 +52,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     elsif resume && resume_from_step_id.present?
       position = run.run_steps.maximum(:position) || 0
       queue.shift while queue.any? && queue.first[0].id != resume_from_step_id
-      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id, status: ["failed", "awaiting_approval"]).last
+      crashed_run_step = run.run_steps.where(step_id: resume_from_step_id,
+                                             status: ["failed", "awaiting_approval", "waiting_for_tokens"]).last
       queue[0] = [queue[0][0], crashed_run_step.id] if crashed_run_step && queue.any?
     elsif resume_from_step_id.present?
       position = 0
@@ -90,7 +91,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                          attempt: run_step.attempt + 1,
                          position: position, resolved_input_context: resolved_context,
                          rejection_context: nil, output: nil, error_output: nil,
-                         finished_at: nil, duration: nil, exit_code: nil)
+                         finished_at: nil, duration: nil, exit_code: nil,
+                         waiting_until: nil)
       else
         run_step = run.run_steps.create!(step: step, status: "running", attempt: 1,
                                          position: position, started_at: Time.current,
@@ -126,6 +128,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
         broadcast_step(run, run_step)
         result = StepExecutor::Result.new(exit_code: 1, stdout: result.stdout, stderr: validation_msg)
       else
+        limit = Runners::LimitDetector.detect(result)
+        if limit[:limit_hit]
+          park_for_tokens(run, run_step, step, result, limit)
+          return
+        end
         mark_failed(run_step, result)
       end
 
@@ -360,6 +367,37 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     run_step.update!(attrs)
   end
 
+  # Park a run + step in "waiting_for_tokens" when Claude reports a usage /
+  # session / rate limit. We deliberately leave WorktreeManager.retain (we
+  # need the worktree intact for resume) and skip the on-fail recovery path
+  # — recovery only makes sense for actionable failures, not "wait it out".
+  # TokenWaitJob will fire at waiting_until (or sooner if the operator
+  # reschedules) and re-enqueue ExecuteRunJob to resume from this step.
+  def park_for_tokens(run, run_step, step, result, limit)
+    reset_at = limit[:reset_at] || (Time.current + TokenWaitJob::FALLBACK_INTERVAL)
+    msg = limit[:message] || "Claude session/usage limit reached; waiting for reset"
+
+    run_step.update!(
+      status: "waiting_for_tokens",
+      waiting_until: reset_at,
+      output: result.stdout,
+      error_output: [run_step.error_output, result.stderr, msg].compact.reject(&:empty?).uniq.join("\n"),
+      stream_log: result.stream_events.presence,
+      finished_at: nil
+    )
+    run.update!(status: "waiting_for_tokens", waiting_until: reset_at, error_message: msg)
+
+    WorktreeManager.retain(run)
+
+    broadcast_step(run, run_step)
+    broadcast_run(run)
+
+    TokenWaitJob.schedule(run, step.id, reset_at)
+    Rails.logger.info(
+      "[ExecuteRunJob] Run ##{run.id} parked waiting_for_tokens until #{reset_at.iso8601} (step '#{step.name}')"
+    )
+  end
+
   def sync_task_status(run)
     task = run.pipeline_task
     return unless task
@@ -416,12 +454,16 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     result = executor.execute(&on_progress)
 
     return result if result.passed? || step.max_retries.zero?
+    # Don't burn retries against a known token wall — bubble up so the caller
+    # can park the run instead of spamming Claude through the same outage.
+    return result if Runners::LimitDetector.detect(result)[:limit_hit]
 
     (2..(step.max_retries + 1)).each do |attempt|
       run_step.update!(status: "retrying", attempt: attempt)
       broadcast_step(run, run_step)
       result = executor.execute(&on_progress)
       return result if result.passed?
+      return result if Runners::LimitDetector.detect(result)[:limit_hit]
     end
 
     result

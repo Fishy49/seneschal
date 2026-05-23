@@ -5,7 +5,8 @@ class RunStep < ApplicationRecord
   has_many :child_run_steps, class_name: "RunStep", foreign_key: :parent_run_step_id, dependent: :destroy
   has_many :context_query_logs, dependent: :destroy
 
-  STATUSES = ["pending", "queued", "running", "awaiting_approval", "passed", "failed", "retrying", "skipped"].freeze
+  STATUSES = ["pending", "queued", "running", "awaiting_approval", "waiting_for_tokens",
+              "passed", "failed", "retrying", "skipped"].freeze
 
   validates :status, presence: true, inclusion: { in: STATUSES }
   validates :attempt, numericality: { only_integer: true, greater_than: 0 }

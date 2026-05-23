@@ -5,6 +5,9 @@
     <% if run.input["resumed_from_run"].present? %>
       <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Resumed from</th><td class="px-3 py-2 border-b border-edge"><%= link_to "Run ##{run.input['resumed_from_run']}", run_path(run.input["resumed_from_run"]) %></td></tr>
     <% end %>
+    <% if run.waiting_for_tokens? && run.waiting_until.present? %>
+      <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Tokens reset</th><td class="px-3 py-2 border-b border-edge text-sm"><%= run.waiting_until.strftime("%Y-%m-%d %H:%M:%S") %> (<%= time_ago_in_words(run.waiting_until) %> from now)</td></tr>
+    <% end %>
     <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Started</th><td class="px-3 py-2 border-b border-edge text-sm"><%= run.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "\u2014" %></td></tr>
     <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Finished</th><td class="px-3 py-2 border-b border-edge text-sm"><%= run.finished_at&.strftime("%Y-%m-%d %H:%M:%S") || "\u2014" %></td></tr>
     <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th><td class="px-3 py-2 border-b border-edge text-sm"><%= format_duration(run.duration) %></td></tr>

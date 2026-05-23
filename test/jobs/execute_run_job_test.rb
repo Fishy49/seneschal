@@ -293,6 +293,68 @@ class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLen
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  test "limit hit on a step with max_retries does not burn through retries" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "ClaudeStep", step_type: "command", body: "echo limited",
+      position: 1, timeout: 30, max_retries: 5, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    call_count = 0
+    fake_result = StepExecutor::Result.new(
+      exit_code: 1, stdout: "", stderr: "Claude AI usage limit reached. resets in 1h",
+      stream_events: nil
+    )
+    factory = lambda do |*_a, **_k|
+      exec = Object.new
+      exec.define_singleton_method(:execute) do |&_blk|
+        call_count += 1
+        fake_result
+      end
+      exec
+    end
+
+    ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    assert_equal 1, call_count, "executor should only run once when limit is hit (no retries)"
+    assert_equal "waiting_for_tokens", run.reload.status
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "step failure with usage-limit text parks run and step in waiting_for_tokens" do
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(
+      name: "ClaudeStep", step_type: "command", body: "echo limited",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    fake_result = StepExecutor::Result.new(
+      exit_code: 1, stdout: "", stderr: "Claude AI usage limit reached. resets in 1h",
+      stream_events: nil
+    )
+    factory = ->(*_a, **_k) { fake_executor(fake_result) }
+
+    ActiveJob::Base.queue_adapter.enqueued_jobs.clear
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    assert_equal "waiting_for_tokens", run.status
+    assert run.waiting_until.present?
+
+    rs = run.run_steps.last
+    assert_equal "waiting_for_tokens", rs.status
+    assert rs.waiting_until.present?
+
+    enqueued = ActiveJob::Base.queue_adapter.enqueued_jobs.find { |j| j["job_class"] == "TokenWaitJob" }
+    assert_not_nil enqueued, "expected TokenWaitJob to be scheduled"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   private
 
   def setup_workflow_with_ready_project!
