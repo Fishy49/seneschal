@@ -100,6 +100,8 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :preview_assets, only: [:show]
+
   resources :runs, only: [:index, :show] do
     member do
       post :stop

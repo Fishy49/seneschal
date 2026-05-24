@@ -928,4 +928,52 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
       config: { "produces" => ["review"], "base_ref" => "main" }
     )
   end
+
+  # --- preview_assets feature ---
+
+  test "preview_assets disabled by default leaves allowed_tools untouched" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    tools = executor.send(:resolved_allowed_tools)
+    assert_not_includes tools, "seneschal-asset"
+  end
+
+  test "preview_assets enabled appends Bash(seneschal-asset:*) to allowed_tools" do
+    @step.update!(config: @step.config.merge("preview_assets" => true))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    tools = executor.send(:resolved_allowed_tools)
+    assert_includes tools, "Bash(seneschal-asset:*)"
+  end
+
+  test "append_preview_assets_instructions describes the CLI" do
+    @step.update!(config: @step.config.merge("preview_assets" => true))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    prompt = executor.send(:append_preview_assets_instructions, "BODY")
+
+    assert prompt.start_with?("BODY")
+    assert_includes prompt, "Previewable Assets"
+    assert_includes prompt, "seneschal-asset register"
+    assert_includes prompt, "--path"
+  end
+
+  test "env_vars include SENESCHAL_ASSETS_ROOT and baseline keys when preview_assets enabled" do
+    @step.update!(config: @step.config.merge("preview_assets" => true))
+    run = workflows(:deploy).runs.create!(status: "running", context: {}, input: {})
+    @step.update!(run_id: run.id)
+    executor = StepExecutor.new(@step, {}, @ready.local_path, run_step_id: 17)
+    env = executor.send(:env_vars)
+
+    assert_equal PreviewAsset.assets_root.to_s, env["SENESCHAL_ASSETS_ROOT"]
+    assert_equal "17", env["SENESCHAL_RUN_STEP_ID"]
+    assert_equal run.id.to_s, env["SENESCHAL_RUN_ID"]
+    assert env["SENESCHAL_DB_PATH"].present?
+    assert_includes env["PATH"], Rails.root.join("bin").to_s
+    assert_not env.key?("SENESCHAL_QUERYABLE_VARS")
+  end
+
+  test "env_vars omit SENESCHAL_ASSETS_ROOT when preview_assets disabled" do
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    env = executor.send(:env_vars)
+
+    assert_not env.key?("SENESCHAL_ASSETS_ROOT")
+  end
 end

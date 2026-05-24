@@ -70,6 +70,7 @@
         <%= render "runs/stream_log", run_step: run_step %>
       </details>
     <% end %>
+    <%= render "runs/step_assets", run_step: run_step %>
     <% output_vars = run_step.step.produces.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
     <% if output_vars.any? || run_step.output.present? || run_step.error_output.present? %>
       <div class="mt-1">

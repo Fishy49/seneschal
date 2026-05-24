@@ -133,6 +133,14 @@
       <p class="text-sm text-content-muted mt-2">Comma-separated list of Claude CLI tools this step can use. Supports patterns like <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>. Leave blank for the global default.</p>
     </div>
 
+    <div class="mb-4">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
+        <input type="checkbox" name="skill_preview_assets" value="1" <%= "checked" if claude_cfg["preview_assets"] %> class="accent-accent">
+        Preview Assets
+      </label>
+      <p class="text-xs text-content-muted mt-1">When on, the prompt explains the <code class="bg-surface-input px-1 rounded">seneschal-asset</code> CLI and Claude is told to register any generated images, audio, or video. Registered assets show up as clickable previews on this step's run row, and are copied into persistent storage so they survive worktree cleanup.</p>
+    </div>
+
     <%# Output schema picker. When the selected skill carries a default
         schema + output variable, the picker collapses to a compact "Using
         skill default" badge so the common case is one-line. Click "Override"

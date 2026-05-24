@@ -7,7 +7,7 @@ FOREIGN KEY ("workflow_id")
 );
 CREATE INDEX "index_pipeline_tasks_on_project_id" ON "pipeline_tasks" ("project_id") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_workflow_id" ON "pipeline_tasks" ("workflow_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "run_steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "attempt" integer DEFAULT 1 NOT NULL, "created_at" datetime(6) NOT NULL, "duration" float, "error_output" text, "exit_code" integer, "finished_at" datetime(6), "output" text, "run_id" integer NOT NULL, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "step_id" integer NOT NULL, "updated_at" datetime(6) NOT NULL, "position" integer /*application='Seneschal'*/, "resolved_input_context" text /*application='Seneschal'*/, "stream_log" json /*application='Seneschal'*/, "claude_session_id" varchar /*application='Seneschal'*/, "parent_run_step_id" integer /*application='Seneschal'*/, "rejection_context" text /*application='Seneschal'*/, "waiting_until" datetime(6), CONSTRAINT "fk_rails_154ec68049"
+CREATE TABLE IF NOT EXISTS "run_steps" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "attempt" integer DEFAULT 1 NOT NULL, "created_at" datetime(6) NOT NULL, "duration" float, "error_output" text, "exit_code" integer, "finished_at" datetime(6), "output" text, "run_id" integer NOT NULL, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "step_id" integer NOT NULL, "updated_at" datetime(6) NOT NULL, "position" integer /*application='Seneschal'*/, "resolved_input_context" text /*application='Seneschal'*/, "stream_log" json /*application='Seneschal'*/, "claude_session_id" varchar /*application='Seneschal'*/, "parent_run_step_id" integer /*application='Seneschal'*/, "rejection_context" text /*application='Seneschal'*/, "waiting_until" datetime(6) /*application='Seneschal'*/, CONSTRAINT "fk_rails_154ec68049"
 FOREIGN KEY ("run_id")
   REFERENCES "runs" ("id")
 , CONSTRAINT "fk_rails_58f100d30f"
@@ -16,7 +16,7 @@ FOREIGN KEY ("step_id")
 );
 CREATE INDEX "index_run_steps_on_run_id" ON "run_steps" ("run_id") /*application='Seneschal'*/;
 CREATE INDEX "index_run_steps_on_step_id" ON "run_steps" ("step_id") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "runs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "context" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "error_message" text, "finished_at" datetime(6), "input" json DEFAULT '{}' NOT NULL, "pipeline_task_id" integer, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer NOT NULL, "system_flags" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/, "worktree_path" varchar /*application='Seneschal'*/, "worktree_retained" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, "branch_name" varchar /*application='Seneschal'*/, "waiting_until" datetime(6), CONSTRAINT "fk_rails_fe71673043"
+CREATE TABLE IF NOT EXISTS "runs" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "context" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, "error_message" text, "finished_at" datetime(6), "input" json DEFAULT '{}' NOT NULL, "pipeline_task_id" integer, "started_at" datetime(6), "status" varchar DEFAULT 'pending' NOT NULL, "updated_at" datetime(6) NOT NULL, "workflow_id" integer NOT NULL, "system_flags" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/, "worktree_path" varchar /*application='Seneschal'*/, "worktree_retained" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, "branch_name" varchar /*application='Seneschal'*/, "waiting_until" datetime(6) /*application='Seneschal'*/, CONSTRAINT "fk_rails_fe71673043"
 FOREIGN KEY ("pipeline_task_id")
   REFERENCES "pipeline_tasks" ("id")
 , CONSTRAINT "fk_rails_404232665a"
@@ -123,7 +123,17 @@ CREATE INDEX "index_skills_on_source_kind_and_relative_path" ON "skills" ("sourc
 CREATE INDEX "index_skills_on_skill_repo_id" ON "skills" ("skill_repo_id") /*application='Seneschal'*/;
 CREATE INDEX "index_skills_on_archived_at" ON "skills" ("archived_at") /*application='Seneschal'*/;
 CREATE INDEX "index_skills_on_default_json_schema_id" ON "skills" ("default_json_schema_id") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "preview_assets" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run_step_id" integer NOT NULL, "run_id" integer NOT NULL, "kind" varchar NOT NULL, "label" varchar, "original_filename" varchar NOT NULL, "content_type" varchar, "byte_size" bigint DEFAULT 0 NOT NULL, "storage_path" varchar NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_29a7e2c5d9"
+FOREIGN KEY ("run_step_id")
+  REFERENCES "run_steps" ("id")
+ ON DELETE CASCADE, CONSTRAINT "fk_rails_5d341bb2e5"
+FOREIGN KEY ("run_id")
+  REFERENCES "runs" ("id")
+ ON DELETE CASCADE);
+CREATE INDEX "index_preview_assets_on_run_step_id" ON "preview_assets" ("run_step_id") /*application='Seneschal'*/;
+CREATE INDEX "index_preview_assets_on_run_id" ON "preview_assets" ("run_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260524183216'),
 ('20260522221403'),
 ('20260518100001'),
 ('20260518000001'),

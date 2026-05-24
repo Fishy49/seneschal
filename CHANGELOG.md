@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased — Previewable assets
+
+Skill / prompt steps can now register generated images, audio, or video as
+"previewable assets" that show up as clickable tiles on the step's run row.
+Clicking a tile opens a modal with the appropriate player (`<img>`,
+`<audio controls>`, or `<video controls>`).
+
+- New `bin/seneschal-asset register --path <file> [--kind …] [--label …]` CLI,
+  sibling to `bin/seneschal-context`. Talks to SQLite directly (no Rails
+  boot), scoped by the same `SENESCHAL_DB_PATH` / `SENESCHAL_RUN_ID` /
+  `SENESCHAL_RUN_STEP_ID` env vars, plus `SENESCHAL_ASSETS_ROOT`. Refuses
+  to register an asset if `run_step_id` doesn't belong to the given run.
+- New `preview_assets` table + `PreviewAsset` model, with `kind`, `label`,
+  `original_filename`, `content_type`, `byte_size`, `storage_path`.
+- Files are copied out of the worktree into persistent storage at
+  registration time (default `storage/run_assets/<run_id>/<run_step_id>/…`,
+  overridable via `Setting["run_assets_root"]`) so old runs stay browsable
+  after `WorktreeManager` reaps the worktree. If the underlying file is
+  missing the tile renders dimmed and the modal explains why; the controller
+  serves a 410 instead of crashing.
+- Step form gains a "Preview Assets" checkbox under Claude config. When on,
+  `StepExecutor` appends a tool-usage block to the prompt explaining the
+  CLI and auto-merges `Bash(seneschal-asset:*)` into `allowed_tools` so the
+  operator only has to toggle the one checkbox.
+- New `PreviewAssetsController#show` route serves the file inline with the
+  recorded `content_type`.
+- UI: `app/views/runs/_step_assets.html.erb` renders the tile grid;
+  `asset_preview_modal_controller.js` Stimulus controller swaps player
+  elements per kind.
+
+No reaper job for `storage/run_assets/` yet — assets currently live for the
+life of the database row. A future mirror of `WorktreeManager.reap_stale`
+can sweep old run subtrees on the same retention window if desired.
+
 ## Unreleased — `refactor/agent-runtime` (the architectural refactor)
 
 A foundation pass on the agent-runtime stack, organized into five phases. Each

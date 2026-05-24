@@ -83,13 +83,14 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   private
 
-  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity
+  def execute_skill(&) # rubocop:disable Metrics/PerceivedComplexity,Metrics/CyclomaticComplexity
     prompt = @step.prompt_body(@context)
     return Result.new(exit_code: 1, stdout: "", stderr: "No prompt content") unless prompt
 
     prompt = prepend_project_context(prompt)
     prompt = prepend_consumes_context(prompt) if @step.consumes.any?
     prompt = prepend_queryable_context(prompt) if @step.queries.any? && queryable_schemas.any?
+    prompt = append_preview_assets_instructions(prompt) if preview_assets_enabled?
     prompt = prepend_failure_context(prompt) if @context["previous_failure"].present? && @step.run_id.present?
     prompt = "#{prompt}\n\n## Additional Context\n\n#{@resolved_input_context}" if @resolved_input_context.present?
     # When the runner handles schemas natively (SDK's StructuredOutput tool
@@ -386,7 +387,16 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     base = @step.config["allowed_tools"].presence ||
            Setting["default_allowed_tools"].presence ||
            DEFAULT_ALLOWED_TOOLS
-    active_queryable_schemas.any? ? "#{base},Bash(seneschal-context:*)" : base
+    tools = base.dup
+    tools = "#{tools},Bash(seneschal-context:*)" if active_queryable_schemas.any?
+    tools = "#{tools},Bash(seneschal-asset:*)"   if preview_assets_enabled?
+    tools
+  end
+
+  def preview_assets_enabled?
+    return false unless @step.step_type.in?(["skill", "prompt"])
+
+    ActiveModel::Type::Boolean.new.cast(@step.config["preview_assets"])
   end
 
   # --- Non-streaming execution ---
@@ -636,7 +646,12 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     end
     vars["REPO_PATH"] = @repo_path
     vars["INPUT_CONTEXT"] = @resolved_input_context if @resolved_input_context.present?
-    vars.merge!(queryable_env_vars) if active_queryable_schemas.any?
+    # Either feature (queries OR preview_assets) needs the same SENESCHAL_*
+    # baseline (DB path, run id, run step id, bin/ on PATH). The CLI-specific
+    # extras get layered on top.
+    vars.merge!(seneschal_baseline_env) if active_queryable_schemas.any? || preview_assets_enabled?
+    vars["SENESCHAL_QUERYABLE_VARS"] = active_queryable_schemas.keys.join(",") if active_queryable_schemas.any?
+    vars["SENESCHAL_ASSETS_ROOT"]    = PreviewAsset.assets_root.to_s if preview_assets_enabled?
     vars
   end
 
@@ -661,13 +676,12 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     end
   end
 
-  def queryable_env_vars
+  def seneschal_baseline_env
     {
       "PATH" => "#{Rails.root.join("bin")}:#{ENV.fetch("PATH", "")}",
       "SENESCHAL_DB_PATH" => absolute_db_path,
       "SENESCHAL_RUN_ID" => resolved_run_id.to_s,
-      "SENESCHAL_RUN_STEP_ID" => @run_step_id.to_s,
-      "SENESCHAL_QUERYABLE_VARS" => active_queryable_schemas.keys.join(",")
+      "SENESCHAL_RUN_STEP_ID" => @run_step_id.to_s
     }
   end
 
@@ -799,6 +813,29 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       ---
 
     CONTEXT
+  end
+
+  # Appended (not prepended) so the asset-registration nudge is the last thing
+  # the model reads before doing the work — keeps it top-of-mind right when
+  # files are being produced. Mirrors append_produces_instructions / nudge
+  # style so it lives near the bottom of the assembled prompt.
+  def append_preview_assets_instructions(prompt)
+    prompt + <<~INSTRUCTIONS
+
+      ## Previewable Assets
+
+      Whenever you generate a file the operator should be able to view (image, audio, or video), register it so it shows up as a clickable preview on this step in the Seneschal UI:
+
+      ```
+      seneschal-asset register --path <file> [--kind image|audio|video] [--label "Short description"]
+      ```
+
+      - `--path` is required and must point at a file inside this working directory.
+      - `--kind` is inferred from the file extension (png/jpg/etc → image, mp3/wav/etc → audio, mp4/webm/etc → video); pass it explicitly if the extension is unusual.
+      - `--label` is optional but recommended — it's what shows on the preview tile.
+
+      Register every viewable artifact you produce. The CLI copies the file into Seneschal's persistent storage, so it remains viewable even after the worktree is cleaned up.
+    INSTRUCTIONS
   end
 
   # When a skill/prompt step has a JSON Schema attached, extract the produced

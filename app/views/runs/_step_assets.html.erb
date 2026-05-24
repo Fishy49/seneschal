@@ -1,0 +1,30 @@
+<% assets = run_step.preview_assets %>
+<% if assets.any? %>
+  <details class="mt-1" open>
+    <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
+      previewable assets <span class="text-content-muted">(<%= assets.size %>)</span>
+    </summary>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <% assets.each do |asset| %>
+        <% available = asset.file_exists? %>
+        <div data-controller="asset-preview-modal"
+             data-asset-preview-modal-src-value="<%= preview_asset_path(asset) %>"
+             data-asset-preview-modal-kind-value="<%= asset.kind %>"
+             data-asset-preview-modal-label-value="<%= asset.display_label %>"
+             data-asset-preview-modal-content-type-value="<%= asset.content_type %>"
+             data-asset-preview-modal-available-value="<%= available %>"
+             class="inline-block">
+          <button type="button" data-action="asset-preview-modal#open"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface-input border border-edge rounded-lg text-[0.8125rem] text-content-muted hover:text-content hover:bg-edge transition-colors cursor-pointer max-w-xs <%= 'opacity-60' unless available %>"
+                  title="<%= available ? "Preview #{asset.kind}" : "Asset file no longer available" %>">
+            <span class="text-base leading-none"><%= asset_kind_icon(asset.kind) %></span>
+            <span class="truncate"><%= asset.display_label %></span>
+            <% unless available %>
+              <span class="text-[0.625rem] uppercase tracking-wide text-content-muted">missing</span>
+            <% end %>
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </details>
+<% end %>

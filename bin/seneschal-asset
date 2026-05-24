@@ -1,0 +1,180 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Tool exposed to skill/prompt steps so they can register generated assets
+# (images, audio, video) as "previewable" — Seneschal copies the file into
+# persistent storage and the run UI surfaces it in a player modal.
+#
+# Worktrees are reaped on a schedule, so assets are copied out to
+# storage/run_assets/<run_id>/<run_step_id>/<random>/... at registration
+# time rather than being read on demand from the worktree.
+#
+# Usage:
+#   seneschal-asset register --path <file> [--kind image|audio|video] [--label "..."]
+#
+# Examples:
+#   seneschal-asset register --path output/cover.png --label "Title screen"
+#   seneschal-asset register --path tmp/intro.mp3 --kind audio
+#
+# Required env (set by StepExecutor when the step has preview_assets enabled):
+#   SENESCHAL_DB_PATH         absolute path to the SQLite database file
+#   SENESCHAL_RUN_ID          id of the parent run
+#   SENESCHAL_RUN_STEP_ID     id of the run_step registering the asset
+#   SENESCHAL_ASSETS_ROOT     absolute path to the persistent assets root
+
+require "fileutils"
+require "json"
+require "optparse"
+require "pathname"
+require "securerandom"
+require "sqlite3"
+require "time"
+
+PROGRAM = "seneschal-asset"
+
+EXTENSION_KIND = {
+  ".png" => "image", ".jpg" => "image", ".jpeg" => "image", ".gif" => "image",
+  ".webp" => "image", ".bmp" => "image", ".svg" => "image", ".avif" => "image",
+  ".mp3" => "audio", ".wav" => "audio", ".ogg" => "audio", ".m4a" => "audio",
+  ".flac" => "audio", ".aac" => "audio", ".opus" => "audio",
+  ".mp4" => "video", ".webm" => "video", ".mov" => "video", ".m4v" => "video",
+  ".mkv" => "video", ".ogv" => "video"
+}.freeze
+
+EXTENSION_CONTENT_TYPE = {
+  ".png" => "image/png", ".jpg" => "image/jpeg", ".jpeg" => "image/jpeg",
+  ".gif" => "image/gif", ".webp" => "image/webp", ".bmp" => "image/bmp",
+  ".svg" => "image/svg+xml", ".avif" => "image/avif",
+  ".mp3" => "audio/mpeg", ".wav" => "audio/wav", ".ogg" => "audio/ogg",
+  ".m4a" => "audio/mp4", ".flac" => "audio/flac", ".aac" => "audio/aac",
+  ".opus" => "audio/ogg",
+  ".mp4" => "video/mp4", ".webm" => "video/webm", ".mov" => "video/quicktime",
+  ".m4v" => "video/mp4", ".mkv" => "video/x-matroska", ".ogv" => "video/ogg"
+}.freeze
+
+def die(msg)
+  warn "#{PROGRAM}: #{msg}"
+  exit 1
+end
+
+def parse_register_args(argv)
+  opts = { path: nil, kind: nil, label: nil }
+  parser = OptionParser.new do |o|
+    o.banner = "Usage: #{PROGRAM} register --path <file> [--kind <kind>] [--label <text>]"
+    o.on("--path PATH", "Path to the asset file (required)") { |v| opts[:path] = v }
+    o.on("--kind KIND", "image|audio|video (inferred from extension if omitted)") { |v| opts[:kind] = v }
+    o.on("--label LABEL", "Human-readable label shown in the UI") { |v| opts[:label] = v }
+    o.on("-h", "--help", "Show this help") do
+      puts o
+      exit 0
+    end
+  end
+  parser.parse!(argv)
+  opts
+end
+
+def infer_kind(path)
+  EXTENSION_KIND[File.extname(path).downcase]
+end
+
+def infer_content_type(path)
+  EXTENSION_CONTENT_TYPE[File.extname(path).downcase] || "application/octet-stream"
+end
+
+def insert_row(db_path:, attrs:)
+  now = Time.now.utc.iso8601
+  sql = <<~SQL
+    INSERT INTO preview_assets
+      (run_step_id, run_id, kind, label, original_filename, content_type,
+       byte_size, storage_path, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  SQL
+  inserted_id = nil
+  SQLite3::Database.new(db_path) do |db|
+    db.execute(sql, [
+                 attrs[:run_step_id], attrs[:run_id], attrs[:kind], attrs[:label],
+                 attrs[:original_filename], attrs[:content_type], attrs[:byte_size],
+                 attrs[:storage_path], now, now
+               ])
+    inserted_id = db.last_insert_row_id
+  end
+  inserted_id
+end
+
+def lookup_run_id(db_path:, run_step_id:)
+  # SQLite3::Database.new with a block returns the Database (not the block's
+  # value), so capture via an outer variable — same pattern as bin/seneschal-context.
+  result = nil
+  SQLite3::Database.new(db_path, readonly: true) do |db|
+    result = db.get_first_value("SELECT run_id FROM run_steps WHERE id = ?", [run_step_id.to_i])
+  end
+  result
+end
+
+# --- main ---
+
+subcommand = ARGV.shift
+die "usage: #{PROGRAM} register --path <file> [--kind <kind>] [--label <text>]" unless subcommand == "register"
+
+opts = parse_register_args(ARGV)
+
+db_path     = ENV.fetch("SENESCHAL_DB_PATH", nil)     or die "SENESCHAL_DB_PATH not set"
+run_id      = ENV.fetch("SENESCHAL_RUN_ID", nil)      or die "SENESCHAL_RUN_ID not set"
+run_step_id = ENV.fetch("SENESCHAL_RUN_STEP_ID", nil) or die "SENESCHAL_RUN_STEP_ID not set"
+assets_root = ENV.fetch("SENESCHAL_ASSETS_ROOT", nil) or die "SENESCHAL_ASSETS_ROOT not set"
+
+die "--path is required" if opts[:path].nil? || opts[:path].strip.empty?
+
+source = Pathname.new(opts[:path]).expand_path
+die "file not found: #{opts[:path]}" unless source.file?
+
+explicit_kind = opts[:kind].to_s.strip
+kind = explicit_kind.empty? ? infer_kind(source.to_s) : explicit_kind.downcase
+die "could not infer asset kind from #{source.basename}; pass --kind image|audio|video" if kind.nil? || kind.empty?
+die "invalid --kind #{kind.inspect}: must be one of image, audio, video" unless ["image", "audio", "video"].include?(kind)
+
+# Confirm the parent run_step actually belongs to the run we're scoped to.
+# Prevents a step from registering an asset onto somebody else's row by
+# guessing an id.
+actual_run_id = lookup_run_id(db_path: db_path, run_step_id: run_step_id)
+die "run_step #{run_step_id} not found" if actual_run_id.nil?
+die "run_step #{run_step_id} does not belong to run #{run_id}" unless actual_run_id.to_s == run_id.to_s
+
+stem        = SecureRandom.hex(8)
+dest_dir    = Pathname.new(assets_root).join(run_id.to_s, run_step_id.to_s, stem)
+dest_file   = dest_dir.join(source.basename)
+rel_storage = dest_file.relative_path_from(Pathname.new(assets_root)).to_s
+
+begin
+  FileUtils.mkdir_p(dest_dir)
+  FileUtils.cp(source.to_s, dest_file.to_s)
+rescue StandardError => e
+  die "failed to copy asset into storage: #{e.message}"
+end
+
+byte_size    = File.size(dest_file.to_s)
+content_type = infer_content_type(source.to_s)
+
+begin
+  asset_id = insert_row(
+    db_path: db_path,
+    attrs: {
+      run_step_id: run_step_id.to_i,
+      run_id: run_id.to_i,
+      kind: kind,
+      label: (opts[:label].to_s.strip.empty? ? nil : opts[:label].to_s.strip),
+      original_filename: source.basename.to_s,
+      content_type: content_type,
+      byte_size: byte_size,
+      storage_path: rel_storage
+    }
+  )
+rescue StandardError => e
+  # File copy already succeeded; surface the DB error but leave the orphaned
+  # file in place (operators can clean it up; better than a half-registered
+  # asset with no row).
+  die "asset file copied but DB insert failed: #{e.message}"
+end
+
+label_for_log = opts[:label].to_s.strip.empty? ? source.basename.to_s : opts[:label].to_s.strip
+puts "Registered #{kind} asset ##{asset_id}: #{label_for_log}"

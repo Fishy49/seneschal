@@ -152,6 +152,7 @@ class StepsController < ApplicationController
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
+    config["preview_assets"] = raw["skill_preview_assets"] == "1"
 
     # Schema picker has two modes (see app/views/steps/_form.html.erb):
     #   "inherit"  → omit the key so Step#inherit_skill_defaults can fill it

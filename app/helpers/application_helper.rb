@@ -81,6 +81,12 @@ module ApplicationHelper
     count >= 1_000_000 ? "#{(count / 1_000_000.0).round(1)}M" : "#{(count / 1_000.0).round(1)}k"
   end
 
+  ASSET_KIND_ICONS = { "image" => "\u{1F5BC}", "audio" => "\u{1F50A}", "video" => "\u{1F3AC}" }.freeze
+
+  def asset_kind_icon(kind)
+    ASSET_KIND_ICONS[kind.to_s] || "\u{1F4CE}"
+  end
+
   def usage_stats_bar(stats)
     return nil unless stats
 
