@@ -63,6 +63,28 @@ module Runners
       end
     end
 
+    test "matches the CLI 'out of extra usage' banner and parses bare clock-tz reset" do
+      freeze_time = Time.use_zone("America/Chicago") { Time.zone.parse("2026-05-24 00:00:00") }
+      travel_to freeze_time do
+        r = result_with(stdout: "You're out of extra usage · resets 2am (America/Chicago)")
+        out = LimitDetector.detect(r)
+        assert out[:limit_hit]
+        expected = Time.use_zone("America/Chicago") { Time.zone.parse("2026-05-24 02:00:00") }
+        assert_equal expected, out[:reset_at]
+      end
+    end
+
+    test "bare clock-tz reset rolls forward when today's occurrence has already passed" do
+      freeze_time = Time.use_zone("America/Chicago") { Time.zone.parse("2026-05-24 03:00:00") }
+      travel_to freeze_time do
+        r = result_with(stdout: "out of usage · resets 2am (America/Chicago)")
+        out = LimitDetector.detect(r)
+        assert out[:limit_hit]
+        expected = Time.use_zone("America/Chicago") { Time.zone.parse("2026-05-25 02:00:00") }
+        assert_equal expected, out[:reset_at]
+      end
+    end
+
     test "still trips on real rate-limit phrasings" do
       [
         "anthropic.RateLimitError: 429 rate_limit_error",

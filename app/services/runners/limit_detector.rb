@@ -26,7 +26,8 @@ module Runners
       /5[\s-]?hour limit\s+(?:reached|exceeded|hit)/i,
       /quota\s+(?:exceeded|exhausted)/i,
       /too many requests/i,
-      /429\s+(?:too many requests|client error)/i
+      /429\s+(?:too many requests|client error)/i,
+      /out of (?:extra\s+)?usage/i # CLI banner: "You're out of extra usage · resets 2am (America/Chicago)"
     ].freeze
 
     # ISO 8601 timestamps the CLI sometimes embeds: "...resets at 2026-05-22T18:30:00Z"
@@ -37,6 +38,10 @@ module Runners
 
     # Relative: "resets in 4h 23m" / "try again in 2 hours"
     RELATIVE_RESET = /(?:resets?|try again)\s*in\s*((?:\d+\s*(?:h|hours?|m|mins?|minutes?|s|secs?|seconds?)\s*)+)/i
+
+    # Bare clock-time + named TZ, as the CLI banner uses:
+    # "resets 2am (America/Chicago)" / "resets 11:30pm (America/New_York)"
+    CLOCK_TZ_RESET = %r{resets?\s+(\d{1,2})(?::(\d{2}))?\s*([ap]m)\s*\(([A-Za-z]+/[A-Za-z_]+)\)}i
 
     # Examine a Result; returns { limit_hit: bool, reset_at: Time|nil, message: String|nil }
     def detect(result)
@@ -76,6 +81,24 @@ module Runners
         seconds = relative_to_seconds(m[1])
         return Time.current + seconds if seconds.positive?
       end
+
+      if (m = text.match(CLOCK_TZ_RESET))
+        return parse_clock_tz_reset(hour: m[1].to_i, minute: m[2].to_i, meridiem: m[3], tz_name: m[4])
+      end
+      nil
+    end
+
+    # "2am (America/Chicago)" → the next moment in that zone at that hour.
+    # If today's occurrence has already passed, advance to tomorrow.
+    def parse_clock_tz_reset(hour:, minute:, meridiem:, tz_name:)
+      hour24 = hour % 12
+      hour24 += 12 if meridiem.casecmp("pm").zero?
+      Time.use_zone(tz_name) do
+        t = Time.zone.now.change(hour: hour24, min: minute)
+        t += 1.day if t <= Time.zone.now
+        t
+      end
+    rescue ArgumentError
       nil
     end
 
