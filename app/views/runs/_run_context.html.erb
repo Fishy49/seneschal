@@ -6,7 +6,7 @@
         <tr>
           <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted align-top"><%= key %></th>
           <td class="px-3 py-2 border-b border-edge text-sm">
-            <% text = value.to_s %>
+            <% text = value.is_a?(Hash) || value.is_a?(Array) ? value.to_json : value.to_s %>
             <% if text.length > 200 %>
               <div data-controller="content-modal" data-content-modal-title-value="<%= key %>">
                 <code class="font-mono text-[0.8125rem] break-all"><%= truncate(text, length: 200) %></code>
