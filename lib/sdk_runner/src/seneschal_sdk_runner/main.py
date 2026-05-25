@@ -407,6 +407,19 @@ def build_hooks(config: dict[str, Any]) -> dict[str, Any] | None:
         for tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
             pre_tool_use.append(HookMatcher(matcher=tool, hooks=[confine_hook]))
 
+    # StructuredOutput unwrap: catch the case where the model passes the
+    # schema payload wrapped under a single key matching the produces
+    # variable name (e.g. `{graphics: {...}}` instead of `{...}`) and
+    # silently rewrite tool_input via updatedInput before the CLI runs its
+    # schema validator. Always-on whenever both a schema and a produces_var
+    # are configured — the unwrap is gated on a single-key match so it
+    # can't fire on legitimate inputs.
+    schema = config.get("json_schema")
+    produces_var = config.get("produces_var")
+    if isinstance(schema, dict) and schema and isinstance(produces_var, str) and produces_var:
+        unwrap_hook = make_unwrap_structured_output_hook(produces_var, schema)
+        pre_tool_use.append(HookMatcher(matcher="StructuredOutput", hooks=[unwrap_hook]))
+
     if not pre_tool_use:
         return None
 
@@ -460,6 +473,75 @@ def make_confine_writes_hook(cwd: str):
         }
 
     return confine_writes_hook
+
+
+def make_unwrap_structured_output_hook(produces_var: str, schema: dict[str, Any]):
+    """Build a PreToolUse hook for the StructuredOutput tool that auto-
+    unwraps inputs of the form ``{produces_var: {<schema fields>}}``.
+
+    Why: under the SDK runner, the StructuredOutput tool's input shape IS
+    the json_schema. But the operator prompt also references the produces
+    variable name ("Seneschal will assign the result to `graphics`"),
+    which tempts the model into emitting `{graphics: {schema_version: ...,
+    ...}}` on the first call. The CLI's validator rejects that as
+    "missing required property schema_version", the model spends a turn
+    apologizing and re-emitting the entire payload — a large, avoidable
+    token spend on schemas like GraphicsManifest.
+
+    The hook fires only when:
+      * exactly one key is present at the top level
+      * that key matches the configured produces_var
+      * produces_var is NOT itself a declared top-level property of the
+        schema (so a legitimate `{graphics: ...}` payload isn't molested)
+      * the wrapped value is a dict
+
+    On match, it returns ``updatedInput`` pointing at the unwrapped value;
+    the CLI's validator then sees the correct shape on the first try. If
+    the unwrapped value still doesn't validate the CLI rejects it as
+    before — the hook can't make things worse, only better.
+    """
+    schema_properties: set[str] = set()
+    properties = schema.get("properties") if isinstance(schema, dict) else None
+    if isinstance(properties, dict):
+        schema_properties = set(properties.keys())
+
+    async def unwrap_hook(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+        if (input_data.get("tool_name") or "") != "StructuredOutput":
+            return {}
+
+        tool_input = input_data.get("tool_input") or {}
+        if not isinstance(tool_input, dict) or len(tool_input) != 1:
+            return {}
+
+        only_key = next(iter(tool_input))
+        if only_key != produces_var:
+            return {}
+
+        # If produces_var is itself a legitimate top-level field on the
+        # schema, the model is plausibly emitting it correctly and we
+        # must not unwrap.
+        if produces_var in schema_properties:
+            return {}
+
+        wrapped = tool_input[only_key]
+        if not isinstance(wrapped, dict):
+            return {}
+
+        emit({
+            "type": "hook_unwrapped",
+            "hook": "unwrap_structured_output",
+            "tool_use_id": tool_use_id,
+            "wrapped_key": produces_var,
+        })
+
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "updatedInput": wrapped,
+            }
+        }
+
+    return unwrap_hook
 
 
 def resolve_prompt(config: dict[str, Any]) -> str:

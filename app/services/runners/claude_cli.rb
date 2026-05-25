@@ -21,6 +21,7 @@ module Runners
       # ignored by CLI; only ClaudeSDK consumes these (structured outputs,
       # hooks, subagents, MCP servers)
       json_schema: nil, # rubocop:disable Lint/UnusedMethodArgument
+      produces_var: nil, # rubocop:disable Lint/UnusedMethodArgument
       hooks: nil, # rubocop:disable Lint/UnusedMethodArgument
       agents: nil, # rubocop:disable Lint/UnusedMethodArgument
       mcp_servers: nil, # rubocop:disable Lint/UnusedMethodArgument

@@ -339,6 +339,12 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
       # Schema-validated structured outputs. Only runners that support this
       # contract (today: ClaudeSDK) will consume it; ClaudeCLI ignores it.
       json_schema: @step.json_schema&.parsed_body,
+      # Name of the variable the step's structured output will be assigned
+      # to. Used by the SDK sidecar's StructuredOutput unwrap hook to
+      # detect models that wrap the payload under this key (e.g. emitting
+      # `{graphics: {...}}` instead of `{...}`) and silently rewrite the
+      # tool_input before schema validation. SDK-only.
+      produces_var: @step.produces.first.presence,
       # Runner-level policy hooks (also SDK-only). Today's only knob is the
       # cwd-confining write hook, default ON. Operators can flip it off
       # globally via Setting["confine_writes_to_cwd"] = "false" or
@@ -980,10 +986,14 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
       ## Deliver Your Final Answer
 
-      When you are finished, call the **StructuredOutput** tool to deliver
-      the final result (variable name: `#{output_var}`). Do not emit the
-      result inline as text or in an ```output``` block — the tool call is
-      the only delivery channel for this step.
+      When you are finished, call the **StructuredOutput** tool. Its input
+      parameters mirror the schema exactly — pass the schema's top-level
+      fields directly as the tool's arguments. Do NOT wrap them under any
+      key (especially not `#{output_var}`); Seneschal assigns the tool's
+      result to the `#{output_var}` variable on its side.
+
+      Do not emit the result inline as text or in an ```output``` block —
+      the tool call is the only delivery channel for this step.
     NUDGE
   end
 
