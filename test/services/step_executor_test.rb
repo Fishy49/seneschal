@@ -308,6 +308,27 @@ class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/Class
     assert errors.any? { |e| e.include?("missing") }, errors.inspect
   end
 
+  # Inside validate_with_session_retry the loop re-invokes the runner with the
+  # original schema in play, so a successful retry returns a Result with
+  # structured_output already populated (the SDK enforces the schema upstream).
+  # validation_errors_for must recognize that and short-circuit — otherwise it
+  # falls into the ```output``` text-block path, finds nothing (the SDK does
+  # not emit one), reports "missing", and the loop burns to max_attempts even
+  # though the model actually delivered a schema-conforming payload.
+  test "validation_errors_for returns nil when result carries structured_output even with no text output block" do
+    schema = json_schemas(:person_schema)
+    @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))
+    executor = StepExecutor.new(@step, {}, @ready.local_path)
+    result = StepExecutor::Result.new(
+      exit_code: 0,
+      stdout: "Delivered.",
+      stderr: "",
+      structured_output: { "name" => "Rick", "age" => 42 }
+    )
+
+    assert_nil executor.send(:validation_errors_for, result)
+  end
+
   test "validate_with_session_retry returns initial result when output is valid" do
     schema = json_schemas(:person_schema)
     @step.update!(config: @step.config.merge("json_schema_id" => schema.id, "produces" => ["person"]))

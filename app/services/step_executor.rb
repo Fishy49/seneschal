@@ -896,6 +896,15 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     output_var = @step.produces.first
     return ["No output variable configured for schema-bound step"] if output_var.to_s.strip.empty?
 
+    # SDK-runner short-circuit: when result.structured_output is populated
+    # the SDK already enforced the schema upstream (via output_format), so
+    # there is nothing left to validate here — the object is schema-conforming
+    # by construction. Without this short-circuit the loop below would parse
+    # result.stdout looking for a ```output``` block the SDK doesn't emit,
+    # decide the variable is "missing", and burn through validation_max_attempts
+    # even though the retry produced a perfectly good structured output.
+    return nil if result.structured_output
+
     extracted = PipelineExtractor.new(@step, result.stdout).extract
     raw = extracted[output_var]
     return ["Output variable `#{output_var}` was missing from the response"] if raw.nil? || raw.to_s.strip.empty?
