@@ -80,9 +80,11 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       position += 1
       resolved_context = resolve_input_context(step, run.context)
 
+      rejection = nil
       if queued_run_step_id
         run_step = run.run_steps.find(queued_run_step_id)
-        resolved_context = append_rejection_context(resolved_context, run_step.rejection_context)
+        rejection = run_step.rejection_context.presence
+        resolved_context = append_rejection_context(resolved_context, rejection)
         # Don't wipe stream_log: if the new attempt crashes before its runner
         # emits anything (e.g. another MCP cold-start hang), the prior
         # attempt's trajectory stays visible. The first broadcast from the
@@ -100,7 +102,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       end
       broadcast_run(run)
 
-      result = execute_with_retries(run, run_step, step, repo_path, resolved_context)
+      result = execute_with_retries(run, run_step, step, repo_path, resolved_context, rejection: rejection)
 
       if result.passed?
         mark_passed(run_step, result)
@@ -414,6 +416,24 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     [base.to_s, note].join.strip.presence
   end
 
+  # Build the user-turn message the model should see when its output was
+  # rejected and the run is resuming the prior Claude session. On a resume
+  # the sidecar IGNORES the freshly-built prompt and uses this string as
+  # the next user turn instead — so without it, the operator's feedback
+  # would be silently dropped and the model would just see the default
+  # "your previous session was interrupted, continue" message.
+  def build_rejection_resume_message(rejection)
+    return nil if rejection.blank?
+
+    <<~MSG
+      The operator reviewed your output and requested changes. Apply this feedback and re-deliver the result.
+
+      --- Operator feedback ---
+      #{rejection}
+      ---
+    MSG
+  end
+
   def resolve_input_context(step, context)
     return nil if step.input_context.blank?
 
@@ -424,14 +444,22 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     resolved.strip.presence
   end
 
-  def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil)
+  def execute_with_retries(run, run_step, step, repo_path, resolved_context = nil, rejection: nil)
     resume_sid = run_step.claude_session_id if step.step_type.in?(["skill", "prompt"])
 
     scoped = scope_context(step, run.context)
 
+    # On a session-resume the sidecar uses resume_message — not the prompt —
+    # as the model's next user turn. Surface the operator's rejection
+    # feedback through that channel so it actually lands; otherwise it sits
+    # in resolved_input_context (and thus the prompt), which the sidecar
+    # discards on resume.
+    resume_msg = build_rejection_resume_message(rejection)
+
     executor = StepExecutor.new(step, scoped, repo_path,
                                 resolved_input_context: resolved_context,
                                 resume_session_id: resume_sid,
+                                resume_message: resume_msg,
                                 run_step_id: run_step.id)
 
     on_progress = lambda { |update|
