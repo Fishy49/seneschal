@@ -91,11 +91,11 @@ class StepsController < ApplicationController
                                      :input_context, :manual_approval]).to_h
 
     raw = request.params
-    permitted[:config] = build_step_config(permitted[:step_type], raw)
+    permitted[:config] = build_step_config(permitted[:step_type], raw, permitted[:skill_id])
 
     # Pipeline: produces and consumes
     produces =
-      if claude_schema_mode?(permitted)
+      if claude_schema_mode?(permitted, raw)
         [raw["schema_output_variable"].to_s.strip].compact_blank
       else
         raw["produces"].to_s.split(",").map(&:strip).compact_blank
@@ -118,15 +118,22 @@ class StepsController < ApplicationController
     permitted
   end
 
-  def claude_schema_mode?(permitted)
-    permitted[:step_type].to_s.in?(["skill", "prompt"]) &&
-      permitted[:config]["json_schema_id"].present?
+  # Schema mode is on whenever the form's schema-output single-input is the
+  # canonical produces source — i.e. EITHER the step has an explicit
+  # json_schema_id OR the form is in inherit mode (the "From skill" badge is
+  # showing). Inherit mode used to fall through to the multi-tag widget here,
+  # which silently wiped produces on every edit save.
+  def claude_schema_mode?(permitted, raw)
+    return false unless permitted[:step_type].to_s.in?(["skill", "prompt"])
+    return true if permitted[:config]["json_schema_id"].present?
+
+    raw["schema_picker_mode"] == "inherit"
   end
 
-  def build_step_config(step_type, raw)
+  def build_step_config(step_type, raw, skill_id = nil)
     case step_type
     when "ci_check" then build_ci_check_config(raw)
-    when "skill", "prompt" then build_skill_config(raw)
+    when "skill", "prompt" then build_skill_config(raw, skill_id)
     when "context_fetch" then build_context_fetch_config(raw)
     when "pr" then build_pr_config(raw)
     else {}
@@ -146,7 +153,7 @@ class StepsController < ApplicationController
     }.compact
   end
 
-  def build_skill_config(raw)
+  def build_skill_config(raw, skill_id = nil)
     config = {}
     config["effort"] = raw["skill_effort"].presence || "medium"
     config["model"] = raw["skill_model"] if raw["skill_model"].present?
@@ -154,15 +161,22 @@ class StepsController < ApplicationController
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
     config["preview_assets"] = raw["skill_preview_assets"] == "1"
 
-    # Schema picker has two modes (see app/views/steps/_form.html.erb):
-    #   "inherit"  → omit the key so Step#inherit_skill_defaults can fill it
-    #                from skill.default_json_schema_id at validation time.
+    # Schema picker has three persisted shapes (see app/views/steps/_form.html.erb):
+    #   "inherit"  → resolve through skill.default_json_schema_id and persist
+    #                the id explicitly. Step#inherit_skill_defaults only runs
+    #                on new records / skill changes, so leaving the key absent
+    #                on a normal edit drops the saved schema id on the floor.
     #   "override" → write whatever the picker has, even if blank — explicit
     #                "None" must beat inheritance.
-    if raw["schema_picker_mode"] == "override"
+    #   (legacy)   → schema_picker_mode missing, fall back to the picker value.
+    case raw["schema_picker_mode"]
+    when "inherit"
+      default_id = Skill.where(id: skill_id).pick(:default_json_schema_id) if skill_id.present?
+      config["json_schema_id"] = default_id if default_id.present?
+    when "override"
       config["json_schema_id"] = raw["json_schema_id"].presence&.to_i
-    elsif raw["json_schema_id"].present?
-      config["json_schema_id"] = raw["json_schema_id"].to_i
+    else
+      config["json_schema_id"] = raw["json_schema_id"].to_i if raw["json_schema_id"].present?
     end
 
     context_ids = Array(raw["skill_context_projects"]).compact_blank.map(&:to_i).uniq

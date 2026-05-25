@@ -54,7 +54,11 @@ export default class extends Controller {
     const type = this.typeSelectTarget.value
     const isClaudeStep = type === "skill" || type === "prompt"
     const schemaId = this.hasSchemaSelectTarget ? this.schemaSelectTarget.value : ""
-    const inSchemaMode = isClaudeStep && !!schemaId
+    // The schema picker has three states: inherit (badge shown, schemaId ""),
+    // override-with-schema (schemaId set), and override-with-None (schemaId "").
+    // schemaId alone can't tell the first from the third — inherit also counts
+    // as schema mode (we'll use schema.default_output_variable as produces).
+    const inSchemaMode = isClaudeStep && (!!schemaId || this.isInheritMode())
 
     this.schemaOutputFieldsTarget.style.display = inSchemaMode ? "" : "none"
     this.producesMultiFieldsTarget.style.display = inSchemaMode ? "none" : ""
@@ -62,10 +66,15 @@ export default class extends Controller {
     if (inSchemaMode) {
       if (wipeOnEnter) this.wipeProducesTags()
       if (this.hasSchemaOutputInputTarget && !this.schemaOutputInputTarget.value) {
-        const opt = this.schemaSelectTarget.selectedOptions[0]
+        const opt = schemaId ? this.schemaSelectTarget.selectedOptions[0] : null
         if (opt) this.schemaOutputInputTarget.value = this.slugify(opt.textContent)
       }
     }
+  }
+
+  isInheritMode() {
+    const modeInput = this.element.querySelector('input[name="schema_picker_mode"]')
+    return !!modeInput && modeInput.value === "inherit"
   }
 
   wipeProducesTags() {

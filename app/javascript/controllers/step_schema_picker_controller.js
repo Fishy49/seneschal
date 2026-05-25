@@ -20,6 +20,10 @@ export default class extends Controller {
     if (this.hasModeInputTarget) this.modeInputTarget.value = "override"
     if (this.hasBadgeTarget) this.badgeTarget.style.display = "none"
     if (this.hasPickerTarget) this.pickerTarget.style.display = ""
+    // Let step-form re-evaluate which produces UI to show — flipping the
+    // mode toggles the badge but the schemaSelect value can be unchanged,
+    // so no native "change" event fires on its own.
+    this.dispatch("changed")
   }
 
   restoreDefault(event) {
@@ -30,5 +34,6 @@ export default class extends Controller {
     if (select) select.value = ""
     if (this.hasPickerTarget) this.pickerTarget.style.display = "none"
     if (this.hasBadgeTarget) this.badgeTarget.style.display = ""
+    this.dispatch("changed")
   }
 }

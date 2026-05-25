@@ -404,6 +404,99 @@ class StepsControllerTest < ActionDispatch::IntegrationTest # rubocop:disable Me
     assert_response :unprocessable_content
   end
 
+  # Regression: editing an inherit-mode step and saving without changes used
+  # to wipe both produces and json_schema_id, because the controller's
+  # claude_schema_mode? check only fired when json_schema_id was already in
+  # permitted[:config] — which inherit-mode deliberately leaves absent.
+  test "PATCH update preserves produces and json_schema_id when saving an inherit-mode step unchanged" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "foundation")
+    step = steps(:skill_step)
+    step.update!(skill: skill, config: { "json_schema_id" => schema.id, "produces" => ["foundation"] })
+
+    patch project_workflow_step_path(@project, @workflow, step), params: {
+      step: {
+        name: step.name,
+        step_type: "skill",
+        skill_id: skill.id,
+        position: step.position,
+        timeout: step.timeout,
+        max_retries: step.max_retries
+      },
+      # Form in inherit mode: badge visible, picker hidden so json_schema_id="",
+      # schema_output_variable is the canonical produces source, multi-tag is
+      # hidden so produces="" comes through empty.
+      schema_picker_mode: "inherit",
+      json_schema_id: "",
+      schema_output_variable: "foundation",
+      produces: ""
+    }
+
+    step.reload
+    assert_equal ["foundation"], step.config["produces"]
+    assert_equal schema.id, step.config["json_schema_id"]
+  end
+
+  test "PATCH update in inherit mode honors an edited schema_output_variable" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "foundation")
+    step = steps(:skill_step)
+    step.update!(skill: skill, config: { "json_schema_id" => schema.id, "produces" => ["foundation"] })
+
+    patch project_workflow_step_path(@project, @workflow, step), params: {
+      step: {
+        name: step.name, step_type: "skill", skill_id: skill.id,
+        position: step.position, timeout: step.timeout, max_retries: step.max_retries
+      },
+      schema_picker_mode: "inherit",
+      json_schema_id: "",
+      schema_output_variable: "renamed_var",
+      produces: ""
+    }
+
+    step.reload
+    assert_equal ["renamed_var"], step.config["produces"]
+    assert_equal schema.id, step.config["json_schema_id"]
+  end
+
+  test "PATCH update from inherit to explicit None drops the schema" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "foundation")
+    step = steps(:skill_step)
+    step.update!(skill: skill, config: { "json_schema_id" => schema.id, "produces" => ["foundation"] })
+
+    patch project_workflow_step_path(@project, @workflow, step), params: {
+      step: {
+        name: step.name, step_type: "skill", skill_id: skill.id,
+        position: step.position, timeout: step.timeout, max_retries: step.max_retries
+      },
+      schema_picker_mode: "override",
+      json_schema_id: "",
+      schema_output_variable: "",
+      produces: "alpha,beta"
+    }
+
+    step.reload
+    assert_nil step.config["json_schema_id"]
+    assert_equal ["alpha", "beta"], step.config["produces"]
+  end
+
+  test "GET edit on an inherit-mode step shows the schema output variable input populated" do
+    schema = json_schemas(:person_schema)
+    skill = skills(:shared_skill)
+    skill.update!(default_json_schema: schema, default_output_variable: "foundation")
+    step = steps(:skill_step)
+    step.update!(skill: skill, config: { "json_schema_id" => schema.id, "produces" => ["foundation"] })
+
+    get edit_project_workflow_step_path(@project, @workflow, step)
+    assert_response :success
+    assert_select "input[name=schema_output_variable][value=foundation]"
+    assert_select "input[type=hidden][name=schema_picker_mode][value=inherit]"
+  end
+
   test "POST create persists produces as array" do
     assert_difference "Step.count", 1 do
       post project_workflow_steps_path(@project, @workflow), params: {

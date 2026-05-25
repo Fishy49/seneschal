@@ -4,10 +4,18 @@
 <% ctx_fetch = step.step_type == "context_fetch" ? (step.config || {}) : {} %>
 <% pr_cfg = step.step_type == "pr" ? (step.config || {}) : {} %>
 <% templates = StepTemplate.ordered %>
-<% schema_mode = step.step_type.in?(%w[skill prompt]) && claude_cfg["json_schema_id"].present? %>
-<% schema_output_var = schema_mode ? step.produces.first : "" %>
+<% skill_default_schema = step.skill&.default_json_schema %>
+<% skill_default_var    = step.skill&.default_output_variable.to_s %>
+<% picker_selected_id   = claude_cfg["json_schema_id"].to_i %>
+<% using_skill_default  = skill_default_schema && (claude_cfg["json_schema_id"].blank? || picker_selected_id == skill_default_schema.id) %>
+<%# schema_mode = the form's single-input "Output Variable" is the canonical
+    produces source. True whenever a schema id is set OR we're inheriting one
+    from the skill — both cases hide the multi-tag widget. %>
+<% schema_mode = step.step_type.in?(%w[skill prompt]) && (claude_cfg["json_schema_id"].present? || using_skill_default) %>
+<% schema_output_var = schema_mode ? (step.produces.first.presence || skill_default_var) : "" %>
 <%= form_with model: [@project, @workflow, step],
       data: { controller: "step-form",
+              action: "step-schema-picker:changed->step-form#schemaChanged",
               step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json,
               step_form_templates_value: templates.map { |t| [t.id, t.template_data] }.to_h.to_json } do |f| %>
   <% if step.errors.any? %>
@@ -144,11 +152,8 @@
     <%# Output schema picker. When the selected skill carries a default
         schema + output variable, the picker collapses to a compact "Using
         skill default" badge so the common case is one-line. Click "Override"
-        to expand the full picker. %>
-    <% skill_default_schema = step.skill&.default_json_schema %>
-    <% skill_default_var    = step.skill&.default_output_variable.to_s %>
-    <% picker_selected_id   = claude_cfg["json_schema_id"].to_i %>
-    <% using_skill_default  = skill_default_schema && (claude_cfg["json_schema_id"].blank? || picker_selected_id == skill_default_schema.id) %>
+        to expand the full picker. (skill_default_schema / using_skill_default
+        are computed at the top of this template so schema_mode can use them.) %>
     <div class="mb-4" data-controller="step-schema-picker" data-step-schema-picker-overridden-value="<%= using_skill_default ? 'false' : 'true' %>">
       <%# mode marker: "inherit" → controller leaves config["json_schema_id"] absent
           so Step#inherit_skill_defaults can fill it from skill.default_json_schema.
