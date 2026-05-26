@@ -83,6 +83,18 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
     assert_not @workflow.reload.config.key?("runner")
   end
 
+  test "GET export downloads a JSON workflow export" do
+    get export_project_workflow_path(@project, @workflow)
+
+    assert_response :success
+    assert_equal "application/json", response.media_type
+    assert_match(/attachment; filename="workflow-deploy-pipeline-/, response.headers["Content-Disposition"])
+
+    body = response.parsed_body
+    assert_equal 1, body["seneschal_workflow_export"]["version"]
+    assert_equal "Deploy Pipeline", body["seneschal_workflow_export"]["workflow"]["name"]
+  end
+
   test "PATCH update refuses an unknown runner value rather than persisting garbage" do
     patch project_workflow_path(@project, @workflow), params: {
       workflow: { name: @workflow.name, description: @workflow.description.to_s, runner: "fake_runner_lol" }

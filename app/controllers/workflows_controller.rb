@@ -1,6 +1,6 @@
 class WorkflowsController < ApplicationController
   before_action :set_project
-  before_action :set_workflow, only: [:show, :edit, :update, :destroy, :trigger]
+  before_action :set_workflow, only: [:show, :edit, :update, :destroy, :trigger, :export]
 
   def show
     @steps = @workflow.steps
@@ -39,6 +39,13 @@ class WorkflowsController < ApplicationController
     run = @workflow.runs.create!(input: trigger_input_params)
     ExecuteRunJob.perform_later(run)
     redirect_to run_path(run), notice: "Run started."
+  end
+
+  def export
+    payload = WorkflowExporter.new(@workflow).call
+    send_data payload.to_json,
+              filename: "workflow-#{@workflow.name.parameterize}-#{Date.current}.json",
+              type: "application/json"
   end
 
   private

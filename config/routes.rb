@@ -52,9 +52,11 @@ Rails.application.routes.draw do
       get :search
       post :suggestions
     end
+    resource :workflow_import, only: [:new, :create], controller: "workflow_imports"
     resources :workflows do
       member do
         post :trigger
+        get :export
       end
       resource :copy, only: [:new, :create], controller: "workflow_copies"
       resources :steps, only: [:new, :create, :edit, :update, :destroy] do
