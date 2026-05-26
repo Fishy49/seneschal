@@ -73,6 +73,85 @@ class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLen
     assert_equal "base", result
   end
 
+  test "build_rejection_resume_message returns nil when rejection is blank" do
+    assert_nil @job.send(:build_rejection_resume_message, nil)
+    assert_nil @job.send(:build_rejection_resume_message, "")
+    assert_nil @job.send(:build_rejection_resume_message, "   ")
+  end
+
+  test "build_rejection_resume_message wraps feedback in a user-turn frame" do
+    msg = @job.send(:build_rejection_resume_message, "fix the angle")
+    assert_includes msg, "operator reviewed your output"
+    assert_includes msg, "fix the angle"
+    assert_includes msg, "Apply this feedback and re-deliver"
+  end
+
+  # Regression: on a rejection re-run the sidecar uses resume_message (not
+  # the prompt) as the model's next user turn. ExecuteRunJob must surface
+  # the rejection feedback there or the model never sees it. The step must
+  # be skill/prompt for execute_with_retries to set resume_sid at all.
+  test "rejection re-run threads operator feedback into StepExecutor's resume_message" do
+    workflow = setup_workflow_with_ready_project!
+    step = workflow.steps.create!(
+      name: "Pause", step_type: "prompt", body: "deliver the result",
+      position: 1, manual_approval: true, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "running", started_at: 1.minute.ago, context: {}, input: {})
+    run.run_steps.create!(
+      step: step, status: "awaiting_approval", attempt: 1, position: 1,
+      started_at: 1.minute.ago, finished_at: 50.seconds.ago, duration: 10.0,
+      claude_session_id: "sid-abc", rejection_context: "the third sprite is too dark"
+    )
+
+    captured = []
+    factory = lambda do |_step, _ctx, _repo_path, **kwargs|
+      captured << kwargs
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: "", stream_events: nil))
+    end
+    stub_step_executor_new(factory) do
+      ExecuteRunJob.new.perform(run, step.id, resume: true)
+    end
+
+    assert_equal 1, captured.size, "step should be executed exactly once on resume"
+    resume_msg = captured.first[:resume_message]
+    assert_not_nil resume_msg, "resume_message must be set on a rejection re-run"
+    assert_includes resume_msg, "the third sprite is too dark", "operator feedback must reach the model"
+    assert_equal "sid-abc", captured.first[:resume_session_id], "prior session is resumed, preserving context"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  # Crash recovery (no operator rejection) must still resume cleanly without
+  # injecting a misleading "operator feedback" message.
+  test "crash-recovery resume leaves resume_message nil when no rejection" do
+    workflow = setup_workflow_with_ready_project!
+    step = workflow.steps.create!(
+      name: "Crashy", step_type: "prompt", body: "do the thing",
+      position: 1, timeout: 30, max_retries: 0, config: {}
+    )
+    run = workflow.runs.create!(status: "running", started_at: 1.minute.ago, context: {}, input: {})
+    run.run_steps.create!(
+      step: step, status: "failed", attempt: 1, position: 1,
+      started_at: 1.minute.ago, finished_at: 50.seconds.ago, duration: 10.0,
+      claude_session_id: "sid-xyz", rejection_context: nil
+    )
+
+    captured = []
+    factory = lambda do |_step, _ctx, _repo_path, **kwargs|
+      captured << kwargs
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: "", stream_events: nil))
+    end
+    stub_step_executor_new(factory) do
+      ExecuteRunJob.new.perform(run, step.id, resume: true)
+    end
+
+    assert_equal 1, captured.size
+    assert_nil captured.first[:resume_message], "no rejection → no synthetic resume_message"
+    assert_equal "sid-xyz", captured.first[:resume_session_id]
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   test "job pauses run in awaiting_approval after manual_approval step passes" do
     workflow = setup_workflow_with_ready_project!
     workflow.steps.create!(

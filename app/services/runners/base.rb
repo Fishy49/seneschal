@@ -27,6 +27,7 @@ module Runners
       add_dirs: [],
       stream: false,
       json_schema: nil,
+      produces_var: nil,
       hooks: nil,
       agents: nil,
       mcp_servers: nil,

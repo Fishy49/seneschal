@@ -202,6 +202,32 @@ module Runners
       assert_equal schema, captured["json_schema"]
     end
 
+    test "build_config carries produces_var through to the wire payload" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", produces_var: "graphics")
+      assert_equal "graphics", cfg["produces_var"]
+    end
+
+    test "build_config sets produces_var to nil when unset" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp")
+      assert_nil cfg["produces_var"]
+    end
+
+    test "build_config normalizes blank produces_var to nil" do
+      cfg = @runner.build_config(prompt: "x", cwd: "/tmp", produces_var: "")
+      assert_nil cfg["produces_var"]
+    end
+
+    test "produces_var in the wire config reaches the sidecar's stdin" do
+      fake_python, capture_path = install_fake_python(:echo_then_result)
+      Setting["python_bin"] = fake_python
+      Setting["sdk_runner_script"] = make_dummy_script
+
+      @runner.execute(prompt: "x", cwd: @cwd, produces_var: "graphics")
+
+      captured = JSON.parse(File.read(capture_path))
+      assert_equal "graphics", captured["produces_var"]
+    end
+
     test "structured_output is extracted from the result event into Runners::Result" do
       fake_python, = install_fake_python(:result_with_structured_output)
       Setting["python_bin"] = fake_python
