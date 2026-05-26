@@ -20,8 +20,29 @@
       "confidence": "Medium",
       "cwe_id": [77],
       "note": "base_ref is validated against SAFE_GIT_REF (a strict subset of git's ref-name rules — no leading dashes, no shell metacharacters, no '..') before being interpolated into the diff range. Test coverage: `execute_self_review refuses unsafe base_ref values without invoking git`."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "7d53c06e860211045bfacf58be4df1a7f22bcbeafccb6db0b906c838d81393cd",
+      "check_name": "SendFile",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/preview_assets_controller.rb",
+      "line": 11,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(PreviewAsset.find(params.expect(:id)).absolute_path.to_s, :type => ((PreviewAsset.find(params.expect(:id)).content_type or \"application/octet-stream\")), :filename => PreviewAsset.find(params.expect(:id)).original_filename, :disposition => \"inline\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "PreviewAssetsController",
+        "method": "show"
+      },
+      "user_input": "PreviewAsset.find(params.expect(:id)).absolute_path.to_s",
+      "confidence": "Medium",
+      "cwe_id": [22],
+      "note": "storage_path is constructed entirely server-side by bin/seneschal-asset as `assets_root/<run_id>/<run_step_id>/<SecureRandom.hex(8)>/<source.basename>`. The only user-influenced piece is `source.basename`, which is run through Pathname#basename and so cannot include traversal segments. original_filename is only used to set the Content-Disposition header, not to resolve a path."
     }
   ],
-  "updated": "2026-05-15",
+  "updated": "2026-05-26",
   "brakeman_version": "8.0.4"
 }
