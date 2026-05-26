@@ -2,7 +2,7 @@ require "test_helper"
 require "tmpdir"
 require "fileutils"
 
-class ExecuteRunJobTest < ActiveJob::TestCase # rubocop:disable Metrics/ClassLength
+class ExecuteRunJobTest < ActiveJob::TestCase
   setup do
     @job = ExecuteRunJob.new
     @step = steps(:skill_step)

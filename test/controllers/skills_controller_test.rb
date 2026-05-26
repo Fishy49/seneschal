@@ -166,7 +166,7 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
 
   # --- POST import_reference_schema ---
 
-  test "import_reference_schema creates a JsonSchema and sets it as the skill's default" do # rubocop:disable Metrics/BlockLength
+  test "import_reference_schema creates a JsonSchema and sets it as the skill's default" do
     skill_dir = File.join(@tmp_global_root, "schema-haver")
     FileUtils.mkdir_p(File.join(skill_dir, "references"))
     File.write(File.join(skill_dir, "SKILL.md"), "---\nname: schema-haver\ndescription: x\n---\n\nbody\n")

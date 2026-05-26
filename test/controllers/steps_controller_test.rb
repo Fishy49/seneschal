@@ -1,6 +1,6 @@
 require "test_helper"
 
-class StepsControllerTest < ActionDispatch::IntegrationTest # rubocop:disable Metrics/ClassLength
+class StepsControllerTest < ActionDispatch::IntegrationTest
   setup do
     sign_in users(:admin)
     @project = projects(:seneschal)
@@ -341,7 +341,7 @@ class StepsControllerTest < ActionDispatch::IntegrationTest # rubocop:disable Me
     assert_equal ["foundation"], Step.last.queries
   end
 
-  test "POST create pr step persists declared fields into config" do # rubocop:disable Metrics/BlockLength
+  test "POST create pr step persists declared fields into config" do
     assert_difference "Step.count", 1 do
       post project_workflow_steps_path(@project, @workflow), params: {
         step: {

@@ -1,6 +1,6 @@
 require "test_helper"
 
-class StepExecutorTest < ActiveSupport::TestCase # rubocop:disable Metrics/ClassLength
+class StepExecutorTest < ActiveSupport::TestCase
   setup do
     @ready = projects(:seneschal)
     FileUtils.mkdir_p(@ready.local_path)

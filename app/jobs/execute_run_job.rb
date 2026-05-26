@@ -268,7 +268,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     false
   end
 
-  def attempt_reopen_previous(run, parent_run_step, step, on_fail, repo_path, max_rounds) # rubocop:disable Metrics/ParameterLists
+  def attempt_reopen_previous(run, parent_run_step, step, on_fail, repo_path, max_rounds)
     # Find the previous skill/prompt RunStep that has a Claude session to resume
     prev_run_step = run.run_steps
                        .where(parent_run_step_id: nil)

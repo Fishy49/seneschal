@@ -1,7 +1,7 @@
 require "test_helper"
 
 # rubocop:disable Style/ClassAndModuleChildren
-class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Metrics/ClassLength
+class StepExecutor::PrCreatorTest < ActiveSupport::TestCase
   # rubocop:enable Style/ClassAndModuleChildren
   setup do
     @project = projects(:seneschal)
@@ -22,7 +22,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     )
   end
 
-  test "creates a PR via gh and parses pr_number + pr_url" do # rubocop:disable Metrics/BlockLength
+  test "creates a PR via gh and parses pr_number + pr_url" do
     captured_argv = nil
     with_stubbed_capture3(
       ["gh", "pr", "list"] => stub_response(stdout: "[]", success: true),
@@ -164,7 +164,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     assert_not created, "gh pr create should not run when an existing PR is found"
   end
 
-  test "appends --reviewer, --label, and --assignee per array entry" do # rubocop:disable Metrics/BlockLength
+  test "appends --reviewer, --label, and --assignee per array entry" do
     @step.update!(config: @step.config.merge(
       "reviewers" => ["alice", "my-org/backend-team"],
       "labels" => ["feature", "needs-review"],
@@ -258,7 +258,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
     end
   end
 
-  test "honors explicit branch override in config" do # rubocop:disable Metrics/BlockLength
+  test "honors explicit branch override in config" do
     @step.update!(config: @step.config.merge("branch" => "release/v2"))
     captured_list_argv = nil
     captured_create_argv = nil
@@ -290,7 +290,7 @@ class StepExecutor::PrCreatorTest < ActiveSupport::TestCase # rubocop:disable Me
 
   # ---- clean: true (destructive re-create) ----
 
-  test "clean=true closes existing PR, wipes remote branch, pushes local, then creates fresh" do # rubocop:disable Metrics/BlockLength
+  test "clean=true closes existing PR, wipes remote branch, pushes local, then creates fresh" do
     @step.update!(config: @step.config.merge("clean" => true))
     list_payload = JSON.dump([{ "number" => 7, "url" => "https://github.com/test/seneschal/pull/7" }])
 

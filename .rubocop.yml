@@ -55,6 +55,8 @@ Metrics/AbcSize:
 
 Metrics/ClassLength:
   Max: 300
+  Exclude:
+    - "test/**/*"
 
 Metrics/ModuleLength:
   Exclude:
@@ -68,6 +70,11 @@ Metrics/BlockLength:
     - "app/services/**/*"
     - "app/jobs/**/*"
     - "lib/tasks/*.rake"
+    - "test/**/*"
+
+Metrics/ParameterLists:
+  Exclude:
+    - "app/jobs/execute_run_job.rb"
 
 Metrics/CyclomaticComplexity:
   Max: 15
