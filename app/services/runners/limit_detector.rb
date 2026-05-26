@@ -85,6 +85,7 @@ module Runners
       if (m = text.match(CLOCK_TZ_RESET))
         return parse_clock_tz_reset(hour: m[1].to_i, minute: m[2].to_i, meridiem: m[3], tz_name: m[4])
       end
+
       nil
     end
 
