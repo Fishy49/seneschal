@@ -8,17 +8,21 @@ export default class extends Controller {
     "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
     "schemaSelect", "schemaOutputFields", "schemaOutputInput", "producesMultiFields", "producesInputWrapper",
     "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
-    "saveTemplateCheck", "saveTemplateFields"
+    "saveTemplateCheck", "saveTemplateFields", "tabBtn", "tabContent"
   ]
   static values = { skills: Object, templates: Object }
 
   connect() {
     this.previewVisible = false
+    this.currentTab = "general"
     this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
     if (this.hasFetchMethodTarget) this.fetchMethodChanged()
     this.applySchemaMode({ wipeOnEnter: false })
+
+    this.updateTabVisibility()
+    this.activateTab(this.currentTab)
   }
 
   toggle() {
@@ -42,6 +46,51 @@ export default class extends Controller {
       this.prFieldsTarget.style.display = type === "pr" ? "" : "none"
     }
     this.applySchemaMode({ wipeOnEnter: false })
+    this.updateTabVisibility()
+  }
+
+  switchTab(event) {
+    const tabName = event.currentTarget.dataset.tab
+    this.activateTab(tabName)
+  }
+
+  activateTab(tabName) {
+    this.currentTab = tabName
+
+    // Update button states
+    this.tabBtnTargets.forEach(btn => {
+      const active = btn.dataset.tab === tabName
+      if (active) {
+        btn.setAttribute("aria-selected", "true")
+        btn.classList.add("border-accent", "text-accent")
+        btn.classList.remove("border-transparent", "text-content-muted")
+      } else {
+        btn.setAttribute("aria-selected", "false")
+        btn.classList.add("border-transparent", "text-content-muted")
+        btn.classList.remove("border-accent", "text-accent")
+      }
+    })
+
+    // Update panel visibility
+    this.tabContentTargets.forEach(panel => {
+      panel.style.display = panel.dataset.tab === tabName ? "" : "none"
+    })
+  }
+
+  updateTabVisibility() {
+    if (!this.hasTypeSelectTarget) return
+    const type = this.typeSelectTarget.value
+    const isClaude = ["skill", "prompt"].includes(type)
+
+    const aiTabBtn = this.tabBtnTargets.find(btn => btn.dataset.tab === "ai")
+    if (aiTabBtn) {
+      aiTabBtn.style.display = isClaude ? "" : "none"
+    }
+
+    // If active tab was AI settings, but now hidden, fallback to "general"
+    if (this.currentTab === "ai" && !isClaude) {
+      this.activateTab("general")
+    }
   }
 
   schemaChanged() {

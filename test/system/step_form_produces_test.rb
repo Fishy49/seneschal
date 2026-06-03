@@ -10,6 +10,8 @@ class StepFormProducesTest < ApplicationSystemTestCase
   test "can add produce via Enter and button" do
     visit edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
 
+    find("[data-tab='pipeline']").click
+
     produces_input = find("[data-produces-input-target='newInput']")
     produces_input.fill_in with: "pr_number"
     produces_input.native.send_keys(:return)
@@ -26,6 +28,8 @@ class StepFormProducesTest < ApplicationSystemTestCase
 
   test "duplicate produces entry is rejected" do
     visit edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
+
+    find("[data-tab='pipeline']").click
 
     produces_input = find("[data-produces-input-target='newInput']")
     produces_input.fill_in with: "pr_number"
