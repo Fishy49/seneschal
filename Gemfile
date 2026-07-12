@@ -35,7 +35,7 @@ gem "solid_queue"
 gem "bootsnap", require: false
 
 # Cron expression parser used for per-task scheduled triggers
-gem "fugit", "~> 1.12"
+gem "fugit", "~> 1.13"
 
 # JSON Schema validation (Draft 4/6/7/2019/2020)
 gem "json_schemer", "~> 2.3"
