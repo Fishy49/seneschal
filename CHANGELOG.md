@@ -4,6 +4,13 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.3 Workflow trigger has a button
+
+`workflows#trigger` existed but nothing in the UI called it. The workflow show
+page now leads with a "Run workflow" button that creates a run and lands on it.
+When the project repo is not cloned the button renders disabled with a tooltip
+explaining why, instead of queueing a run that would fail on allocation.
+
 ### 1.2 Re-run affordances
 
 Finished runs are one click away from being run again.

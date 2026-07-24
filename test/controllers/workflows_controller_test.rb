@@ -61,6 +61,21 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
         post trigger_project_workflow_path(@project, @workflow), as: :json
       end
     end
+    assert_redirected_to run_path(Run.last)
+  end
+
+  test "GET show offers a Run workflow button when the repo is ready" do
+    get project_workflow_path(@project, @workflow)
+    assert_response :success
+    assert_select "form[action=?]", trigger_project_workflow_path(@project, @workflow)
+  end
+
+  test "GET show disables Run workflow when the repo is not cloned" do
+    project = projects(:other_project)
+    workflow = project.workflows.create!(name: "Unclonable", trigger_type: "manual")
+    get project_workflow_path(project, workflow)
+    assert_response :success
+    assert_select "form[action=?]", trigger_project_workflow_path(project, workflow), false
   end
 
   test "PATCH update sets workflow.config[runner] when the form picks one" do
