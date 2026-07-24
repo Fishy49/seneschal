@@ -121,6 +121,99 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  # --- Per-user credentials (3.6) ---
+
+  test "the launcher's credentials reach the step executor" do
+    user = users(:admin)
+    user.user_credentials.create!(kind: "github_token", value: "ghp_launcher")
+    user.user_credentials.create!(kind: "anthropic_api_key", value: "sk-ant-launcher")
+
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(name: "Only", step_type: "prompt", body: "go",
+                           position: 1, timeout: 30, max_retries: 0, config: {})
+    run = workflow.runs.create!(status: "pending", context: {}, input: {}, started_by: user)
+
+    captured = []
+    factory = lambda do |_step, _ctx, _repo_path, **kwargs|
+      captured << kwargs
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: ""))
+    end
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    overlay = captured.first[:extra_env]
+    assert_equal "ghp_launcher", overlay["GH_TOKEN"]
+    assert_equal "sk-ant-launcher", overlay["ANTHROPIC_API_KEY"]
+    assert_equal user.email, overlay["GIT_AUTHOR_EMAIL"]
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "a cron run gets an empty overlay and keeps the host session" do
+    users(:admin).user_credentials.create!(kind: "github_token", value: "ghp_launcher")
+
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(name: "Only", step_type: "prompt", body: "go",
+                           position: 1, timeout: 30, max_retries: 0, config: {})
+    # started_by is nil, exactly as CronTickJob and BranchWatchPollJob leave it.
+    run = workflow.runs.create!(status: "pending", context: {}, input: {}, started_by: nil)
+
+    captured = []
+    factory = lambda do |_step, _ctx, _repo_path, **kwargs|
+      captured << kwargs
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: ""))
+    end
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    assert_empty captured.first[:extra_env],
+                 "an unattributed run must never borrow somebody's credentials"
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "one user's credentials never leak into another user's run" do
+    other = users(:other)
+    users(:admin).user_credentials.create!(kind: "github_token", value: "ghp_admin")
+    other.user_credentials.create!(kind: "github_token", value: "ghp_other")
+
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(name: "Only", step_type: "prompt", body: "go",
+                           position: 1, timeout: 30, max_retries: 0, config: {})
+    run = workflow.runs.create!(status: "pending", context: {}, input: {}, started_by: other)
+
+    captured = []
+    factory = lambda do |_step, _ctx, _repo_path, **kwargs|
+      captured << kwargs
+      fake_executor(StepExecutor::Result.new(exit_code: 0, stdout: "ok\n", stderr: ""))
+    end
+    stub_step_executor_new(factory) { ExecuteRunJob.new.perform(run) }
+
+    assert_equal "ghp_other", captured.first[:extra_env]["GH_TOKEN"]
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "credentials never reach the run record, its steps, or its stream log" do
+    user = users(:admin)
+    user.user_credentials.create!(kind: "github_token", value: "ghp_do_not_persist")
+
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(name: "Only", step_type: "prompt", body: "go",
+                           position: 1, timeout: 30, max_retries: 0, config: {})
+    run = workflow.runs.create!(status: "pending", context: {}, input: {}, started_by: user)
+
+    with_stubbed_step_executor(stdout: "ok\n") { ExecuteRunJob.new.perform(run) }
+
+    run.reload
+    haystack = [
+      run.context.to_json, run.input.to_json, run.system_flags.to_json, run.error_message.to_s,
+      run.run_steps.map { |rs| [rs.output, rs.error_output, rs.resolved_input_context, rs.stream_log.to_json] }.to_json
+    ].join
+
+    assert_no_match(/ghp_do_not_persist/, haystack, "a credential was persisted somewhere on the run")
+  ensure
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
   # --- Outbound notifications (3.1) ---
 
   test "a completed run enqueues a completion notification" do

@@ -34,7 +34,8 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
 
   def initialize(step, context, repo_path, # rubocop:disable Metrics/ParameterLists
                  resolved_input_context: nil, resume_session_id: nil,
-                 resume_message: nil, run_step_id: nil, runner: nil)
+                 resume_message: nil, run_step_id: nil, runner: nil,
+                 extra_env: {})
     @step = step
     @context = context
     @repo_path = repo_path
@@ -43,6 +44,9 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     @resume_message = resume_message
     @run_step_id = run_step_id
     @runner = runner
+    # Per-user credential overlay. Empty by default, and an empty overlay
+    # leaves env_vars byte-identical to what it produced before this existed.
+    @extra_env = extra_env || {}
   end
 
   # The agent runner this executor dispatches skill/prompt steps through.
@@ -658,7 +662,9 @@ class StepExecutor # rubocop:disable Metrics/ClassLength
     vars.merge!(seneschal_baseline_env) if active_queryable_schemas.any? || preview_assets_enabled?
     vars["SENESCHAL_QUERYABLE_VARS"] = active_queryable_schemas.keys.join(",") if active_queryable_schemas.any?
     vars["SENESCHAL_ASSETS_ROOT"]    = PreviewAsset.assets_root.to_s if preview_assets_enabled?
-    vars
+    # Merged LAST so a launcher's own credentials beat anything a run context
+    # happened to define. Never logged, never broadcast, never persisted.
+    vars.merge(@extra_env)
   end
 
   # Open3 / Process.spawn rejects non-String env values with

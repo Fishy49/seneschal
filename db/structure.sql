@@ -167,7 +167,14 @@ FOREIGN KEY ("created_by_id")
 CREATE INDEX "index_share_links_on_run_id" ON "share_links" ("run_id") /*application='Seneschal'*/;
 CREATE INDEX "index_share_links_on_created_by_id" ON "share_links" ("created_by_id") /*application='Seneschal'*/;
 CREATE UNIQUE INDEX "index_share_links_on_token" ON "share_links" ("token") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "user_credentials" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer NOT NULL, "kind" varchar NOT NULL, "value" text NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_9b162a81f6"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+);
+CREATE INDEX "index_user_credentials_on_user_id" ON "user_credentials" ("user_id") /*application='Seneschal'*/;
+CREATE UNIQUE INDEX "index_user_credentials_on_user_id_and_kind" ON "user_credentials" ("user_id", "kind") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260724210000'),
 ('20260724200000'),
 ('20260724190000'),
 ('20260724180000'),

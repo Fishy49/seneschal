@@ -215,7 +215,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       broadcast_run(run)
 
       scoped = scope_context(recovery_step, run.context)
-      executor = StepExecutor.new(recovery_step, scoped, repo_path, run_step_id: child_run_step.id)
+      executor = StepExecutor.new(recovery_step, scoped, repo_path, run_step_id: child_run_step.id,
+                                                                    extra_env: credential_env(run))
       recovery_result = executor.execute { |update| broadcast_child_progress(child_run_step, update) }
 
       if recovery_result.passed?
@@ -251,7 +252,9 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
     resolved_context = resolve_input_context(step, run.context)
     scoped = scope_context(step, run.context)
-    executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context, run_step_id: parent_run_step.id)
+    executor = StepExecutor.new(step, scoped, repo_path, resolved_input_context: resolved_context,
+                                                         run_step_id: parent_run_step.id,
+                                                         extra_env: credential_env(run))
     result = executor.execute { |update| broadcast_child_progress(parent_run_step, update) }
 
     if result.passed?
@@ -319,7 +322,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       executor = StepExecutor.new(prev_step, scoped, repo_path,
                                   resume_session_id: prev_run_step.claude_session_id,
                                   resume_message: resume_msg,
-                                  run_step_id: child_run_step.id)
+                                  run_step_id: child_run_step.id,
+                                  extra_env: credential_env(run))
       resume_result = executor.execute { |update| broadcast_child_progress(child_run_step, update) }
 
       if resume_result.passed?
@@ -406,6 +410,14 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     )
   end
 
+  # Only the launcher's own stored credentials are ever injected, and only
+  # for this run. Cron and branch-watch runs have no started_by, so they get
+  # an empty overlay and keep using the host CLI sessions. Computed once per
+  # job so a long run does not re-read the credential rows per step.
+  def credential_env(run)
+    @credential_env ||= CredentialEnv.for(run.started_by)
+  end
+
   def sync_task_status(run)
     task = run.pipeline_task
     return unless task
@@ -475,7 +487,8 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                                 resolved_input_context: resolved_context,
                                 resume_session_id: resume_sid,
                                 resume_message: resume_msg,
-                                run_step_id: run_step.id)
+                                run_step_id: run_step.id,
+                                extra_env: credential_env(run))
 
     on_progress = lambda { |update|
       # Detect being superseded: if RunRecoveryJob (or another path)

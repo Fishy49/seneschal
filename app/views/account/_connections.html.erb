@@ -1,0 +1,52 @@
+<%# Per-user credentials. The stored value is NEVER rendered: each row shows
+    only a fixed mask and a length. %>
+<% help = {
+     "github_token" => "A fine-grained personal access token with pull-request and contents write on the repos you run against.",
+     "anthropic_api_key" => "A personal Anthropic API key. Takes precedence over the OAuth token below, matching the Claude CLI's own order.",
+     "claude_oauth_token" => "The output of `claude setup-token`. Lasts one year. Used only when no API key is set."
+   } %>
+
+<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+  <h2 class="text-lg font-semibold mb-1">Connections</h2>
+  <p class="text-sm text-content-muted mb-4">
+    Runs you launch use these credentials instead of the server's shared CLI sessions.
+    Leave them empty and your runs behave exactly as they do today, using the host's
+    <code class="text-xs bg-surface-input px-1 py-0.5 rounded">claude</code> and
+    <code class="text-xs bg-surface-input px-1 py-0.5 rounded">gh</code> logins.
+    Scheduled and branch-watch runs have no launching user, so they always use the host session.
+  </p>
+
+  <% UserCredential::KINDS.each do |kind| %>
+    <% credential = @credentials[kind] %>
+    <div class="py-3 border-b border-edge last:border-b-0">
+      <div class="flex items-center justify-between gap-3 mb-1.5">
+        <div class="min-w-0">
+          <span class="text-sm font-medium"><%= UserCredential::KIND_LABELS[kind] %></span>
+          <% if credential %>
+            <span class="ml-2 text-xs text-success">connected</span>
+            <div class="text-xs text-content-muted font-mono"><%= credential.masked %></div>
+            <div class="text-xs text-content-muted">updated <%= time_ago_short(credential.updated_at) %></div>
+          <% else %>
+            <span class="ml-2 text-xs text-content-muted">not set</span>
+          <% end %>
+        </div>
+        <% if credential %>
+          <%= button_to "Remove", user_credential_path(credential), method: :delete,
+                class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                data: { turbo_confirm: "Remove your #{UserCredential::KIND_LABELS[kind]}?" } %>
+        <% end %>
+      </div>
+
+      <p class="text-xs text-content-muted mb-2"><%= help[kind] %></p>
+
+      <%= form_with url: user_credentials_path, method: :post, class: "flex items-center gap-2" do |f| %>
+        <%= hidden_field_tag :kind, kind %>
+        <%= password_field_tag :value, nil, autocomplete: "off",
+              placeholder: credential ? "Paste a new value to replace" : "Paste value",
+              class: "flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-[0.8125rem] font-mono focus:outline-none focus:border-accent" %>
+        <%= f.submit credential ? "Replace" : "Save",
+              class: "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

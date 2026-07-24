@@ -24,6 +24,7 @@ Rails.application.routes.draw do
   # Account
   get   "account", to: "account#edit"
   patch "account", to: "account#update"
+  resources :user_credentials, only: [:create, :destroy], path: "account/connections"
 
   # User management (admin only)
   resources :users, only: [:index, :new, :create, :destroy] do

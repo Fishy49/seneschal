@@ -4,6 +4,59 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.6 Per-user Connections (the credential plane)
+
+Runs can now execute under the identity of the person who launched them,
+instead of everything going through the server's one `claude` and `gh` login.
+
+- New `UserCredential` (`user`, `kind` of `github_token` /
+  `anthropic_api_key` / `claude_oauth_token`, `encrypts :value`, unique per
+  user and kind). A test asserts the token is not sitting in SQLite in
+  plaintext.
+- A "Connections" panel on the account page: one row per kind showing only a
+  fixed mask and a character count, a paste field that is never pre-filled
+  with the stored value, and a Remove button. Per-kind help text explains what
+  to paste (fine-grained PAT with pull-request and contents write; a personal
+  API key, or the output of `claude setup-token`).
+- New `CredentialEnv.for(user)` maps stored credentials to `GH_TOKEN`,
+  `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`, following each CLI's own
+  documented precedence. When a user stores both Claude kinds only the API key
+  is sent, so the two can never disagree about which identity is in use. A
+  GitHub token also sets `GIT_AUTHOR_*` / `GIT_COMMITTER_*` from the user's
+  email so their commits carry their name.
+- `ExecuteRunJob` computes the overlay once per job and passes it to
+  `StepExecutor` as `extra_env:`. `env_vars` merges it LAST, so a launcher's
+  credential always beats a colliding run-context variable.
+
+Engine-room note: this touches the spawn seam, and the change is deliberately
+one constructor keyword and one `merge` on the final line of `env_vars`. No
+spawn call was restructured. `env_vars` is the single funnel every subprocess
+goes through - the skill and prompt runners via `runner_call_kwargs`, and the
+`gh` calls in the pr and ci_check paths, since `PrCreator` is mixed into
+`StepExecutor` rather than being a separate object with its own environment.
+A test asserts an empty overlay leaves `env_vars` byte-identical to what it
+produced before this existed, which is what keeps host-session auth working
+untouched for everybody who does not connect anything.
+
+Security invariants, each asserted in tests:
+
+- Only the launcher's own credentials are ever injected, never another user's.
+- Runs with no `started_by` - cron ticks and branch-watch polls - get an
+  empty overlay and keep using the host session.
+- Credentials never reach the run context, input, system flags, error
+  message, step output, `resolved_input_context`, or `stream_log`.
+- The decrypted value is never rendered into HTML.
+
+`CredentialEnv.for` is called from exactly one place, and the credential value
+is read in exactly two: that service, and `masked`, which only reads its
+length.
+
+**Deploy note:** this requires Active Record encryption. If
+`bin/rails credentials:show` has no `active_record_encryption` section, run
+`bin/rails db:encryption:init` and add the three keys via
+`bin/rails credentials:edit` before deploying, or saving a connection will
+fail.
+
 ### 3.7 Read-only share links
 
 A run can be shown to someone outside Seneschal without giving them an
