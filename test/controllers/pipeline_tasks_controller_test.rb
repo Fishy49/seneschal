@@ -94,6 +94,22 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "running", task.reload.status
   end
 
+  test "POST create records the author" do
+    post pipeline_tasks_path, params: {
+      pipeline_task: {
+        title: "Attributed", body: "who made this",
+        kind: "feature", project_id: projects(:seneschal).id
+      }
+    }
+    assert_equal users(:admin), PipelineTask.last.created_by
+  end
+
+  test "POST execute records who started the run" do
+    post execute_pipeline_task_path(pipeline_tasks(:ready_task))
+    assert_equal users(:admin), Run.last.started_by
+    assert_equal users(:admin).email, Run.last.started_by_label
+  end
+
   test "POST execute re-runs a completed task" do
     task = pipeline_tasks(:completed_task)
     assert_difference "Run.count", 1 do

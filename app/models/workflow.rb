@@ -1,5 +1,6 @@
 class Workflow < ApplicationRecord
   belongs_to :project
+  belongs_to :created_by, class_name: "User", optional: true
   has_many :steps, -> { order(:position) }, dependent: :destroy
   has_many :runs, dependent: :destroy
 

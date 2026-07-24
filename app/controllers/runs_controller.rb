@@ -41,7 +41,9 @@ class RunsController < ApplicationController
 
   def stop
     if @run.active?
-      @run.update!(status: "stopped", finished_at: Time.current, error_message: "Stopped by user")
+      @run.update!(status: "stopped", finished_at: Time.current,
+                   stopped_by: current_user,
+                   error_message: "Stopped by #{current_user.email}")
       @run.pipeline_task&.update!(status: "failed")
     end
     redirect_to run_path(@run), notice: "Run stopped."
@@ -131,7 +133,8 @@ class RunsController < ApplicationController
       status: "pending",
       context: failure_context,
       input: @run.input.merge("resumed_from_run" => @run.id.to_s),
-      pipeline_task: @run.pipeline_task
+      pipeline_task: @run.pipeline_task,
+      started_by: current_user
     )
 
     @run.pipeline_task&.update!(status: "running")

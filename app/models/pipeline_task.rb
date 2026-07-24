@@ -1,6 +1,7 @@
 class PipelineTask < ApplicationRecord
   belongs_to :project
   belongs_to :workflow, optional: true
+  belongs_to :created_by, class_name: "User", optional: true
   has_many :runs, dependent: :nullify
 
   KINDS = ["feature", "bugfix", "chore"].freeze
@@ -64,7 +65,7 @@ class PipelineTask < ApplicationRecord
 
   # Used by the manual Execute button, scheduled cron ticks, and branch-watch
   # polling. All three create a Run through this single code path.
-  def enqueue_run!(reason: "manual")
+  def enqueue_run!(reason: "manual", started_by: nil)
     raise "Task is not executable" if workflow.blank?
 
     context = {
@@ -84,6 +85,7 @@ class PipelineTask < ApplicationRecord
 
     run = runs.create!(
       workflow: workflow,
+      started_by: started_by,
       input: {
         "task_id" => id,
         "task_title" => title,

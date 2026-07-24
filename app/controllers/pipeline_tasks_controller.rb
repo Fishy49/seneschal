@@ -32,6 +32,7 @@ class PipelineTasksController < ApplicationController
 
   def create
     @task = PipelineTask.new(task_params)
+    @task.created_by = current_user
     if @task.save
       after_save_redirect("Task created.")
     else
@@ -148,7 +149,7 @@ class PipelineTasksController < ApplicationController
 
   def launch!
     @task.update!(status: "ready") if @task.status == "draft"
-    @task.enqueue_run!(reason: "manual")
+    @task.enqueue_run!(reason: "manual", started_by: current_user)
   end
 
   def execution_blocked_reason

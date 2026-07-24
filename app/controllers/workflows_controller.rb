@@ -15,6 +15,7 @@ class WorkflowsController < ApplicationController
 
   def create
     @workflow = @project.workflows.build(workflow_params)
+    @workflow.created_by = current_user
     if @workflow.save
       redirect_to project_workflow_path(@project, @workflow), notice: "Workflow created."
     else
@@ -36,7 +37,7 @@ class WorkflowsController < ApplicationController
   end
 
   def trigger
-    run = @workflow.runs.create!(input: trigger_input_params)
+    run = @workflow.runs.create!(input: trigger_input_params, started_by: current_user)
     ExecuteRunJob.perform_later(run)
     redirect_to run_path(run), notice: "Run started."
   end

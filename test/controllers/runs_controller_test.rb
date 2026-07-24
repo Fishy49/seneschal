@@ -33,6 +33,14 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action*=?]", "/execute", false
   end
 
+  test "POST stop records who stopped the run" do
+    run = runs(:active_run)
+    post stop_run_path(run)
+    run.reload
+    assert_equal users(:admin), run.stopped_by
+    assert_equal "Stopped by #{users(:admin).email}", run.error_message
+  end
+
   test "POST stop marks run as stopped" do
     run = runs(:active_run)
     post stop_run_path(run)

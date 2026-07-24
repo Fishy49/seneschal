@@ -69,7 +69,7 @@
             <% end %>
           </td>
         </tr>
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></td></tr>
+        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %><% if @task.created_by %> <span class="text-content-muted">by <%= @task.created_by.email %></span><% end %></td></tr>
         <% if (stats = @task.usage_stats) && stats[:cost_usd] > 0 %>
           <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Cost</th><td class="px-3 py-2 border-b border-edge text-sm font-medium"><%= format_cost(stats[:cost_usd]) %></td></tr>
           <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>

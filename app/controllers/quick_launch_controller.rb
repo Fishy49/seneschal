@@ -24,7 +24,8 @@ class QuickLaunchController < ApplicationController
       kind: "feature",
       status: "ready",
       project_id: params[:project_id].presence,
-      workflow_id: params[:workflow_id].presence
+      workflow_id: params[:workflow_id].presence,
+      created_by: current_user
     )
 
     unless task.save
@@ -32,7 +33,7 @@ class QuickLaunchController < ApplicationController
       return
     end
 
-    run = task.enqueue_run!(reason: "manual")
+    run = task.enqueue_run!(reason: "manual", started_by: current_user)
     render json: { redirect: run_path(run) }
   end
 

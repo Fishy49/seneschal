@@ -1,6 +1,8 @@
 class Run < ApplicationRecord
   belongs_to :workflow
   belongs_to :pipeline_task, optional: true
+  belongs_to :started_by, class_name: "User", optional: true
+  belongs_to :stopped_by, class_name: "User", optional: true
   has_many :run_steps, dependent: :destroy
   has_many :ad_hoc_steps, -> { order(:position) }, class_name: "Step", dependent: :destroy
   has_one :project, through: :workflow
@@ -27,6 +29,12 @@ class Run < ApplicationRecord
 
   def awaiting_run_step
     run_steps.find_by(status: "awaiting_approval")
+  end
+
+  # Human-readable attribution. Runs from before attribution existed, and runs
+  # fired by cron or a branch watcher, fall back to the trigger reason.
+  def started_by_label
+    started_by&.email || input["trigger_reason"].presence || "system"
   end
 
   def duration

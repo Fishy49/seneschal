@@ -4,6 +4,28 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 2.1 The attribution spine
+
+Until now no domain table referenced a user, so nothing recorded who did what.
+Migration `20260724160000_add_attribution_columns` adds four nullable foreign
+keys, all `on_delete: :nullify` so removing a user never takes history with it:
+
+- `pipeline_tasks.created_by_id`
+- `workflows.created_by_id`
+- `runs.started_by_id`, `runs.stopped_by_id`
+
+`PipelineTask#enqueue_run!` takes a `started_by:` keyword (default nil), so the
+cron and branch-watch callers keep behaving exactly as before while the manual
+paths pass `current_user`. Attribution is now written on task create, workflow
+create, task execute, quick launch, workflow trigger, retry-from-here, and
+stop; `runs#stop` records the actor and its `error_message` names them instead
+of saying "Stopped by user".
+
+`Run#started_by_label` renders the launching user's email, falling back to the
+run's trigger reason ("cron", "branch_update") and then to "system" for
+historical rows. The run header shows it under the title; the task page shows
+"Created ... by <email>" when known.
+
 ### 1.9 Housekeeping
 
 Two landmines removed.

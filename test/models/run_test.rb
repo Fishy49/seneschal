@@ -1,6 +1,34 @@
 require "test_helper"
 
 class RunTest < ActiveSupport::TestCase
+  test "started_by_label prefers the launching user" do
+    run = runs(:completed_run)
+    run.update!(started_by: users(:admin))
+    assert_equal users(:admin).email, run.started_by_label
+  end
+
+  test "started_by_label falls back to the trigger reason" do
+    run = runs(:completed_run)
+    run.update!(started_by: nil, input: { "trigger_reason" => "cron" })
+    assert_equal "cron", run.started_by_label
+  end
+
+  test "started_by_label falls back to system" do
+    run = runs(:completed_run)
+    run.update!(started_by: nil, input: {})
+    assert_equal "system", run.started_by_label
+  end
+
+  test "deleting a user nullifies attribution instead of deleting the run" do
+    user = User.create!(email: "temp-attribution@test.com", password: "password12")
+    run = runs(:completed_run)
+    run.update!(started_by: user)
+
+    user.destroy!
+    assert Run.exists?(run.id)
+    assert_nil run.reload.started_by_id
+  end
+
   test "valid run" do
     r = Run.new(workflow: workflows(:deploy), status: "pending")
     assert r.valid?
