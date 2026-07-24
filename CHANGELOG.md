@@ -4,6 +4,22 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.5 The Launch Bar
+
+Cmd/Ctrl+K from any page opens an overlay: describe the work, confirm project
+and workflow, Enter, and a run is streaming. No form, no draft, no navigation.
+
+- New `QuickLaunchController`. `GET /quick_launch/options` returns projects
+  with their workflows as JSON; `POST /quick_launch` builds a `PipelineTask`
+  (first line as the title truncated to 80 chars, whole description as the
+  body) and enqueues its run, answering with `{ redirect: "/runs/N" }` or a
+  422 carrying the validation messages.
+- New `command_palette_controller.js` owns the shortcut. It only claims Escape
+  while the overlay is open so other modals keep their handlers, and it
+  remembers the last-used project and workflow in `localStorage`
+  (`seneschal.launch.project` / `seneschal.launch.workflow`).
+- Rendered once from the layout for signed-in users, with a sidebar hint.
+
 ### 1.4 Dashboard mission control
 
 The landing page now answers "what needs me?" and "what can I start?" before

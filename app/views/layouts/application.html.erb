@@ -115,6 +115,9 @@
         <div class="flex-1"></div>
         <% if current_user %>
           <div class="border-t border-edge pt-3 mt-2 space-y-1">
+            <div class="px-3 py-1 text-xs text-content-muted">
+              Launch: <kbd class="px-1 py-0.5 rounded bg-surface-input border border-edge font-mono text-[0.6875rem]">&#8984;K</kbd>
+            </div>
             <%= link_to current_user.email, account_path,
                   class: "block px-3 py-1 text-xs text-content-muted truncate hover:text-content transition-colors" %>
             <% if current_user.otp_required_for_login? %>
@@ -151,5 +154,8 @@
         </div>
       </main>
     </div>
+    <% if current_user %>
+      <%= render "shared/command_palette" %>
+    <% end %>
   </body>
 </html>
