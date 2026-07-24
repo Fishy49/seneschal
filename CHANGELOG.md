@@ -4,6 +4,21 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.2 Slack notifications
+
+New `slack_webhook_url` setting. When present, `NotifyJob` also posts a Block
+Kit message for the same four events: a header naming the event and task, a
+section with project and run status, a context line with workflow and who
+started it, and a button linking back to the run ("Review & approve" for an
+approval gate, "View run" otherwise). The button block is omitted entirely
+when no `app_base_url` is configured.
+
+The two destinations are delivered independently with separate rescues, so a
+broken generic webhook cannot cost the Slack message or vice versa.
+
+Link buttons only. True interactive approve/reject in Slack needs a Slack app
+and a signed callback endpoint, which is out of scope.
+
 ### 3.1 Outbound webhooks
 
 Seneschal can now tell something outside itself that a run needs attention.

@@ -98,9 +98,68 @@ class NotifyJobTest < ActiveJob::TestCase
     assert_empty http.requests
   end
 
-  test "configured? follows the webhook setting" do
+  test "configured? follows either webhook setting" do
     assert NotifyJob.configured?
+
     Setting["webhook_url"] = ""
     assert_not NotifyJob.configured?
+
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    assert NotifyJob.configured?
+  end
+
+  # --- Slack (3.2) ---
+
+  test "posts a Block Kit message when a Slack webhook is configured" do
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    http = capture_post { NotifyJob.perform_now("run.awaiting_approval", @run.id) }
+
+    assert_equal 2, http.requests.size, "generic webhook and Slack should both fire"
+    slack = JSON.parse(http.requests.last.body)
+
+    assert_match(/Needs approval/, slack["text"])
+    types = slack["blocks"].pluck("type")
+    assert_equal ["header", "section", "context", "actions"], types
+    assert_match(/Needs approval/, slack["blocks"].first["text"]["text"])
+    assert_match(/Deploy Pipeline/, slack["blocks"][2]["elements"].first["text"])
+
+    button = slack["blocks"].last["elements"].first
+    assert_equal "Review & approve", button["text"]["text"]
+    assert_equal "https://seneschal.internal/runs/#{@run.id}", button["url"]
+  end
+
+  test "non-approval events get a plain View run button" do
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    http = capture_post { NotifyJob.perform_now("run.failed", @run.id) }
+
+    button = JSON.parse(http.requests.last.body)["blocks"].last["elements"].first
+    assert_equal "View run", button["text"]["text"]
+  end
+
+  test "Slack message omits the button when there is no base url" do
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    Setting["app_base_url"] = ""
+    http = capture_post { NotifyJob.perform_now("run.completed", @run.id) }
+
+    types = JSON.parse(http.requests.last.body)["blocks"].pluck("type")
+    assert_not_includes types, "actions"
+  end
+
+  test "Slack posts even when the generic webhook is not configured" do
+    Setting["webhook_url"] = ""
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    http = capture_post { NotifyJob.perform_now("run.completed", @run.id) }
+
+    assert_equal 1, http.requests.size
+    assert JSON.parse(http.requests.first.body).key?("blocks")
+  end
+
+  test "a broken generic webhook does not cost the Slack message" do
+    Setting["webhook_url"] = "not a url at all"
+    Setting["slack_webhook_url"] = "https://hooks.slack.com/services/x"
+    http = capture_post { NotifyJob.perform_now("run.completed", @run.id) }
+
+    assert_equal 1, http.requests.size
+    assert JSON.parse(http.requests.first.body).key?("blocks")
   end
 end

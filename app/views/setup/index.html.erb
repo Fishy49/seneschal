@@ -144,6 +144,13 @@
                  class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
         </div>
         <div>
+          <label for="slack_webhook_url" class="block text-sm font-medium text-content-muted mb-1.5">Slack Incoming Webhook</label>
+          <input type="url" name="slack_webhook_url" id="slack_webhook_url" value="<%= @slack_webhook_url %>"
+                 placeholder="https://hooks.slack.com/services/..."
+                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
+          <p class="text-sm text-content-muted mt-2">Optional. The same events also post as Block Kit messages with a button linking back to the run.</p>
+        </div>
+        <div>
           <label for="app_base_url" class="block text-sm font-medium text-content-muted mb-1.5">App Base URL</label>
           <input type="url" name="app_base_url" id="app_base_url" value="<%= @app_base_url %>"
                  placeholder="https://seneschal.internal"

@@ -2,8 +2,8 @@ require "net/http"
 
 # Fire-and-forget outbound notification for the run lifecycle events a human
 # would want to know about. Nothing here may ever affect a run: every failure
-# is swallowed and logged, and the job is only enqueued when a destination is
-# actually configured.
+# is swallowed and logged, each destination is delivered independently, and
+# the job is only enqueued when a destination is actually configured.
 class NotifyJob < ApplicationJob
   queue_as :default
 
@@ -14,24 +14,38 @@ class NotifyJob < ApplicationJob
     "run.waiting_for_tokens"
   ].freeze
 
+  EVENT_LABELS = {
+    "run.awaiting_approval" => "Needs approval",
+    "run.failed" => "Run failed",
+    "run.completed" => "Run completed",
+    "run.waiting_for_tokens" => "Waiting for tokens"
+  }.freeze
+
   OPEN_TIMEOUT = 5
   READ_TIMEOUT = 5
 
   # True when anything at all is listening, so callers can skip enqueueing.
   def self.configured?
-    Setting["webhook_url"].present?
+    Setting["webhook_url"].present? || Setting["slack_webhook_url"].present?
   end
 
   def perform(event, run_id)
     run = Run.includes(:pipeline_task, workflow: :project).find_by(id: run_id)
     return unless run
 
-    deliver(Setting["webhook_url"], payload_for(event, run))
-  rescue StandardError => e
-    Rails.logger.error("NotifyJob(#{event}) failed for run #{run_id}: #{e.class}: #{e.message}")
+    # Independent rescues: a broken generic webhook must not cost the Slack
+    # message, or the other way round.
+    safely(event, run_id) { deliver(Setting["webhook_url"], payload_for(event, run)) }
+    safely(event, run_id) { deliver(Setting["slack_webhook_url"], slack_payload_for(event, run)) }
   end
 
   private
+
+  def safely(event, run_id)
+    yield
+  rescue StandardError => e
+    Rails.logger.error("NotifyJob(#{event}) failed for run #{run_id}: #{e.class}: #{e.message}")
+  end
 
   def payload_for(event, run)
     {
@@ -47,6 +61,30 @@ class NotifyJob < ApplicationJob
       },
       timestamp: Time.current.iso8601
     }
+  end
+
+  # Slack Block Kit. Link buttons only: a true interactive approve/reject needs
+  # a Slack app plus a signed callback endpoint, which is out of scope here.
+  def slack_payload_for(event, run)
+    label = EVENT_LABELS.fetch(event, event)
+    title = run.pipeline_task&.title || "Manual run"
+    url = run_url(run)
+
+    blocks = [
+      { type: "header", text: { type: "plain_text", text: "#{label}: #{title}".truncate(150) } },
+      { type: "section",
+        text: { type: "mrkdwn", text: "*Project:* #{run.workflow.project.name}\n*Run:* ##{run.id} (#{run.status})" } },
+      { type: "context",
+        elements: [{ type: "mrkdwn", text: "Workflow: #{run.workflow.name} - started by #{run.started_by_label}" }] }
+    ]
+
+    if url
+      button_text = event == "run.awaiting_approval" ? "Review & approve" : "View run"
+      blocks << { type: "actions",
+                  elements: [{ type: "button", text: { type: "plain_text", text: button_text }, url: url }] }
+    end
+
+    { text: "#{label}: #{title}", blocks: blocks }
   end
 
   # Absolute run URL, or nil when the operator has not told us what host the

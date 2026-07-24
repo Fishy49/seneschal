@@ -9,6 +9,7 @@ class SetupController < ApplicationController
     @sdk_runner = integration_status("sdk_runner")
     @allowed_tools = Setting["default_allowed_tools"].presence || StepExecutor::DEFAULT_ALLOWED_TOOLS
     @webhook_url = Setting["webhook_url"].to_s
+    @slack_webhook_url = Setting["slack_webhook_url"].to_s
     @app_base_url = Setting["app_base_url"].to_s
     # SDK runner stays optional — skills can still execute via the CLI runner,
     # which is the default. Only the two core CLIs gate the rest of the app.
@@ -22,6 +23,7 @@ class SetupController < ApplicationController
 
   def update_notifications
     Setting["webhook_url"] = params[:webhook_url].to_s.strip
+    Setting["slack_webhook_url"] = params[:slack_webhook_url].to_s.strip
     Setting["app_base_url"] = params[:app_base_url].to_s.strip
     redirect_to setup_path, notice: "Notification settings updated."
   end
