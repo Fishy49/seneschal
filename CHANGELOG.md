@@ -4,6 +4,15 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.5 follow-up: launch bar fixes found in the browser
+
+A headless-Chrome test of the launch bar (`test/system/launch_bar_test.rb`)
+turned up a real defect: the launch POST read
+`document.querySelector('meta[name="csrf-token"]').content` unguarded, so on
+any install where forgery protection is off Rails emits no meta tag and the
+palette died with "Cannot read properties of null". The header is now sent
+only when a token exists.
+
 ### 1.8 No CDN dependency
 
 The layout pulled highlight.js and its two themes from cdnjs on every page

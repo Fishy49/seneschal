@@ -116,14 +116,16 @@ export default class extends Controller {
     this.submitTarget.disabled = true
     this.submitTarget.textContent = "Launching..."
 
+    // Forgery protection is off in some environments, and then Rails emits no
+    // csrf-token meta tag at all. Send the header only when there is one.
+    const headers = { "Content-Type": "application/json", Accept: "application/json" }
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+    if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+
     try {
       const response = await fetch(this.launchUrlValue, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-        },
+        headers: headers,
         body: JSON.stringify({
           description: description,
           project_id: this.projectTarget.value,
