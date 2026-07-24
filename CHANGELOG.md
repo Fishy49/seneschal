@@ -4,6 +4,37 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.3 Presence on run pages
+
+Run pages now show who else is looking at them.
+
+- `ApplicationCable::Connection` is no longer empty: it is `identified_by
+  :current_user`, resolved from the same encrypted session cookie the HTTP side
+  reads, and rejects unauthenticated connections.
+- New `RunPresence` service keeps a per-run viewer roster in the Rails cache
+  (SolidCache in production), so it survives more than one web worker. Viewers
+  are reference-counted, so closing one of two tabs does not evict the person.
+- New `PresenceChannel` joins on subscribe, leaves on unsubscribe, and
+  broadcasts the roster on its own `presence:run:<id>` stream. Deliberately not
+  the run's Turbo stream, which carries HTML fragments.
+- New `presence_controller.js` renders initials chips with email tooltips. Any
+  failure is swallowed: presence is decoration and must never take down the run
+  page or its existing Turbo stream. `@rails/actioncable` is pinned in the
+  importmap (served by the actioncable gem, nothing vendored).
+
+Two environment notes:
+
+- Development uses the async cable adapter, which is in-process only, so
+  presence across two separately-started servers will not work in dev.
+- The test environment uses the `test` cable adapter, which collects broadcasts
+  for `assert_broadcast_on` but never delivers them to a real websocket client.
+  The roster therefore cannot be asserted in a browser test; `RunPresence` and
+  `PresenceChannel` carry that coverage, and the system test only proves the
+  strip mounts.
+- `config.cache_store` in the test environment moved from `:null_store` to
+  `:memory_store`, since a null store makes cache-backed behavior untestable.
+  Nothing else in the app used `Rails.cache`.
+
 ### 3.2 Slack notifications
 
 New `slack_webhook_url` setting. When present, `NotifyJob` also posts a Block

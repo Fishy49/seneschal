@@ -122,6 +122,10 @@ export default class extends Controller {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken
 
+    // Once the redirect is assigned the document starts tearing down; touching
+    // the button after that races the navigation.
+    let navigating = false
+
     try {
       const response = await fetch(this.launchUrlValue, {
         method: "POST",
@@ -141,12 +145,15 @@ export default class extends Controller {
 
       localStorage.setItem(PROJECT_KEY, this.projectTarget.value)
       localStorage.setItem(WORKFLOW_KEY, this.workflowTarget.value)
+      navigating = true
       window.location = data.redirect
     } catch (error) {
       this.showError(error.message)
     } finally {
-      this.submitTarget.disabled = false
-      this.submitTarget.textContent = "Launch"
+      if (!navigating) {
+        this.submitTarget.disabled = false
+        this.submitTarget.textContent = "Launch"
+      }
     }
   }
 

@@ -17,6 +17,17 @@ class RunsTest < ApplicationSystemTestCase
     assert_text "Plan Feature"
   end
 
+  # The presence roster itself cannot be asserted here: config/cable.yml uses
+  # the `test` adapter, which collects broadcasts for assert_broadcast_on but
+  # never delivers them to a real websocket client. RunPresence and
+  # PresenceChannel carry the behavioral coverage; this only proves the strip
+  # renders and its controller loads without error.
+  test "the run page mounts the presence strip" do
+    visit run_path(runs(:completed_run))
+    assert_selector "[data-controller='presence']", visible: :all
+    assert_selector "[data-presence-target='roster']", visible: :all
+  end
+
   test "view run with usage stats" do
     visit run_path(runs(:completed_run))
     assert_text "$0.05"

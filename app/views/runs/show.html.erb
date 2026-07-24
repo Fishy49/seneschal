@@ -5,6 +5,12 @@
      task: @run.pipeline_task,
      run: @run %>
 
+<div class="flex items-center gap-2 mb-2" hidden
+     data-controller="presence" data-presence-run-id-value="<%= @run.id %>">
+  <span class="text-xs text-content-muted">Also viewing</span>
+  <div class="flex items-center gap-1" data-presence-target="roster"></div>
+</div>
+
 <%= render "run_header", run: @run %>
 
 <div class="grid grid-cols-[2fr_1fr] gap-4">
