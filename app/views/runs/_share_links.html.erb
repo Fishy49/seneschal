@@ -1,0 +1,33 @@
+<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-lg font-semibold mb-0">Share</h2>
+    <%= button_to "Create link", share_links_path(run_id: run.id),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  </div>
+
+  <% links = run.share_links.recent %>
+  <% if links.any? %>
+    <ul class="list-none">
+      <% links.each do |link| %>
+        <li class="flex items-center justify-between gap-2 py-2 border-b border-edge last:border-b-0">
+          <div class="min-w-0">
+            <div class="text-xs font-mono truncate"><%= shared_run_url(link.token) %></div>
+            <div class="text-xs text-content-muted">
+              <% if link.expired? %>
+                expired <%= time_ago_short(link.expires_at) %>
+              <% else %>
+                expires <%= link.expires_at.strftime("%Y-%m-%d") %>
+              <% end %>
+              <% if link.created_by %>&middot; by <%= link.created_by.email %><% end %>
+            </div>
+          </div>
+          <%= button_to "Revoke", share_link_path(link), method: :delete,
+                class: "shrink-0 text-xs text-content-muted bg-transparent border border-edge rounded px-2 py-0.5 cursor-pointer hover:text-danger",
+                data: { turbo_confirm: "Revoke this share link?" } %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="text-sm text-content-muted">No share links. A link gives read-only access to a redacted summary: task, project, workflow, step names and statuses, timings and total cost. No logs, no output, no paths.</p>
+  <% end %>
+</div>

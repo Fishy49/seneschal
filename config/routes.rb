@@ -107,6 +107,11 @@ Rails.application.routes.draw do
     end
   end
 
+  # Public, unauthenticated, redacted run summary
+  get "shared/:token", to: "shared_runs#show", as: :shared_run
+
+  resources :share_links, only: [:create, :destroy]
+
   get "activity", to: "activity#index", as: :activity
 
   resources :comments, only: [:create, :destroy]

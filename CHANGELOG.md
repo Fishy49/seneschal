@@ -4,6 +4,28 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.7 Read-only share links
+
+A run can be shown to someone outside Seneschal without giving them an
+account or leaking anything.
+
+- New `ShareLink` (`run`, nullable `created_by`, unique `token` from
+  `SecureRandom.urlsafe_base64(32)`, `expires_at` defaulting to 30 days).
+- A Share card on the run page mints links and lists existing ones with their
+  expiry and a Revoke button.
+- `GET /shared/:token` skips authentication and the setup gate. Unknown or
+  revoked tokens render a 404 page; expired tokens render a friendly 410
+  "link expired" page rather than a crash.
+- The public view is purpose-built and reuses no `runs/` partial. It shows
+  ONLY: task title, project name, workflow name, run status, per-step names,
+  statuses and durations, total cost, and started / finished times. Tests
+  assert the absence of stream-log markers, step output, branch names from
+  output, error messages, repo and worktree paths, environment variables, and
+  comments.
+- `to_param` is deliberately left as the record id so an incidental
+  `url_for(link)` cannot mint a shareable URL; the public path is always
+  built explicitly from the token.
+
 ### 3.5 Activity feed
 
 A chronological, attributed record of what happened across the system.

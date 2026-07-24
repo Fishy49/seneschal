@@ -28,6 +28,7 @@
 
   <div class="min-w-0">
     <%= render "run_info", run: @run %>
+    <%= render "share_links", run: @run %>
     <%= render "run_context", run: @run %>
 
     <% if @run.input.present? && @run.input.any? %>
