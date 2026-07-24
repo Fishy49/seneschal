@@ -106,8 +106,7 @@
       <div class="mt-2">
         <%= button_to "Retry from here",
               retry_from_run_path(run, step_id: run_step.step_id),
-              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
-              data: { turbo_confirm: "Create a new run retrying from '#{run_step.step.name}'?" } %>
+              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
       </div>
     <% end %>
   </div>

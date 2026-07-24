@@ -24,8 +24,7 @@
       <% end %>
       <% if run.status.in?(%w[failed stopped]) && run.run_steps.exists?(status: "failed") %>
         <%= button_to "Resume", resume_run_path(run),
-              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
-              data: { turbo_confirm: "Resume this run from the failed step?" } %>
+              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
       <% end %>
     </div>
   </div>

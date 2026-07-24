@@ -4,6 +4,18 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.7 Confirm dialogs are for destruction only
+
+Dropped `turbo_confirm` from Execute, Archive, Clone Repository, Refetch,
+Approve, Resume, and Retry-from-here. Kept it on every destroy, on Stop
+(which kills an in-flight run), on Disable 2FA, on the data import that wipes
+the database, and on replacing a skill's default schema.
+
+Note: Refetch resets the primary clone to `origin/HEAD`, so it can discard
+uncommitted work in `project.local_path`. Since runs execute in per-run
+worktrees the primary clone is effectively a cache, which is why this one lost
+its confirm along with the rest.
+
 ### 1.6 Task form cascade and integrity validation
 
 The task form referenced a `task-form` Stimulus controller that did not exist,
