@@ -4,7 +4,18 @@
     tool_use cards expand to show input/output, thinking + text bubbles
     drop into <details> for long content, result/system/error events
     are one-liners. %>
-<li class="px-4 py-3" data-replay-filter-target="entry" data-kind="<%= entry[:kind] %>">
+<%# anchor_id is absent when this partial renders inside the Compare view,
+    where entries are not individually addressable. %>
+<% anchor_id = local_assigns[:anchor_id] %>
+<li class="px-4 py-3 relative group" data-replay-filter-target="entry" data-kind="<%= entry[:kind] %>" id="<%= anchor_id %>">
+  <% if anchor_id %>
+    <button type="button"
+            data-controller="permalink"
+            data-permalink-anchor-value="<%= anchor_id %>"
+            data-action="permalink#copy"
+            title="Copy a link to this entry"
+            class="absolute top-2 right-2 hidden group-hover:block text-[0.625rem] text-content-muted bg-surface-card border border-edge rounded px-1 py-0.5 cursor-pointer hover:text-content">Link</button>
+  <% end %>
   <% case entry[:kind] %>
   <% when :tool_use %>
     <details class="text-sm">

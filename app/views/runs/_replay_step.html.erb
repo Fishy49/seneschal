@@ -5,7 +5,7 @@
 <% step_label = run_step.step&.name || "(removed step)" %>
 <% step_stats = run_step.usage_stats || {} %>
 <% trajectory = stream_log_trajectory(run_step.stream_log) %>
-<div class="bg-surface-card border border-edge rounded-lg overflow-hidden">
+<div class="bg-surface-card border border-edge rounded-lg overflow-hidden" id="replay_step_<%= run_step.id %>">
   <div class="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface-muted/30">
     <div class="flex items-center gap-3">
       <span class="text-xs font-mono text-content-muted">#<%= run_step.position %></span>
@@ -14,6 +14,12 @@
       <% if run_step.attempt && run_step.attempt > 1 %>
         <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
       <% end %>
+      <button type="button"
+              data-controller="permalink"
+              data-permalink-anchor-value="replay_step_<%= run_step.id %>"
+              data-action="permalink#copy"
+              title="Copy a link to this step"
+              class="text-xs text-content-muted bg-transparent border border-edge rounded px-1.5 py-0.5 cursor-pointer hover:text-content hover:bg-surface-input transition-colors">Link</button>
     </div>
     <div class="text-xs text-content-muted">
       <% if run_step.duration %>
@@ -30,8 +36,8 @@
 
   <% if trajectory.any? %>
     <ol class="divide-y divide-edge">
-      <% trajectory.each do |entry| %>
-        <%= render "runs/trajectory_entry", entry: entry %>
+      <% trajectory.each_with_index do |entry, index| %>
+        <%= render "runs/trajectory_entry", entry: entry, anchor_id: "entry_#{run_step.id}_#{index}" %>
       <% end %>
     </ol>
   <% else %>

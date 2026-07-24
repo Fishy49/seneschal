@@ -211,6 +211,24 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", /Replay/
   end
 
+  test "GET replay gives every step and entry an addressable id" do
+    run = runs(:completed_run)
+    get replay_run_path(run)
+    assert_response :success
+
+    run.run_steps.where(parent_run_step_id: nil).find_each do |run_step|
+      assert_select "##{"replay_step_#{run_step.id}"}"
+    end
+    assert_select "li[id^=?]", "entry_"
+  end
+
+  test "GET replay offers copy-link buttons anchored to those ids" do
+    run_step = runs(:completed_run).run_steps.first
+    get replay_run_path(runs(:completed_run))
+    assert_response :success
+    assert_select "button[data-permalink-anchor-value=?]", "replay_step_#{run_step.id}"
+  end
+
   test "GET replay surfaces stream_log entries from each RunStep" do
     get replay_run_path(runs(:completed_run))
     assert_response :success

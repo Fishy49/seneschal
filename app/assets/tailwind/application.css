@@ -44,6 +44,15 @@
   a:hover {
     color: var(--accent-hover);
   }
+
+  /* Deep links from the Replay view land on a step or a trajectory entry;
+     the outline makes it obvious which one the URL pointed at. */
+  :target {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+    scroll-margin-top: 1.5rem;
+  }
 }
 
 @theme inline {

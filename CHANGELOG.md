@@ -4,6 +4,22 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 2.4 Replay permalinks
+
+Anything in a Replay is now addressable, so a run can be discussed by URL.
+
+- Every step card carries `id="replay_step_<id>"`; every trajectory entry
+  carries `id="entry_<run_step_id>_<index>"`. Entries rendered inside the
+  Compare view stay unanchored (they are not individually addressable there).
+- A "Link" button on each step header, and on each entry on hover, copies the
+  full URL to that element. New `permalink_controller.js` builds it from the
+  live location so the current query string rides along.
+- `replay_filter_controller.js` round-trips chip state through a `show` query
+  param via `history.replaceState`. The default set produces no param at all,
+  so ordinary URLs stay clean, and the defaults are read off the rendered
+  checkboxes rather than duplicated in JS.
+- A `:target` outline marks whichever element the URL pointed at.
+
 ### 2.3 The needs-you badge
 
 `awaiting_approval_count` helper plus a warning-coloured count next to the Runs

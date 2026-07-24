@@ -42,6 +42,28 @@ class RunsTest < ApplicationSystemTestCase
     assert_no_text "claude-sonnet-4-20250514"
   end
 
+  test "filter chip state round-trips through the URL" do
+    visit replay_run_path(runs(:completed_run))
+    assert_no_match(/show=/, current_url)
+
+    check_chip("System")
+    assert_match(/show=[^&]*system/, current_url)
+
+    # A fresh load of the copied URL restores the same chips.
+    visit current_url
+    assert_text "claude-sonnet-4-20250514"
+
+    uncheck_chip("System")
+    assert_no_match(/show=/, current_url)
+  end
+
+  test "a step permalink lands on the highlighted step" do
+    run_step = runs(:completed_run).run_steps.first
+    visit "#{replay_run_path(runs(:completed_run))}#replay_step_#{run_step.id}"
+
+    assert_selector "#replay_step_#{run_step.id}:target"
+  end
+
   test "compare view picks a default target and renders side-by-side" do
     # Seed a second run on the same task so the compare picker has a target.
     other = Run.create!(workflow: workflows(:deploy),
