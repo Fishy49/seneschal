@@ -4,6 +4,7 @@ class Run < ApplicationRecord
   belongs_to :started_by, class_name: "User", optional: true
   belongs_to :stopped_by, class_name: "User", optional: true
   has_many :run_steps, dependent: :destroy
+  has_many :comments, as: :commentable, dependent: :destroy
   has_many :ad_hoc_steps, -> { order(:position) }, class_name: "Step", dependent: :destroy
   has_one :project, through: :workflow
 

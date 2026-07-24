@@ -107,6 +107,8 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :comments, only: [:create, :destroy]
+
   resources :preview_assets, only: [:show]
 
   resources :runs, only: [:index, :show] do

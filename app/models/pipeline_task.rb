@@ -3,6 +3,7 @@ class PipelineTask < ApplicationRecord
   belongs_to :workflow, optional: true
   belongs_to :created_by, class_name: "User", optional: true
   has_many :runs, dependent: :nullify
+  has_many :comments, as: :commentable, dependent: :destroy
 
   KINDS = ["feature", "bugfix", "chore"].freeze
   STATUSES = ["draft", "ready", "running", "completed", "failed"].freeze

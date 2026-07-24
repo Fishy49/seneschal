@@ -4,6 +4,35 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.4 Comments with mentions
+
+Humans can now talk about a run, a step, or a task, in the app rather than
+around it.
+
+- New polymorphic `Comment` (`commentable`, `user`, `body`, optional `anchor`
+  pointing at a Replay DOM id from 2.4). `commentable_type` is validated
+  against an allowlist and the controller refuses anything outside it, so a
+  crafted request cannot reach an arbitrary model through the polymorphic
+  association.
+- `CommentsController` handles create and destroy only; destroy is restricted
+  to the author or an admin.
+- Threads render on the run page, inside each step's collapsible
+  "discussion", and on the task page. A step thread stamps the comment with
+  that step's replay anchor automatically.
+- New comments broadcast an append to the run's existing Turbo stream, so
+  everyone watching sees them without a refresh. Broadcast failures are caught
+  and logged.
+- `@mention` matching is deliberately narrow and documented on the model: a
+  token matches a user when it equals the whole local part of their email or
+  that local part's first `.`/`_`/`-` delimited segment. So `@rick` reaches
+  `rick@` and `rick.cagle@`, but `@dan` does not reach `dana@`. Self-mentions
+  are ignored. Each match enqueues `NotifyJob` with a `comment.mentioned`
+  event carrying the author, body, and replay anchor; `NotifyJob` deep-links
+  the Slack button straight to the anchor.
+- Comment bodies are HTML-escaped and then have their mention tokens tinted.
+  There is no shared markdown renderer in this app (the markdown Stimulus
+  controller only syntax-highlights source), so comments are plain text.
+
 ### 3.3 Presence on run pages
 
 Run pages now show who else is looking at them.

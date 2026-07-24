@@ -35,6 +35,11 @@
       <div class="code-preview" data-markdown-target="output"></div>
       <template data-markdown-target="source"><%= @task.body %></template>
     </div>
+
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Discussion</h2>
+      <%= render "comments/thread", commentable: @task %>
+    </div>
   </div>
 
   <div>

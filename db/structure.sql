@@ -144,7 +144,14 @@ FOREIGN KEY ("user_id")
  ON DELETE SET NULL);
 CREATE INDEX "index_approval_events_on_run_step_id" ON "approval_events" ("run_step_id") /*application='Seneschal'*/;
 CREATE INDEX "index_approval_events_on_user_id" ON "approval_events" ("user_id") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "comments" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "commentable_type" varchar NOT NULL, "commentable_id" integer NOT NULL, "user_id" integer NOT NULL, "body" text NOT NULL, "anchor" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_03de2dc08c"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+);
+CREATE INDEX "index_comments_on_commentable" ON "comments" ("commentable_type", "commentable_id") /*application='Seneschal'*/;
+CREATE INDEX "index_comments_on_user_id" ON "comments" ("user_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260724180000'),
 ('20260724170000'),
 ('20260724160000'),
 ('20260724152000'),

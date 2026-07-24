@@ -6,6 +6,7 @@ class RunStep < ApplicationRecord
   has_many :context_query_logs, dependent: :destroy
   has_many :preview_assets, -> { ordered }, dependent: :destroy
   has_many :approval_events, dependent: :destroy
+  has_many :comments, as: :commentable, dependent: :destroy
 
   STATUSES = ["pending", "queued", "running", "awaiting_approval", "waiting_for_tokens",
               "passed", "failed", "retrying", "skipped"].freeze

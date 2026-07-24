@@ -106,6 +106,13 @@
     <% unless run_step.status == "awaiting_approval" %>
       <%= render "runs/approval_history", run_step: run_step %>
     <% end %>
+    <details class="mt-2">
+      <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">
+        discussion<% if (count = run_step.comments.size).positive? %> (<%= count %>)<% end %>
+      </summary>
+      <%= render "comments/thread", commentable: run_step, compact: true,
+            anchor: "replay_step_#{run_step.id}" %>
+    </details>
     <% if run.status.in?(%w[failed stopped]) && run_step.status == "failed" %>
       <div class="mt-2">
         <%= button_to "Retry from here",

@@ -1,0 +1,25 @@
+<%# A comment thread for any commentable. Locals:
+      commentable: the Run / RunStep / PipelineTask
+      anchor:      optional DOM id a new comment should point at
+      compact:     smaller presentation for inline (per-step) threads %>
+<% compact = local_assigns.fetch(:compact, false) %>
+<% anchor = local_assigns[:anchor] %>
+
+<div class="<%= compact ? "mt-2" : "" %>">
+  <ul class="list-none" id="<%= "comments_#{commentable.class.name.underscore}_#{commentable.id}" %>">
+    <%= render partial: "comments/comment", collection: commentable.comments.chronological.includes(:user) %>
+  </ul>
+
+  <%= form_with url: comments_path, method: :post, class: "mt-2 flex items-start gap-2" do |f| %>
+    <%= hidden_field_tag :commentable_type, commentable.class.name %>
+    <%= hidden_field_tag :commentable_id, commentable.id %>
+    <% if anchor.present? %>
+      <%= hidden_field_tag "comment[anchor]", anchor %>
+    <% end %>
+    <%= text_area_tag "comment[body]", nil, rows: compact ? 1 : 2,
+          placeholder: "Add a comment. Use @name to notify someone.",
+          class: "flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-[0.8125rem] focus:outline-none focus:border-accent resize-y" %>
+    <%= f.submit "Comment",
+          class: "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  <% end %>
+</div>

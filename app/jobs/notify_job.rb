@@ -11,14 +11,16 @@ class NotifyJob < ApplicationJob
     "run.awaiting_approval",
     "run.failed",
     "run.completed",
-    "run.waiting_for_tokens"
+    "run.waiting_for_tokens",
+    "comment.mentioned"
   ].freeze
 
   EVENT_LABELS = {
     "run.awaiting_approval" => "Needs approval",
     "run.failed" => "Run failed",
     "run.completed" => "Run completed",
-    "run.waiting_for_tokens" => "Waiting for tokens"
+    "run.waiting_for_tokens" => "Waiting for tokens",
+    "comment.mentioned" => "You were mentioned"
   }.freeze
 
   OPEN_TIMEOUT = 5
@@ -29,14 +31,18 @@ class NotifyJob < ApplicationJob
     Setting["webhook_url"].present? || Setting["slack_webhook_url"].present?
   end
 
-  def perform(event, run_id)
+  # `extra` merges into the payload, carrying event-specific detail such as the
+  # comment behind a comment.mentioned.
+  def perform(event, run_id, extra = {})
     run = Run.includes(:pipeline_task, workflow: :project).find_by(id: run_id)
     return unless run
 
+    extra = (extra || {}).deep_symbolize_keys
+
     # Independent rescues: a broken generic webhook must not cost the Slack
     # message, or the other way round.
-    safely(event, run_id) { deliver(Setting["webhook_url"], payload_for(event, run)) }
-    safely(event, run_id) { deliver(Setting["slack_webhook_url"], slack_payload_for(event, run)) }
+    safely(event, run_id) { deliver(Setting["webhook_url"], payload_for(event, run).merge(extra)) }
+    safely(event, run_id) { deliver(Setting["slack_webhook_url"], slack_payload_for(event, run, extra)) }
   end
 
   private
@@ -65,10 +71,12 @@ class NotifyJob < ApplicationJob
 
   # Slack Block Kit. Link buttons only: a true interactive approve/reject needs
   # a Slack app plus a signed callback endpoint, which is out of scope here.
-  def slack_payload_for(event, run)
+  def slack_payload_for(event, run, extra = {})
     label = EVENT_LABELS.fetch(event, event)
     title = run.pipeline_task&.title || "Manual run"
+    comment = extra[:comment]
     url = run_url(run)
+    url = "#{url}##{comment[:anchor]}" if url && comment && comment[:anchor].present?
 
     blocks = [
       { type: "header", text: { type: "plain_text", text: "#{label}: #{title}".truncate(150) } },
@@ -77,6 +85,11 @@ class NotifyJob < ApplicationJob
       { type: "context",
         elements: [{ type: "mrkdwn", text: "Workflow: #{run.workflow.name} - started by #{run.started_by_label}" }] }
     ]
+
+    if comment
+      blocks.insert(2, { type: "section",
+                         text: { type: "mrkdwn", text: "*#{comment[:author]}:* #{comment[:body].to_s.truncate(2000)}" } })
+    end
 
     if url
       button_text = event == "run.awaiting_approval" ? "Review & approve" : "View run"

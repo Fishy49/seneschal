@@ -19,6 +19,11 @@
       <h2 class="text-lg font-semibold mb-3">Steps</h2>
       <%= render "run_steps_list", run: @run %>
     </div>
+
+    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+      <h2 class="text-lg font-semibold mb-3">Discussion</h2>
+      <%= render "comments/thread", commentable: @run %>
+    </div>
   </div>
 
   <div class="min-w-0">

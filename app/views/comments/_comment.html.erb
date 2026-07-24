@@ -1,0 +1,19 @@
+<li class="py-2 border-b border-edge last:border-b-0" id="comment_<%= comment.id %>">
+  <div class="flex items-start justify-between gap-2">
+    <div class="min-w-0">
+      <div class="text-xs text-content-muted">
+        <span class="text-content font-medium"><%= comment.user.email %></span>
+        <%= comment.created_at.strftime("%Y-%m-%d %H:%M") %>
+        <% if comment.anchor.present? %>
+          &middot; <a href="#<%= comment.anchor %>" class="hover:underline">on this step</a>
+        <% end %>
+      </div>
+      <div class="text-sm mt-0.5 whitespace-pre-wrap break-words"><%= highlight_mentions(comment.body) %></div>
+    </div>
+    <% if current_user && (comment.user_id == current_user.id || current_user.admin?) %>
+      <%= button_to "Delete", comment_path(comment), method: :delete,
+            class: "shrink-0 text-xs text-content-muted bg-transparent border-none cursor-pointer hover:text-danger",
+            data: { turbo_confirm: "Delete this comment?" } %>
+    <% end %>
+  </div>
+</li>
