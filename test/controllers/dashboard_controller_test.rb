@@ -11,6 +11,19 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", /Dashboard/i
   end
 
+  test "sidebar badges the number of runs awaiting approval" do
+    get root_path
+    assert_response :success
+    assert_select "a[href=?] span[title*=?]", runs_path, "awaiting approval", text: "1"
+  end
+
+  test "sidebar has no badge when nothing is parked" do
+    Run.awaiting_approval.find_each { |r| r.update!(status: "completed") }
+    get root_path
+    assert_response :success
+    assert_select "a[href=?] span[title*=?]", runs_path, "awaiting approval", false
+  end
+
   test "loads highlight.js and its theme from local assets" do
     get root_path
     assert_response :success

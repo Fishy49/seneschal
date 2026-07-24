@@ -87,6 +87,12 @@ module ApplicationHelper
     ASSET_KIND_ICONS[kind.to_s] || "\u{1F4CE}"
   end
 
+  # Runs parked on a manual approval gate. Computed per page load; the
+  # dashboard's own polling covers the live case.
+  def awaiting_approval_count
+    Run.awaiting_approval.count
+  end
+
   def usage_stats_bar(stats)
     return nil unless stats
 

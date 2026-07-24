@@ -4,6 +4,12 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 2.3 The needs-you badge
+
+`awaiting_approval_count` helper plus a warning-coloured count next to the Runs
+link in the sidebar, shown only when something is actually parked. Computed per
+page load; the dashboard polling from 1.4 covers the live case.
+
 ### 2.2 Approval attribution and history
 
 New `ApprovalEvent` model (`run_step`, nullable `user`, `action`, optional
