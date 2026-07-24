@@ -4,6 +4,21 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.6 Task form cascade and integrity validation
+
+The task form referenced a `task-form` Stimulus controller that did not exist,
+so changing Project never filtered the Workflow select and a new task could be
+saved pointing at a workflow from a different project.
+
+- New `task_form_controller.js` caches the full workflow option list on connect
+  and rebuilds the select from the options matching the selected project,
+  clearing a selection that no longer belongs. It runs on connect too, which
+  also fixes the old view bug where `/tasks/new` listed every workflow in the
+  install.
+- Workflow options now carry `data-project-id`.
+- `PipelineTask` validates `workflow_matches_project`, so a crafted request
+  cannot attach a foreign workflow.
+
 ### 1.5 The Launch Bar
 
 Cmd/Ctrl+K from any page opens an overlay: describe the work, confirm project

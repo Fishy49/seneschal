@@ -22,6 +22,7 @@ class PipelineTask < ApplicationRecord
   validates :trigger_type, presence: true, inclusion: { in: TRIGGER_TYPES }
   validates :workflow, presence: true, if: -> { status != "draft" }
   validate :validate_trigger_config
+  validate :workflow_matches_project
 
   scope :recent, -> { order(updated_at: :desc) }
   scope :actionable, -> { where(status: ["draft", "ready"]) }
@@ -122,6 +123,12 @@ class PipelineTask < ApplicationRecord
   end
 
   private
+
+  def workflow_matches_project
+    return if workflow.blank? || workflow.project_id == project_id
+
+    errors.add(:workflow, "does not belong to the selected project")
+  end
 
   def validate_trigger_config
     case trigger_type

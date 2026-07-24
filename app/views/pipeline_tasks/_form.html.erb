@@ -21,20 +21,26 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="grid grid-cols-2 gap-4" data-controller="task-form">
     <div class="mb-4">
       <%= f.label :project_id, "Project", class: "block text-sm font-medium text-content-muted mb-1.5" %>
       <%= f.select :project_id, Project.order(:name).pluck(:name, :id),
             {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
-            data: { action: "change->task-form#projectChanged" } %>
+            data: { action: "change->task-form#projectChanged", task_form_target: "projectSelect" } %>
     </div>
 
     <div class="mb-4">
       <%= f.label :workflow_id, "Workflow", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%# Every workflow is rendered, tagged with its project id; task_form_controller
+          narrows the visible list to the selected project. %>
       <%= f.select :workflow_id,
-            (task.project ? task.project.workflows.order(:name).pluck(:name, :id) : Workflow.order(:name).pluck(:name, :id)),
+            options_for_select(
+              Workflow.order(:name).map { |w| [w.name, w.id, { "data-project-id" => w.project_id }] },
+              task.workflow_id
+            ),
             { include_blank: "Select later..." },
-            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+            data: { task_form_target: "workflowSelect" } %>
     </div>
   </div>
 

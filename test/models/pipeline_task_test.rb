@@ -77,6 +77,20 @@ class PipelineTaskTest < ActiveSupport::TestCase
     assert_not task.executable?
   end
 
+  test "accepts a workflow from its own project" do
+    t = pipeline_tasks(:ready_task)
+    t.workflow = workflows(:cron_workflow)
+    assert t.valid?
+  end
+
+  test "rejects a workflow from another project" do
+    other = projects(:other_project).workflows.create!(name: "Foreign", trigger_type: "manual")
+    t = pipeline_tasks(:ready_task)
+    t.workflow = other
+    assert_not t.valid?
+    assert_includes t.errors[:workflow], "does not belong to the selected project"
+  end
+
   test "latest_run returns most recent run" do
     task = pipeline_tasks(:running_task)
     assert_equal runs(:active_run), task.latest_run

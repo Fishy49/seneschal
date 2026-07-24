@@ -147,6 +147,27 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to run_path(Run.last)
   end
 
+  test "POST create rejects a workflow from another project" do
+    foreign = projects(:other_project).workflows.create!(name: "Foreign", trigger_type: "manual")
+    assert_no_difference "PipelineTask.count" do
+      post pipeline_tasks_path, params: {
+        pipeline_task: {
+          title: "Crafted", body: "mismatch",
+          kind: "feature", project_id: projects(:seneschal).id,
+          workflow_id: foreign.id
+        }
+      }
+    end
+    assert_response :unprocessable_content
+  end
+
+  test "GET new tags every workflow option with its project id" do
+    get new_pipeline_task_path
+    assert_response :success
+    assert_select "select[name='pipeline_task[workflow_id]'] option[data-project-id=?]",
+                  workflows(:deploy).project_id.to_s
+  end
+
   test "DELETE destroy removes task" do
     task = PipelineTask.create!(
       title: "Temp", body: "temp", kind: "chore",
