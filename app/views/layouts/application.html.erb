@@ -7,15 +7,14 @@
     <%= csp_meta_tag %>
     <%= action_cable_meta_tag %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <link rel="stylesheet" id="hljs-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <link rel="stylesheet" id="hljs-theme" href="<%= asset_path("highlight-github-dark.css") %>">
+    <script src="<%= asset_path("highlight.min.js") %>"></script>
     <script>
       (function() {
         var t = localStorage.getItem("theme") || "dark";
         document.documentElement.setAttribute("data-theme", t);
         if (t === "light") {
-          document.getElementById("hljs-theme").href =
-            "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css";
+          document.getElementById("hljs-theme").href = "<%= asset_path("highlight-github.css") %>";
         }
       })();
     </script>
@@ -133,7 +132,10 @@
                   class: "block w-full text-left px-3 py-1.5 rounded-lg text-[0.8125rem] text-content-muted hover:bg-surface-input hover:text-content transition-colors bg-transparent border-none cursor-pointer" %>
           </div>
         <% end %>
-        <button type="button" class="theme-switch flex items-center justify-center bg-transparent border-none cursor-pointer py-2" data-controller="theme-toggle" data-action="theme-toggle#toggle">
+        <button type="button" class="theme-switch flex items-center justify-center bg-transparent border-none cursor-pointer py-2"
+                data-controller="theme-toggle" data-action="theme-toggle#toggle"
+                data-theme-toggle-dark-css-value="<%= asset_path("highlight-github-dark.css") %>"
+                data-theme-toggle-light-css-value="<%= asset_path("highlight-github.css") %>">
           <span class="theme-switch-track">
             <span class="theme-switch-icon theme-switch-sun">&#9788;</span>
             <span class="theme-switch-thumb" data-theme-toggle-target="thumb"></span>

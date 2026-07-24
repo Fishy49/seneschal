@@ -1,10 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 
-const HLJS_DARK = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
-const HLJS_LIGHT = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css"
-
 export default class extends Controller {
   static targets = ["thumb"]
+  // Digest-stamped paths to the two vendored highlight.js themes, injected by
+  // the layout so this controller never has to know an asset URL.
+  static values = { darkCss: String, lightCss: String }
 
   connect() {
     this.update()
@@ -15,7 +15,12 @@ export default class extends Controller {
     const next = current === "dark" ? "light" : "dark"
     document.documentElement.setAttribute("data-theme", next)
     localStorage.setItem("theme", next)
-    document.getElementById("hljs-theme").href = next === "dark" ? HLJS_DARK : HLJS_LIGHT
+
+    const themeLink = document.getElementById("hljs-theme")
+    if (themeLink && this.hasDarkCssValue && this.hasLightCssValue) {
+      themeLink.href = next === "dark" ? this.darkCssValue : this.lightCssValue
+    }
+
     this.update()
   }
 

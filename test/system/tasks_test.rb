@@ -23,7 +23,7 @@ class TasksTest < ApplicationSystemTestCase
     page.execute_script("document.querySelector('input[name=\"pipeline_task[body]\"]').value = 'Implement this feature'")
     select "Feature", from: "Kind"
     select "Seneschal", from: "Project"
-    click_on "Create Pipeline task"
+    click_on "Save"
 
     assert_text "Brand New Task"
   end
@@ -31,9 +31,45 @@ class TasksTest < ApplicationSystemTestCase
   test "edit task" do
     visit edit_pipeline_task_path(pipeline_tasks(:draft_task))
     fill_in "Title", with: "Updated Task Title"
-    click_on "Update Pipeline task"
+    click_on "Save"
 
     assert_text "Updated Task Title"
+  end
+
+  test "highlight.js loads from local assets" do
+    visit new_pipeline_task_path
+    assert page.evaluate_script("typeof window.hljs !== 'undefined'"),
+           "highlight.js did not load from the vendored asset"
+  end
+
+  test "choosing a project narrows the workflow select" do
+    other = projects(:other_project).workflows.create!(name: "Other Project Flow", trigger_type: "manual")
+
+    visit new_pipeline_task_path
+    select "Seneschal", from: "Project"
+    assert_select_options "pipeline_task_workflow_id", includes: "Deploy Pipeline", excludes: other.name
+
+    select "OtherProject", from: "Project"
+    assert_select_options "pipeline_task_workflow_id", includes: other.name, excludes: "Deploy Pipeline"
+  end
+
+  test "save and run starts a run in one submission" do
+    visit new_pipeline_task_path
+    fill_in "Title", with: "Launch straight away"
+    page.execute_script("document.querySelector('input[name=\"pipeline_task[body]\"]').value = 'Do the thing'")
+    select "Seneschal", from: "Project"
+    select "Deploy Pipeline", from: "Workflow"
+    click_on "Save & Run"
+
+    assert_text "Run started for 'Launch straight away'"
+  end
+
+  private
+
+  def assert_select_options(select_id, includes:, excludes:)
+    options = find("##{select_id}").all("option", visible: :all).map(&:text)
+    assert_includes options, includes
+    assert_not_includes options, excludes
   end
 
   test "filter tasks by status" do

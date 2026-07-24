@@ -11,6 +11,14 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", /Dashboard/i
   end
 
+  test "loads highlight.js and its theme from local assets" do
+    get root_path
+    assert_response :success
+    assert_no_match(/cdnjs\.cloudflare\.com/, response.body)
+    assert_select "script[src*=?]", "highlight"
+    assert_select "link#hljs-theme[href*=?]", "highlight-github-dark"
+  end
+
   test "redirects to login when not authenticated" do
     delete logout_path
     get root_path

@@ -4,6 +4,26 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.8 No CDN dependency
+
+The layout pulled highlight.js and its two themes from cdnjs on every page
+load, so an air-gapped or offline install rendered an unhighlighted, partly
+broken editor. All three files are now vendored at the same version
+(11.11.1, byte-identical to the cdnjs build, BSD-3-Clause):
+
+- `vendor/javascript/highlight.min.js`
+- `app/assets/stylesheets/highlight-github-dark.css`
+- `app/assets/stylesheets/highlight-github.css`
+
+The layout emits digest-stamped `asset_path` URLs, and `theme_toggle_controller`
+takes the two theme paths as Stimulus values instead of hardcoding CDN URLs.
+Every `window.hljs` call site is now guarded, so a missing highlighter degrades
+to a plain editable field that still syncs and submits rather than throwing.
+
+Also repaired two system tests that clicked the Rails default submit labels
+("Create Pipeline task" / "Update Pipeline task"), renamed by item 1.1. System
+tests do not run under `bin/rails test`, so run `bin/rails test:system` too.
+
 ### 1.7 Confirm dialogs are for destruction only
 
 Dropped `turbo_confirm` from Execute, Archive, Clone Repository, Refetch,

@@ -205,7 +205,7 @@ export default class extends Controller {
       const pre = document.createElement("pre")
       pre.appendChild(code)
       this.previewContentTarget.replaceChildren(pre)
-      window.hljs.highlightElement(code)
+      window.hljs?.highlightElement(code)
     }
 
     if (!hasSkill) {
