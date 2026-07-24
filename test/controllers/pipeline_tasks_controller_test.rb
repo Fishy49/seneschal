@@ -110,6 +110,26 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal users(:admin).email, Run.last.started_by_label
   end
 
+  test "POST create records a task.created event" do
+    assert_difference "Event.count", 1 do
+      post pipeline_tasks_path, params: {
+        pipeline_task: {
+          title: "Feed me", body: "b", kind: "feature",
+          project_id: projects(:seneschal).id
+        }
+      }
+    end
+    event = Event.recent.first
+    assert_equal "task.created", event.action
+    assert_equal users(:admin), event.user
+  end
+
+  test "POST execute records a run.started event" do
+    post execute_pipeline_task_path(pipeline_tasks(:ready_task))
+    assert_equal "run.started", Event.recent.first.action
+    assert_equal Run.last, Event.recent.first.subject
+  end
+
   test "POST execute re-runs a completed task" do
     task = pipeline_tasks(:completed_task)
     assert_difference "Run.count", 1 do

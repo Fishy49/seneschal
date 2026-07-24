@@ -45,6 +45,7 @@ class RunsController < ApplicationController
                    stopped_by: current_user,
                    error_message: "Stopped by #{current_user.email}")
       @run.pipeline_task&.update!(status: "failed")
+      Event.record("run.stopped", subject: @run, user: current_user)
     end
     redirect_to run_path(@run), notice: "Run stopped."
   end
@@ -104,6 +105,7 @@ class RunsController < ApplicationController
     # The clear stays: ExecuteRunJob keys re-injection off rejection_context.
     # The human-readable record is the approval event created above.
     awaiting.update!(status: "passed", rejection_context: nil)
+    Event.record("run.approved", subject: @run, user: current_user, metadata: { "step" => awaiting.step&.name })
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, after_approval: true)
     redirect_to run_path(@run), notice: "Step approved. Continuing run."
@@ -118,6 +120,7 @@ class RunsController < ApplicationController
     context = params.expect(:rejection_context).to_s.strip
     awaiting.approval_events.create!(user: current_user, action: "rejected", comment: context.presence)
     awaiting.update!(rejection_context: context.presence)
+    Event.record("run.rejected", subject: @run, user: current_user, metadata: { "step" => awaiting.step&.name })
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, resume: true)
     redirect_to run_path(@run), notice: "Step rejected. Re-running with feedback."
@@ -143,6 +146,7 @@ class RunsController < ApplicationController
     )
 
     @run.pipeline_task&.update!(status: "running")
+    Event.record("run.started", subject: new_run, user: current_user)
 
     ExecuteRunJob.perform_later(new_run, step.id)
     redirect_to run_path(new_run), notice: "Retrying from step '#{step.name}'."

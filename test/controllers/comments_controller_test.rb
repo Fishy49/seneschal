@@ -74,6 +74,16 @@ class CommentsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "POST create records a comment.created event" do
+    assert_difference "Event.count", 1 do
+      post comments_path, params: {
+        commentable_type: "Run", commentable_id: @run.id,
+        comment: { body: "Noted." }
+      }, headers: { "HTTP_REFERER" => run_path(@run) }
+    end
+    assert_equal "comment.created", Event.recent.first.action
+  end
+
   test "the run page renders the discussion thread" do
     @run.comments.create!(user: users(:admin), body: "a prior remark")
     get run_path(@run)

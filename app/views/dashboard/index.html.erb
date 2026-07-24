@@ -28,6 +28,22 @@
 
       <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold mb-0">Recent activity</h2>
+          <%= link_to "View all", activity_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+        </div>
+        <div id="dashboard_activity" data-dashboard-refresh-target="region">
+          <% if @recent_events.any? %>
+            <ul class="list-none">
+              <%= render partial: "activity/event", collection: @recent_events %>
+            </ul>
+          <% else %>
+            <p class="text-center py-8 text-content-muted">Nothing has happened yet.</p>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold mb-0">Recent Runs</h2>
           <%= link_to "View all", runs_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
         </div>

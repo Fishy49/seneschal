@@ -146,6 +146,31 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to run_path(runs(:active_run))
   end
 
+  test "POST stop records a run.stopped event" do
+    post stop_run_path(runs(:active_run))
+    assert_equal "run.stopped", Event.recent.first.action
+    assert_equal users(:admin), Event.recent.first.user
+  end
+
+  test "POST approve records a run.approved event naming the step" do
+    post approve_run_path(runs(:awaiting_run))
+    event = Event.recent.first
+    assert_equal "run.approved", event.action
+    assert_equal run_steps(:awaiting_step_run_step).step.name, event.metadata["step"]
+  end
+
+  test "POST reject records a run.rejected event" do
+    post reject_run_path(runs(:awaiting_run)), params: { rejection_context: "nope" }
+    assert_equal "run.rejected", Event.recent.first.action
+  end
+
+  test "POST retry_from records a run.started event for the new run" do
+    run = runs(:failed_run)
+    post retry_from_run_path(run, step_id: steps(:skill_step).id)
+    assert_equal "run.started", Event.recent.first.action
+    assert_equal Run.last, Event.recent.first.subject
+  end
+
   test "POST approve records an approval event with actor and comment" do
     run = runs(:awaiting_run)
     rs = run_steps(:awaiting_step_run_step)

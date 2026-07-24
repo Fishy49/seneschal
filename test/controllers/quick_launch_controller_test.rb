@@ -37,6 +37,16 @@ class QuickLaunchControllerTest < ActionDispatch::IntegrationTest
     assert_equal "running", task.status
   end
 
+  test "POST create records task.created and run.started events" do
+    post quick_launch_path, params: {
+      description: "Feed this",
+      project_id: projects(:seneschal).id,
+      workflow_id: workflows(:deploy).id
+    }, as: :json
+
+    assert_equal ["run.started", "task.created"], Event.recent.limit(2).map(&:action).sort
+  end
+
   test "POST create titles from the first line and keeps the whole body" do
     post quick_launch_path, params: {
       description: "Ship the thing\n\nDetails follow here.",

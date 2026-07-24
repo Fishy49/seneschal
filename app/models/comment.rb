@@ -12,6 +12,7 @@ class Comment < ApplicationRecord
 
   after_create_commit :broadcast_to_run
   after_create_commit :notify_mentioned
+  after_create_commit :record_event
 
   # The run this comment hangs off, for deep links and broadcasts. Task
   # comments have none.
@@ -41,6 +42,10 @@ class Comment < ApplicationRecord
   end
 
   private
+
+  def record_event
+    Event.record("comment.created", subject: self, user: user)
+  end
 
   def broadcast_to_run
     target_run = run

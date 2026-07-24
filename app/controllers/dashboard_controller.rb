@@ -11,5 +11,6 @@ class DashboardController < ApplicationController
                       .recent.limit(10)
     @projects = Project.order(:name)
     @actionable_tasks = PipelineTask.actionable.includes(:project, :workflow).recent.limit(10)
+    @recent_events = Event.includes(:user, :subject).recent.limit(8)
   end
 end

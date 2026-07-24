@@ -1,0 +1,9 @@
+<li class="flex items-baseline gap-2 py-2 border-b border-edge last:border-b-0 text-sm">
+  <span class="text-content font-medium truncate max-w-[16rem]"><%= event.actor_label %></span>
+  <span class="text-content-muted"><%= event_phrase(event) %></span>
+  <span class="truncate"><%= event_subject_link(event) %></span>
+  <% if (step = event.metadata["step"]).present? %>
+    <span class="text-xs text-content-muted">(<%= step %>)</span>
+  <% end %>
+  <span class="ml-auto shrink-0 text-xs text-content-muted"><%= time_ago_short(event.created_at) %></span>
+</li>

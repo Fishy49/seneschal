@@ -64,6 +64,22 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to run_path(Run.last)
   end
 
+  test "POST create records a workflow.created event" do
+    post project_workflows_path(@project), params: { workflow: { name: "Evented", trigger_type: "manual" } }
+    assert_equal "workflow.created", Event.recent.first.action
+    assert_equal Workflow.last, Event.recent.first.subject
+  end
+
+  test "PATCH update records a workflow.updated event" do
+    patch project_workflow_path(@project, @workflow), params: { workflow: { description: "changed" } }
+    assert_equal "workflow.updated", Event.recent.first.action
+  end
+
+  test "POST trigger records a run.started event" do
+    post trigger_project_workflow_path(@project, @workflow), as: :json
+    assert_equal "run.started", Event.recent.first.action
+  end
+
   test "GET show offers a Run workflow button when the repo is ready" do
     get project_workflow_path(@project, @workflow)
     assert_response :success

@@ -34,6 +34,7 @@ class PipelineTasksController < ApplicationController
     @task = PipelineTask.new(task_params)
     @task.created_by = current_user
     if @task.save
+      Event.record("task.created", subject: @task, user: current_user)
       after_save_redirect("Task created.")
     else
       render :new, status: :unprocessable_content
@@ -149,7 +150,9 @@ class PipelineTasksController < ApplicationController
 
   def launch!
     @task.update!(status: "ready") if @task.status == "draft"
-    @task.enqueue_run!(reason: "manual", started_by: current_user)
+    run = @task.enqueue_run!(reason: "manual", started_by: current_user)
+    Event.record("run.started", subject: run, user: current_user)
+    run
   end
 
   def execution_blocked_reason

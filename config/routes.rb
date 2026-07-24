@@ -107,6 +107,8 @@ Rails.application.routes.draw do
     end
   end
 
+  get "activity", to: "activity#index", as: :activity
+
   resources :comments, only: [:create, :destroy]
 
   resources :preview_assets, only: [:show]

@@ -150,7 +150,15 @@ FOREIGN KEY ("user_id")
 );
 CREATE INDEX "index_comments_on_commentable" ON "comments" ("commentable_type", "commentable_id") /*application='Seneschal'*/;
 CREATE INDEX "index_comments_on_user_id" ON "comments" ("user_id") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "events" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer, "subject_type" varchar NOT NULL, "subject_id" integer NOT NULL, "action" varchar NOT NULL, "metadata" json DEFAULT '{}' NOT NULL, "created_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_0cb5590091"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+ ON DELETE SET NULL);
+CREATE INDEX "index_events_on_user_id" ON "events" ("user_id") /*application='Seneschal'*/;
+CREATE INDEX "index_events_on_subject" ON "events" ("subject_type", "subject_id") /*application='Seneschal'*/;
+CREATE INDEX "index_events_on_created_at" ON "events" ("created_at") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260724190000'),
 ('20260724180000'),
 ('20260724170000'),
 ('20260724160000'),

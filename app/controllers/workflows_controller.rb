@@ -17,6 +17,7 @@ class WorkflowsController < ApplicationController
     @workflow = @project.workflows.build(workflow_params)
     @workflow.created_by = current_user
     if @workflow.save
+      Event.record("workflow.created", subject: @workflow, user: current_user)
       redirect_to project_workflow_path(@project, @workflow), notice: "Workflow created."
     else
       render :new, status: :unprocessable_content
@@ -25,6 +26,7 @@ class WorkflowsController < ApplicationController
 
   def update
     if @workflow.update(workflow_params)
+      Event.record("workflow.updated", subject: @workflow, user: current_user)
       redirect_to project_workflow_path(@project, @workflow), notice: "Workflow updated."
     else
       render :edit, status: :unprocessable_content
@@ -38,6 +40,7 @@ class WorkflowsController < ApplicationController
 
   def trigger
     run = @workflow.runs.create!(input: trigger_input_params, started_by: current_user)
+    Event.record("run.started", subject: run, user: current_user)
     ExecuteRunJob.perform_later(run)
     redirect_to run_path(run), notice: "Run started."
   end

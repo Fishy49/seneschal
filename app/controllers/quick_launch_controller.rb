@@ -33,7 +33,10 @@ class QuickLaunchController < ApplicationController
       return
     end
 
+    Event.record("task.created", subject: task, user: current_user)
     run = task.enqueue_run!(reason: "manual", started_by: current_user)
+    Event.record("run.started", subject: run, user: current_user)
+
     render json: { redirect: run_path(run) }
   end
 

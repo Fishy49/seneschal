@@ -4,6 +4,35 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.5 Activity feed
+
+A chronological, attributed record of what happened across the system.
+
+- New append-only `Event` (nullable `user`, polymorphic `subject`, `action`,
+  `metadata`, `created_at` only - an event is a fact about a moment and is
+  never edited). Indexed on `created_at` and on the subject.
+- `Event.record` is fire-and-forget: an invalid action, a missing subject, or
+  any other failure is logged and swallowed, so recording history can never
+  break the action it describes. The subject association is optional, so the
+  feed survives its subject being deleted afterwards.
+- Instrumented at every site the attribution work already touched: task
+  create (form and launch bar), run start (execute, quick launch, workflow
+  trigger, retry-from-here), stop, approve, reject, workflow create and
+  update, comment create, and the terminal completed / failed transitions
+  inside `ExecuteRunJob`.
+- New `/activity` page with a sidebar link, 50 rows per page, and
+  newer/older links. A "Recent activity" card shows the latest 8 on the
+  dashboard and joins the polled refresh regions.
+- Rows tolerate a deleted subject, rendering "(deleted)" rather than blowing
+  up the page.
+
+Project filtering is deliberately absent: every subject type reaches its
+project through a different association, so a cheap filter is not available
+without denormalizing a `project_id` onto Event. Noted rather than half-built.
+
+The new view helpers live in their own `ActivityHelper` and `CommentsHelper`
+modules rather than growing `ApplicationHelper` past its length budget.
+
 ### 3.4 Comments with mentions
 
 Humans can now talk about a run, a step, or a task, in the app rather than

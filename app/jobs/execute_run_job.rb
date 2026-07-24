@@ -413,9 +413,10 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     task.update!(status: run.status == "completed" ? "completed" : "failed")
   end
 
-  # Outbound notification for a run-level transition. Only enqueues when a
-  # destination is configured, and never raises into the run.
+  # Outbound notification plus an activity-feed row for a run-level
+  # transition. Both are best-effort and never raise into the run.
   def notify(run, event)
+    Event.record(event, subject: run, user: run.started_by) if Event::ACTIONS.include?(event)
     NotifyJob.perform_later(event, run.id) if NotifyJob.configured?
   rescue StandardError => e
     Rails.logger.error("[ExecuteRunJob] could not enqueue #{event} for run ##{run.id}: #{e.message}")
