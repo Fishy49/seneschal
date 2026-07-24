@@ -1,0 +1,29 @@
+<%# Runs parked on a manual approval gate. Renders nothing when the queue is
+    empty so the dashboard does not carry a permanently empty card. %>
+<% if runs.any? %>
+  <div class="bg-warning/10 border border-warning/40 rounded-lg p-5 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold mb-0 text-warning">
+        Needs you
+        <span class="ml-1 inline-block px-2 py-0.5 rounded-full bg-warning/20 text-warning text-xs font-semibold align-middle"><%= runs.size %></span>
+      </h2>
+      <span class="text-xs text-content-muted">Waiting on a human decision</span>
+    </div>
+    <ul class="list-none">
+      <% runs.each do |run| %>
+        <li class="flex items-center justify-between gap-3 py-2 border-b border-warning/20 last:border-b-0">
+          <div class="min-w-0">
+            <div class="truncate">
+              <%= link_to "##{run.id} - #{run.pipeline_task&.title || 'Manual Run'}", run_path(run), class: "font-medium" %>
+            </div>
+            <div class="text-xs text-content-muted truncate">
+              <%= run.workflow.project.name %> &middot; <%= run.workflow.name %> &middot; parked <%= time_ago_short(run.updated_at) %>
+            </div>
+          </div>
+          <%= link_to "Review", run_path(run),
+                class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-warning text-white rounded-lg text-[0.8125rem] font-medium hover:opacity-90 transition-opacity" %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

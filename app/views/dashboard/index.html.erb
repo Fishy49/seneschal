@@ -1,53 +1,71 @@
 <h1 class="text-2xl font-semibold mb-4">Dashboard</h1>
 
-<div class="grid grid-cols-2 gap-4">
-  <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold mb-0">Active Runs</h2>
-      </div>
-      <%= render "shared/runs_list", runs: @active_runs, empty_message: "No active runs" %>
-    </div>
-
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold mb-0">Recent Runs</h2>
-        <%= link_to "View all", runs_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-      </div>
-      <%= render "shared/runs_list", runs: @recent_runs, empty_message: "No completed runs yet" %>
-    </div>
+<div data-controller="dashboard-refresh">
+  <div id="dashboard_awaiting" data-dashboard-refresh-target="region">
+    <%= render "dashboard/awaiting_runs", runs: @awaiting_runs %>
   </div>
 
-  <div>
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold mb-0">Projects</h2>
-      <%= link_to "New Project", new_project_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold mb-0">Active Runs</h2>
+        </div>
+        <div id="dashboard_active" data-dashboard-refresh-target="region">
+          <%= render "shared/runs_list", runs: @active_runs, empty_message: "No active runs" %>
+        </div>
+      </div>
+
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold mb-0">Ready to run</h2>
+          <%= link_to "All tasks", pipeline_tasks_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+        </div>
+        <div id="dashboard_actionable" data-dashboard-refresh-target="region">
+          <%= render "dashboard/actionable_tasks", tasks: @actionable_tasks %>
+        </div>
+      </div>
+
+      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold mb-0">Recent Runs</h2>
+          <%= link_to "View all", runs_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+        </div>
+        <%= render "shared/runs_list", runs: @recent_runs, empty_message: "No completed runs yet" %>
+      </div>
     </div>
-    <% if @projects.any? %>
-      <% @projects.each do |project| %>
-        <div class="bg-surface-card border border-edge rounded-lg p-4 mb-3">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold"><%= link_to project.name, project_path(project), class: "hover:text-accent transition-colors" %></h3>
-            <span class="text-xs text-content-muted"><%= project.repo_status == "ready" ? "Repo cloned" : project.repo_status.titleize %></span>
+
+    <div>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold mb-0">Projects</h2>
+        <%= link_to "New Project", new_project_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+      </div>
+      <% if @projects.any? %>
+        <% @projects.each do |project| %>
+          <div class="bg-surface-card border border-edge rounded-lg p-4 mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold"><%= link_to project.name, project_path(project), class: "hover:text-accent transition-colors" %></h3>
+              <span class="text-xs text-content-muted"><%= project.repo_status == "ready" ? "Repo cloned" : project.repo_status.titleize %></span>
+            </div>
+            <% if project.description.present? %>
+              <p class="text-sm text-content-muted mb-2"><%= project.description.truncate(100) %></p>
+            <% end %>
+            <div class="text-xs text-content-muted mb-3">
+              <%= pluralize(project.workflows.count, "workflow") %> &middot; <%= pluralize(project.pipeline_tasks.count, "task") %>
+            </div>
+            <div class="flex items-center gap-2">
+              <%= link_to "New Task", new_pipeline_task_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+              <%= link_to "Tasks", pipeline_tasks_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+              <%= link_to "Runs", runs_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            </div>
           </div>
-          <% if project.description.present? %>
-            <p class="text-sm text-content-muted mb-2"><%= project.description.truncate(100) %></p>
-          <% end %>
-          <div class="text-xs text-content-muted mb-3">
-            <%= pluralize(project.workflows.count, "workflow") %> &middot; <%= pluralize(project.pipeline_tasks.count, "task") %>
-          </div>
-          <div class="flex items-center gap-2">
-            <%= link_to "New Task", new_pipeline_task_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-            <%= link_to "Tasks", pipeline_tasks_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-            <%= link_to "Runs", runs_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-          </div>
+        <% end %>
+      <% else %>
+        <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
+          <p>No projects yet.</p>
+          <p class="mt-2"><%= link_to "Create your first project", new_project_path %></p>
         </div>
       <% end %>
-    <% else %>
-      <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-        <p>No projects yet.</p>
-        <p class="mt-2"><%= link_to "Create your first project", new_project_path %></p>
-      </div>
-    <% end %>
+    </div>
   </div>
 </div>

@@ -4,6 +4,23 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.4 Dashboard mission control
+
+The landing page now answers "what needs me?" and "what can I start?" before
+it answers "what happened recently?".
+
+- New "Needs you" section at the top listing every run parked on a manual
+  approval gate, with a count and a Review link. Renders nothing when empty.
+  Those runs are excluded from Active Runs so nothing is listed twice.
+- New "Ready to run" section finally renders `@actionable_tasks`, which the
+  controller had been querying and the view had been ignoring. Executable
+  tasks get a Run button; the rest get an Edit link.
+- `Run.awaiting_approval` scope added.
+- New `dashboard_refresh_controller.js` re-fetches the page every 5s and swaps
+  only the marked regions (`#dashboard_awaiting`, `#dashboard_active`,
+  `#dashboard_actionable`), skipping the work entirely while the tab is hidden
+  and leaving the DOM untouched when the markup is unchanged.
+
 ### 1.3 Workflow trigger has a button
 
 `workflows#trigger` existed but nothing in the UI called it. The workflow show

@@ -22,9 +22,36 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "shows actionable tasks" do
+  test "shows actionable tasks with a launch button" do
     get root_path
     assert_response :success
+    assert_select "#dashboard_actionable" do
+      assert_select "form[action=?]", execute_pipeline_task_path(pipeline_tasks(:ready_task))
+    end
+  end
+
+  test "surfaces runs awaiting approval in their own section" do
+    run = runs(:awaiting_run)
+    get root_path
+    assert_response :success
+    assert_select "#dashboard_awaiting" do
+      assert_select "a[href=?]", run_path(run)
+    end
+    assert_match(/Needs you/, response.body)
+  end
+
+  test "awaiting runs are not duplicated into active runs" do
+    run = runs(:awaiting_run)
+    get root_path
+    assert_response :success
+    assert_select "#dashboard_active a[href=?]", run_path(run), false
+  end
+
+  test "needs-you section is absent when nothing is parked" do
+    Run.awaiting_approval.find_each { |r| r.update!(status: "completed") }
+    get root_path
+    assert_response :success
+    assert_no_match(/Needs you/, response.body)
   end
 
   test "shows projects" do

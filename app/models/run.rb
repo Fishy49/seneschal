@@ -10,6 +10,7 @@ class Run < ApplicationRecord
   validates :status, presence: true, inclusion: { in: STATUSES }
 
   scope :active, -> { where(status: ["pending", "running", "awaiting_approval", "waiting_for_tokens"]) }
+  scope :awaiting_approval, -> { where(status: "awaiting_approval") }
   scope :recent, -> { order(created_at: :desc) }
 
   def active?
