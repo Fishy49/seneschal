@@ -94,6 +94,15 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "running", task.reload.status
   end
 
+  test "POST execute re-runs a completed task" do
+    task = pipeline_tasks(:completed_task)
+    assert_difference "Run.count", 1 do
+      post execute_pipeline_task_path(task)
+    end
+    assert_redirected_to run_path(Run.last)
+    assert_equal "running", task.reload.status
+  end
+
   test "POST create with run_now launches immediately" do
     assert_difference ["PipelineTask.count", "Run.count"], 1 do
       assert_enqueued_with(job: ExecuteRunJob) do

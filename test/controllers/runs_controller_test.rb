@@ -20,6 +20,19 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "GET show offers a one-click re-run on a finished run" do
+    run = runs(:completed_run)
+    get run_path(run)
+    assert_response :success
+    assert_select "form[action=?]", execute_pipeline_task_path(run.pipeline_task)
+  end
+
+  test "GET show has no re-run button on a run without a task" do
+    get run_path(runs(:todo_run))
+    assert_response :success
+    assert_select "form[action*=?]", "/execute", false
+  end
+
   test "POST stop marks run as stopped" do
     run = runs(:active_run)
     post stop_run_path(run)

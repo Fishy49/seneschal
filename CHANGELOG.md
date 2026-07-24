@@ -4,6 +4,17 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.2 Re-run affordances
+
+Finished runs are one click away from being run again.
+
+- The run header shows a "Re-run" button on completed / failed / stopped runs
+  whose task is still executable, next to Replay and Compare.
+- `shared/_runs_list` gained a right-aligned actions column with a compact
+  Re-run button under the same conditions, so every run list (dashboard,
+  runs index, project page) can relaunch without a detour.
+- Neither button confirms.
+
 ### 1.1 Save & Run
 
 Launching a task no longer requires the draft -> ready -> execute ratchet.
