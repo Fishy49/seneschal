@@ -5,6 +5,7 @@ class RunStep < ApplicationRecord
   has_many :child_run_steps, class_name: "RunStep", foreign_key: :parent_run_step_id, dependent: :destroy
   has_many :context_query_logs, dependent: :destroy
   has_many :preview_assets, -> { ordered }, dependent: :destroy
+  has_many :approval_events, dependent: :destroy
 
   STATUSES = ["pending", "queued", "running", "awaiting_approval", "waiting_for_tokens",
               "passed", "failed", "retrying", "skipped"].freeze

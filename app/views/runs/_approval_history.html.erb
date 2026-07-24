@@ -1,0 +1,15 @@
+<%# Append-only decision log for one step, newest first. %>
+<% events = run_step.approval_events.recent %>
+<% if events.any? %>
+  <ul class="list-none mt-2 space-y-1">
+    <% events.each do |event| %>
+      <li class="text-xs text-content-muted">
+        <span class="<%= event.action == "approved" ? "text-success" : "text-danger" %> font-medium"><%= event.action.capitalize %></span>
+        by <%= event.actor_label %> at <%= event.created_at.strftime("%Y-%m-%d %H:%M") %>
+        <% if event.comment.present? %>
+          <div class="mt-0.5 pl-2 border-l border-edge text-content whitespace-pre-wrap"><%= event.comment %></div>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

@@ -4,6 +4,22 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 2.2 Approval attribution and history
+
+New `ApprovalEvent` model (`run_step`, nullable `user`, `action`, optional
+`comment`, timestamps) recording every approve and reject decision. It is
+append-only: nothing overwrites an earlier decision.
+
+- Approve gained an optional note field beside the button.
+- Reject stores its feedback as the event comment as well as in
+  `RunStep#rejection_context`. That column's semantics are untouched, because
+  `ExecuteRunJob` keys prompt re-injection off it and clears it on consumption;
+  the durable human-readable record now lives in the event row.
+- Decision history renders newest-first under the approval panel for the parked
+  step, and under every other step that has events, so it survives the approval.
+- A second approver arriving at a decided run now gets "Already approved by
+  <email>." instead of a bare "Run is not awaiting approval."
+
 ### 2.1 The attribution spine
 
 Until now no domain table referenced a user, so nothing recorded who did what.

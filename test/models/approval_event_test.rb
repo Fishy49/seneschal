@@ -1,0 +1,46 @@
+require "test_helper"
+
+class ApprovalEventTest < ActiveSupport::TestCase
+  setup do
+    @run_step = run_steps(:awaiting_step_run_step)
+  end
+
+  test "requires a known action" do
+    event = ApprovalEvent.new(run_step: @run_step, action: "shrugged")
+    assert_not event.valid?
+    assert_includes event.errors[:action], "is not included in the list"
+  end
+
+  test "accepts approved and rejected" do
+    ApprovalEvent::ACTIONS.each do |action|
+      assert ApprovalEvent.new(run_step: @run_step, action: action).valid?
+    end
+  end
+
+  test "actor_label falls back to system for an unattributed event" do
+    event = ApprovalEvent.new(run_step: @run_step, action: "approved")
+    assert_equal "system", event.actor_label
+  end
+
+  test "recent orders newest first" do
+    older = @run_step.approval_events.create!(action: "rejected", created_at: 2.hours.ago)
+    newer = @run_step.approval_events.create!(action: "approved", created_at: 1.minute.ago)
+    assert_equal [newer, older], @run_step.approval_events.recent.to_a
+  end
+
+  test "deleting a user keeps the event and nullifies the actor" do
+    user = User.create!(email: "temp-approver@test.com", password: "password12")
+    event = @run_step.approval_events.create!(action: "approved", user: user)
+
+    user.destroy!
+    assert ApprovalEvent.exists?(event.id)
+    assert_equal "system", event.reload.actor_label
+  end
+
+  test "destroying the run step destroys its events" do
+    @run_step.approval_events.create!(action: "approved")
+    assert_difference "ApprovalEvent.count", -1 do
+      @run_step.destroy!
+    end
+  end
+end

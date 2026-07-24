@@ -146,6 +146,62 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to run_path(runs(:active_run))
   end
 
+  test "POST approve records an approval event with actor and comment" do
+    run = runs(:awaiting_run)
+    rs = run_steps(:awaiting_step_run_step)
+
+    assert_difference "ApprovalEvent.count", 1 do
+      post approve_run_path(run), params: { comment: "Looks right to me." }
+    end
+
+    event = rs.approval_events.recent.first
+    assert_equal "approved", event.action
+    assert_equal users(:admin), event.user
+    assert_equal "Looks right to me.", event.comment
+  end
+
+  test "POST approve without a comment still records the actor" do
+    run = runs(:awaiting_run)
+    post approve_run_path(run)
+    event = run_steps(:awaiting_step_run_step).approval_events.recent.first
+    assert_equal users(:admin), event.user
+    assert_nil event.comment
+  end
+
+  test "POST reject records an approval event carrying the feedback" do
+    run = runs(:awaiting_run)
+    rs = run_steps(:awaiting_step_run_step)
+
+    assert_difference "ApprovalEvent.count", 1 do
+      post reject_run_path(run), params: { rejection_context: "Use a different branch name." }
+    end
+
+    event = rs.approval_events.recent.first
+    assert_equal "rejected", event.action
+    assert_equal "Use a different branch name.", event.comment
+    # Regression: the job still keys re-injection off this column.
+    assert_equal "Use a different branch name.", rs.reload.rejection_context
+  end
+
+  test "a second approver is told who decided first" do
+    run = runs(:awaiting_run)
+    post approve_run_path(run)
+
+    post approve_run_path(run)
+    assert_redirected_to run_path(run)
+    assert_equal "Already approved by #{users(:admin).email}.", flash[:alert]
+  end
+
+  test "approval history renders on the run page after a decision" do
+    run = runs(:awaiting_run)
+    post approve_run_path(run), params: { comment: "Ship it." }
+
+    get run_path(run)
+    assert_response :success
+    assert_match(/Approved/, response.body)
+    assert_match "Ship it.", response.body
+  end
+
   # --- R10: Replay + Compare ---
 
   test "GET replay renders the trajectory view" do

@@ -102,6 +102,10 @@
         <% end %>
       </div>
     <% end %>
+    <%# The awaiting step already shows its history inside the approval panel. %>
+    <% unless run_step.status == "awaiting_approval" %>
+      <%= render "runs/approval_history", run_step: run_step %>
+    <% end %>
     <% if run.status.in?(%w[failed stopped]) && run_step.status == "failed" %>
       <div class="mt-2">
         <%= button_to "Retry from here",

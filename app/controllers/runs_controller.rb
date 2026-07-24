@@ -94,11 +94,15 @@ class RunsController < ApplicationController
   end
 
   def approve
-    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
+    return redirect_to run_path(@run), alert: already_decided_alert unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
     return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
+    awaiting.approval_events.create!(user: current_user, action: "approved",
+                                     comment: params[:comment].to_s.strip.presence)
+    # The clear stays: ExecuteRunJob keys re-injection off rejection_context.
+    # The human-readable record is the approval event created above.
     awaiting.update!(status: "passed", rejection_context: nil)
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, after_approval: true)
@@ -106,12 +110,13 @@ class RunsController < ApplicationController
   end
 
   def reject
-    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
+    return redirect_to run_path(@run), alert: already_decided_alert unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
     return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
     context = params.expect(:rejection_context).to_s.strip
+    awaiting.approval_events.create!(user: current_user, action: "rejected", comment: context.presence)
     awaiting.update!(rejection_context: context.presence)
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, resume: true)
@@ -144,6 +149,15 @@ class RunsController < ApplicationController
   end
 
   private
+
+  # Two people can be looking at the same parked run. Name whoever decided
+  # first instead of a bare "not awaiting approval".
+  def already_decided_alert
+    event = @run.latest_approval_event
+    return "Run is not awaiting approval." unless event
+
+    "Already #{event.action} by #{event.actor_label}."
+  end
 
   def build_follow_up_steps(instructions, skill_ids)
     ActiveRecord::Base.transaction do

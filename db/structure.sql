@@ -135,7 +135,17 @@ CREATE INDEX "index_runs_on_workflow_id" ON "runs" ("workflow_id") /*application
 CREATE INDEX "index_runs_on_worktree_retained_true" ON "runs" ("worktree_retained") WHERE worktree_retained = 1 /*application='Seneschal'*/;
 CREATE INDEX "index_runs_on_started_by_id" ON "runs" ("started_by_id") /*application='Seneschal'*/;
 CREATE INDEX "index_runs_on_stopped_by_id" ON "runs" ("stopped_by_id") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "approval_events" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run_step_id" integer NOT NULL, "user_id" integer, "action" varchar NOT NULL, "comment" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_8de88c4357"
+FOREIGN KEY ("run_step_id")
+  REFERENCES "run_steps" ("id")
+, CONSTRAINT "fk_rails_7ef98a15dd"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+ ON DELETE SET NULL);
+CREATE INDEX "index_approval_events_on_run_step_id" ON "approval_events" ("run_step_id") /*application='Seneschal'*/;
+CREATE INDEX "index_approval_events_on_user_id" ON "approval_events" ("user_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260724170000'),
 ('20260724160000'),
 ('20260724152000'),
 ('20260524183216'),

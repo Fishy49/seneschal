@@ -31,6 +31,12 @@ class Run < ApplicationRecord
     run_steps.find_by(status: "awaiting_approval")
   end
 
+  # Most recent approve / reject decision anywhere in this run, used to tell a
+  # second approver who got there first.
+  def latest_approval_event
+    ApprovalEvent.joins(:run_step).where(run_steps: { run_id: id }).recent.first
+  end
+
   # Human-readable attribution. Runs from before attribution existed, and runs
   # fired by cron or a branch watcher, fall back to the trigger reason.
   def started_by_label
