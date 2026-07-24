@@ -4,6 +4,23 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 1.9 Housekeeping
+
+Two landmines removed.
+
+- Deleted `db/schema.rb`. The app runs `config.active_record.schema_format = :sql`,
+  so `db/structure.sql` is authoritative; the Ruby schema had been frozen at
+  `2026_04_13_025821` while migrations ran through `2026_05_24`, and reading
+  it gave a wrong picture of the database. Nothing in `bin/`, `lib/tasks/`, or
+  CI referenced it.
+- Migration `20260724152000_drop_orphaned_assistant_tables` drops
+  `assistant_messages` and then `assistant_conversations`. Those tables were in
+  `structure.sql` with no model, controller, or migration on main - debris from
+  the unmerged `feature/ai-application-assistant` branch, which carries its own
+  migrations if that work is ever revived. The migration is irreversible; any
+  rows in an existing database are deleted (confirmed as intended by the
+  operator before running).
+
 ### 1.5 follow-up: launch bar fixes found in the browser
 
 A headless-Chrome test of the launch bar (`test/system/launch_bar_test.rb`)

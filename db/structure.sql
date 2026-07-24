@@ -77,19 +77,6 @@ FOREIGN KEY ("skill_id")
 CREATE INDEX "index_step_templates_on_skill_id" ON "step_templates" ("skill_id") /*application='Seneschal'*/;
 CREATE UNIQUE INDEX "index_step_templates_on_name" ON "step_templates" ("name") /*application='Seneschal'*/;
 CREATE INDEX "index_pipeline_tasks_on_trigger_type" ON "pipeline_tasks" ("trigger_type") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "assistant_conversations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer NOT NULL, "project_id" integer, "claude_session_id" varchar, "status" varchar DEFAULT 'idle', "last_page_path" varchar, "title" varchar, "turbo_token" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_e0922243f0"
-FOREIGN KEY ("user_id")
-  REFERENCES "users" ("id")
- ON DELETE CASCADE, CONSTRAINT "fk_rails_8051ba0da6"
-FOREIGN KEY ("project_id")
-  REFERENCES "projects" ("id")
- ON DELETE CASCADE);
-CREATE INDEX "index_assistant_conversations_on_user_id_and_updated_at" ON "assistant_conversations" ("user_id", "updated_at") /*application='Seneschal'*/;
-CREATE TABLE IF NOT EXISTS "assistant_messages" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "assistant_conversation_id" integer NOT NULL, "role" varchar, "content" text, "choices" json DEFAULT '[]', "events" json DEFAULT '[]', "turbo_token" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_86abdd5953"
-FOREIGN KEY ("assistant_conversation_id")
-  REFERENCES "assistant_conversations" ("id")
- ON DELETE CASCADE);
-CREATE INDEX "idx_on_assistant_conversation_id_created_at_852c40592e" ON "assistant_messages" ("assistant_conversation_id", "created_at") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "project_groups" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "description" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
 CREATE UNIQUE INDEX "index_project_groups_on_name" ON "project_groups" ("name") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "projects" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "created_at" datetime(6) NOT NULL, "description" text, "local_path" varchar NOT NULL, "name" varchar NOT NULL, "repo_url" varchar NOT NULL, "updated_at" datetime(6) NOT NULL, "repo_status" varchar DEFAULT 'not_cloned' NOT NULL, "markdown_context" text, "project_group_id" integer, "skip_permissions" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, CONSTRAINT "fk_rails_1ce32c7182"
@@ -133,6 +120,7 @@ FOREIGN KEY ("run_id")
 CREATE INDEX "index_preview_assets_on_run_step_id" ON "preview_assets" ("run_step_id") /*application='Seneschal'*/;
 CREATE INDEX "index_preview_assets_on_run_id" ON "preview_assets" ("run_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260724152000'),
 ('20260524183216'),
 ('20260522221403'),
 ('20260518100001'),
