@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased - UX + collaboration redesign
+
+Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
+
+### 1.1 Save & Run
+
+Launching a task no longer requires the draft -> ready -> execute ratchet.
+
+- `PipelineTask#executable?` is now `workflow.present? && !archived? && status != "running"`.
+  Drafts, completed, and failed tasks are all launchable; only an in-flight run
+  or an archived task blocks the button.
+- The task form gained a primary "Save & Run" submit (`run_now=1`) that saves
+  and starts a run in one trip, landing on the streaming run page. Plain "Save"
+  is still there as the secondary action. Saving with `run_now` and no workflow
+  saves the task and flashes an explanation instead of erroring.
+- `PipelineTasksController#execute` promotes a draft to `ready` before
+  enqueueing, so the Execute button works straight off a new task.
+- The "Mark Ready" button is gone from the task page (the route and action
+  remain). The Execute button relabels itself "Re-run" once the task has runs.
+
 ## Unreleased — Previewable assets
 
 Skill / prompt steps can now register generated images, audio, or video as

@@ -35,8 +35,10 @@ class PipelineTask < ApplicationRecord
   def cron? = trigger_type == "cron"
   def github_watch? = trigger_type == "github_watch"
 
+  # Anything with a workflow can be launched, including drafts and finished
+  # tasks. Only an in-flight run or an archived task blocks a launch.
   def executable?
-    workflow.present? && status.in?(["ready", "failed"])
+    workflow.present? && !archived? && status != "running"
   end
 
   def latest_run

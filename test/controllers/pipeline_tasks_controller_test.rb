@@ -77,9 +77,65 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "running", task.reload.status
   end
 
-  test "POST execute rejects non-executable task" do
+  test "POST execute rejects task without a workflow" do
     post execute_pipeline_task_path(pipeline_tasks(:draft_task))
     assert_redirected_to pipeline_task_path(pipeline_tasks(:draft_task))
+    assert_equal "draft", pipeline_tasks(:draft_task).reload.status
+  end
+
+  test "POST execute promotes a draft and starts a run" do
+    task = pipeline_tasks(:draft_task)
+    task.update!(workflow: workflows(:deploy))
+
+    assert_difference "Run.count", 1 do
+      post execute_pipeline_task_path(task)
+    end
+    assert_redirected_to run_path(Run.last)
+    assert_equal "running", task.reload.status
+  end
+
+  test "POST create with run_now launches immediately" do
+    assert_difference ["PipelineTask.count", "Run.count"], 1 do
+      assert_enqueued_with(job: ExecuteRunJob) do
+        post pipeline_tasks_path, params: {
+          run_now: "1",
+          pipeline_task: {
+            title: "Launch me", body: "right now",
+            kind: "feature", project_id: projects(:seneschal).id,
+            workflow_id: workflows(:deploy).id
+          }
+        }
+      end
+    end
+    assert_redirected_to run_path(Run.last)
+    assert_equal "running", PipelineTask.last.status
+  end
+
+  test "POST create with run_now but no workflow saves and warns" do
+    assert_difference "PipelineTask.count", 1 do
+      assert_no_difference "Run.count" do
+        post pipeline_tasks_path, params: {
+          run_now: "1",
+          pipeline_task: {
+            title: "No workflow", body: "yet",
+            kind: "feature", project_id: projects(:seneschal).id
+          }
+        }
+      end
+    end
+    assert_redirected_to pipeline_task_path(PipelineTask.last)
+    assert_match "Assign a workflow", flash[:alert]
+  end
+
+  test "PATCH update with run_now launches immediately" do
+    task = pipeline_tasks(:completed_task)
+    assert_difference "Run.count", 1 do
+      patch pipeline_task_path(task), params: {
+        run_now: "1",
+        pipeline_task: { title: task.title, body: "revised spec", kind: task.kind }
+      }
+    end
+    assert_redirected_to run_path(Run.last)
   end
 
   test "DELETE destroy removes task" do

@@ -11,13 +11,8 @@
   </div>
   <div class="flex items-center gap-2">
     <%= link_to "Edit", edit_pipeline_task_path(@task), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <% if @task.status.in?(%w[draft completed failed]) && @task.workflow.present? %>
-      <%= button_to "Mark Ready", mark_ready_pipeline_task_path(@task), method: :patch,
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
-            data: { turbo_confirm: @task.status != "draft" ? "Reset '#{@task.title}' to ready for re-execution?" : nil } %>
-    <% end %>
     <% if @task.executable? %>
-      <%= button_to "Execute", execute_pipeline_task_path(@task),
+      <%= button_to (@task.runs.any? ? "Re-run" : "Execute"), execute_pipeline_task_path(@task),
             class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
             data: { turbo_confirm: "Execute '#{@task.title}' with #{@task.workflow.name}?" } %>
     <% end %>

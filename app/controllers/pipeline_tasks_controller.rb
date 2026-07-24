@@ -33,7 +33,7 @@ class PipelineTasksController < ApplicationController
   def create
     @task = PipelineTask.new(task_params)
     if @task.save
-      redirect_to @task, notice: "Task created."
+      after_save_redirect("Task created.")
     else
       render :new, status: :unprocessable_content
     end
@@ -41,7 +41,7 @@ class PipelineTasksController < ApplicationController
 
   def update
     if @task.update(task_params)
-      redirect_to @task, notice: "Task updated."
+      after_save_redirect("Task updated.")
     else
       render :edit, status: :unprocessable_content
     end
@@ -120,18 +120,42 @@ class PipelineTasksController < ApplicationController
 
   def execute
     unless @task.executable?
-      redirect_to @task, alert: "Task is not executable. Assign a workflow and mark it ready."
+      redirect_to @task, alert: execution_blocked_reason
       return
     end
 
-    run = @task.enqueue_run!(reason: "manual")
-    redirect_to run_path(run), notice: "Run started for '#{@task.title}'."
+    redirect_to run_path(launch!), notice: "Run started for '#{@task.title}'."
   end
 
   private
 
   def set_task
     @task = PipelineTask.find(params.expect(:id))
+  end
+
+  # "Save & Run" submits run_now so a task can be written and launched in a
+  # single trip. Everything else lands on the task page as before.
+  def after_save_redirect(notice)
+    return redirect_to(@task, notice: notice) if params[:run_now].blank?
+
+    unless @task.executable?
+      redirect_to @task, alert: "#{notice} #{execution_blocked_reason}"
+      return
+    end
+
+    redirect_to run_path(launch!), notice: "Run started for '#{@task.title}'."
+  end
+
+  def launch!
+    @task.update!(status: "ready") if @task.status == "draft"
+    @task.enqueue_run!(reason: "manual")
+  end
+
+  def execution_blocked_reason
+    return "Assign a workflow before running this task." if @task.workflow.blank?
+    return "Unarchive this task before running it." if @task.archived?
+
+    "This task already has a run in flight."
   end
 
   def task_params

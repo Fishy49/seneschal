@@ -53,8 +53,28 @@ class PipelineTaskTest < ActiveSupport::TestCase
     assert pipeline_tasks(:ready_task).executable?
   end
 
-  test "not executable? when draft" do
+  test "executable? when draft with a workflow" do
+    task = pipeline_tasks(:draft_task)
+    task.update!(workflow: workflows(:deploy))
+    assert task.executable?
+  end
+
+  test "executable? when completed with a workflow" do
+    assert pipeline_tasks(:completed_task).executable?
+  end
+
+  test "not executable? without a workflow" do
     assert_not pipeline_tasks(:draft_task).executable?
+  end
+
+  test "not executable? while running" do
+    assert_not pipeline_tasks(:running_task).executable?
+  end
+
+  test "not executable? when archived" do
+    task = pipeline_tasks(:ready_task)
+    task.update!(archived_at: Time.current)
+    assert_not task.executable?
   end
 
   test "latest_run returns most recent run" do
