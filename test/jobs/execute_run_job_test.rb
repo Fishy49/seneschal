@@ -121,6 +121,62 @@ class ExecuteRunJobTest < ActiveJob::TestCase
     cleanup_workflow_with_ready_project!(workflow)
   end
 
+  # --- Outbound notifications (3.1) ---
+
+  test "a completed run enqueues a completion notification" do
+    Setting["webhook_url"] = "https://example.test/hook"
+    workflow = setup_workflow_with_ready_project!
+    workflow.steps.create!(name: "Only", step_type: "command", body: "echo a",
+                           position: 1, timeout: 30, max_retries: 0, config: {})
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    with_stubbed_step_executor(stdout: "ok\n") do
+      assert_enqueued_with(job: NotifyJob, args: ["run.completed", run.id]) do
+        ExecuteRunJob.new.perform(run)
+      end
+    end
+  ensure
+    Setting.find_by(key: "webhook_url")&.destroy
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "a run parking for approval enqueues an awaiting_approval notification" do
+    Setting["webhook_url"] = "https://example.test/hook"
+    workflow = setup_workflow_with_ready_project!
+    create_two_step_workflow(workflow)
+    run = workflow.runs.create!(status: "pending", context: {}, input: {})
+
+    with_stubbed_step_executor(stdout: "ok\n") do
+      assert_enqueued_with(job: NotifyJob, args: ["run.awaiting_approval", run.id]) do
+        ExecuteRunJob.new.perform(run)
+      end
+    end
+  ensure
+    Setting.find_by(key: "webhook_url")&.destroy
+    cleanup_workflow_with_ready_project!(workflow)
+  end
+
+  test "a run whose repo is missing enqueues a failure notification" do
+    Setting["webhook_url"] = "https://example.test/hook"
+    run = workflows(:deploy).runs.create!(status: "pending", context: {}, input: {})
+    projects(:seneschal).update!(repo_status: "not_cloned")
+
+    assert_enqueued_with(job: NotifyJob, args: ["run.failed", run.id]) do
+      ExecuteRunJob.new.perform(run)
+    end
+  ensure
+    Setting.find_by(key: "webhook_url")&.destroy
+  end
+
+  test "no notification job is enqueued when no webhook is configured" do
+    run = workflows(:deploy).runs.create!(status: "pending", context: {}, input: {})
+    projects(:seneschal).update!(repo_status: "not_cloned")
+
+    assert_no_enqueued_jobs(only: NotifyJob) do
+      ExecuteRunJob.new.perform(run)
+    end
+  end
+
   # Crash recovery (no operator rejection) must still resume cleanly without
   # injecting a misleading "operator feedback" message.
   test "crash-recovery resume leaves resume_message nil when no rejection" do

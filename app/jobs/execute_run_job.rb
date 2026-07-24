@@ -10,6 +10,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                   error_message: "Repository not cloned. Clone it from the project page first.")
       sync_task_status(run)
       broadcast_run(run)
+      notify(run, "run.failed")
       return
     end
 
@@ -35,6 +36,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
                   error_message: "Worktree allocation failed: #{e.message}")
       sync_task_status(run)
       broadcast_run(run)
+      notify(run, "run.failed")
       return
     end
     broadcast_run(run)
@@ -117,6 +119,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
             run.update!(status: "awaiting_approval")
             broadcast_step(run, run_step)
             broadcast_run(run)
+            notify(run, "run.awaiting_approval")
             return
           end
 
@@ -152,6 +155,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
       WorktreeManager.retain(run)
       sync_task_status(run)
       broadcast_run(run)
+      notify(run, "run.failed")
       return
     end
 
@@ -159,6 +163,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     WorktreeManager.cleanup(run)
     sync_task_status(run)
     broadcast_run(run)
+    notify(run, "run.completed")
   rescue Runners::Aborted
     # Another ExecuteRunJob has claimed this Run (e.g. RunRecoveryJob saw
     # our worker had gone quiet long enough to look stale, marked the
@@ -393,6 +398,7 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
 
     broadcast_step(run, run_step)
     broadcast_run(run)
+    notify(run, "run.waiting_for_tokens")
 
     TokenWaitJob.schedule(run, step.id, reset_at)
     Rails.logger.info(
@@ -405,6 +411,14 @@ class ExecuteRunJob < ApplicationJob # rubocop:disable Metrics/ClassLength
     return unless task
 
     task.update!(status: run.status == "completed" ? "completed" : "failed")
+  end
+
+  # Outbound notification for a run-level transition. Only enqueues when a
+  # destination is configured, and never raises into the run.
+  def notify(run, event)
+    NotifyJob.perform_later(event, run.id) if NotifyJob.configured?
+  rescue StandardError => e
+    Rails.logger.error("[ExecuteRunJob] could not enqueue #{event} for run ##{run.id}: #{e.message}")
   end
 
   # --- Execution ---

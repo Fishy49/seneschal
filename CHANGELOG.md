@@ -4,6 +4,27 @@
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.
 
+### 3.1 Outbound webhooks
+
+Seneschal can now tell something outside itself that a run needs attention.
+
+- Two settings on the Setup page: `webhook_url` (blank turns the feature off
+  completely, and nothing is enqueued) and `app_base_url` (used to build
+  absolute run links; blank means the payload omits the URL rather than
+  guessing a host).
+- New `NotifyJob` POSTs `{ event, run: { id, status, url, task_title, project,
+  workflow, started_by }, timestamp }` with 5 second open and read timeouts.
+  Every error is caught and logged: a notification failure can never affect a
+  run, including a malformed URL, a refused connection, or a deleted run.
+- `ExecuteRunJob` enqueues it at six terminal transitions covering four events:
+  `run.awaiting_approval`, `run.completed`, `run.waiting_for_tokens`, and
+  `run.failed` (from a missing repo, a failed worktree allocation, or a failed
+  step). The enqueue itself is guarded and rescued.
+
+Test note: this project has no HTTP-stubbing gem and minitest 6 no longer ships
+`minitest/mock`, so the job test swaps `Net::HTTP.new` for a recording double
+around each example.
+
 ### 2.4 Replay permalinks
 
 Anything in a Replay is now addressable, so a run can be discussed by URL.
