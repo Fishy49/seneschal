@@ -46,6 +46,6 @@ class WorkflowAccessSummary
     tools = step.config.is_a?(Hash) ? step.config["allowed_tools"].to_s : ""
     return true if tools.blank?
 
-    tools.downcase.scan(/[a-z]+/).any? { |word| WRITE_TOOLS.include?(word) }
+    tools.downcase.scan(/[a-z]+/).intersect?(WRITE_TOOLS)
   end
 end
