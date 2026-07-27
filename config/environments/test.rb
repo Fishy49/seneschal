@@ -41,4 +41,13 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # UserCredential encrypts its value, and Active Record Encryption needs keys
+  # before anything reads or writes one. Deriving them from credentials would
+  # make the suite depend on config/master.key, which is gitignored and absent
+  # on CI. These are throwaway test keys guarding fixture data and nothing
+  # else; real keys come from credentials or RAILS_MASTER_KEY.
+  config.active_record.encryption.primary_key = "test-only-primary-key-not-a-secret"
+  config.active_record.encryption.deterministic_key = "test-only-deterministic-key-not-a-secret"
+  config.active_record.encryption.key_derivation_salt = "test-only-derivation-salt-not-a-secret"
 end
