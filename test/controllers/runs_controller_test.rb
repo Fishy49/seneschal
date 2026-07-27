@@ -393,7 +393,7 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
   test "the run info card carries the raw id" do
     run = runs(:completed_run)
     get run_path(run)
-    assert_select "#run_info td", text: "##{run.id}"
+    assert_select "#run_info h2", text: /##{run.id}/
   end
 
   # ExecuteRunJob broadcasts `replace target: "run_step_<id>", partial:

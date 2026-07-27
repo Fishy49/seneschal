@@ -1,0 +1,46 @@
+<%# The one discussion surface for a run: comments on the run itself and on
+    any of its steps, in one chronological feed. Step rows link here instead
+    of hosting their own threads. New comments broadcast-append into
+    #run_discussion, and the empty-state hint hides itself via :empty the
+    moment the first one lands, so keep the ul free of whitespace text nodes.
+
+    Locals: run: %>
+<% comments = run.discussion_comments %>
+<% step_options = run.run_steps.includes(:step).order(:id).map do |rs|
+     label = rs.position.to_i.positive? ? "Step #{rs.position} · #{rs.step.name}" : rs.step.name
+     [label, "RunStep:#{rs.id}"]
+   end %>
+<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4 scroll-mt-4" id="discussion">
+  <h2 class="text-lg font-semibold mb-3">Discussion</h2>
+
+  <div class="max-h-96 overflow-y-auto" data-controller="autoscroll">
+    <ul class="list-none peer" id="run_discussion"><%= render partial: "comments/comment", collection: comments %></ul>
+    <p class="hidden peer-empty:block text-sm text-content-muted py-1">
+      Nothing yet. Comments on the run and on individual steps all land here.
+    </p>
+  </div>
+
+  <%= form_with url: comments_path, method: :post, class: "mt-3 pt-3 border-t border-edge/60",
+        data: { action: "turbo:submit-end->discussion#submitEnd" } do |f| %>
+    <div class="flex items-start gap-2.5">
+      <%= avatar_for(current_user, size: :sm) %>
+      <div class="flex-1 min-w-0">
+        <%= text_area_tag "comment[body]", nil, rows: 2, required: true,
+              placeholder: "Add a comment. Use @name to notify someone.",
+              data: { discussion_target: "body" },
+              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-[0.8125rem] focus:outline-none focus:border-accent resize-y" %>
+        <div class="flex items-center justify-between gap-2 mt-1.5">
+          <label class="flex items-center gap-1.5 text-xs text-content-muted min-w-0">
+            on
+            <%= select_tag :commentable,
+                  options_for_select([["This run", "Run:#{run.id}"]] + step_options),
+                  data: { discussion_target: "select" },
+                  class: "max-w-48 truncate px-2 py-1 bg-surface-input border border-edge rounded-lg text-content text-xs focus:outline-none focus:border-accent" %>
+          </label>
+          <%= f.submit "Comment",
+                class: "shrink-0 inline-flex items-center px-3 py-1.5 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

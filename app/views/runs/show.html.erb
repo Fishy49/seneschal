@@ -7,10 +7,17 @@
 
 <%= render "runs/run_chrome", run: @run, mode: :overview %>
 
-<div class="grid grid-cols-[2fr_1fr] gap-4">
+<%# data-controller="discussion" sits up here so a step row in the left column
+    can reach the composer in the right one ("Comment on this step"). %>
+<div class="grid grid-cols-[2fr_1fr] gap-4" data-controller="discussion">
   <div class="min-w-0">
     <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="preserve-details">
-      <h2 class="text-lg font-semibold mb-3">Steps</h2>
+      <div class="flex items-baseline justify-between gap-2 mb-3">
+        <h2 class="text-lg font-semibold">Steps</h2>
+        <% if (current_step = run_progress_text(@run)) %>
+          <span class="text-xs text-content-muted truncate">now: <%= current_step %></span>
+        <% end %>
+      </div>
       <%= render "run_steps_list", run: @run %>
     </div>
   </div>
@@ -18,14 +25,9 @@
   <div class="min-w-0">
     <%= render "run_info", run: @run %>
 
-    <div id="share">
-      <%= render "share_links", run: @run %>
-    </div>
+    <%= render "discussion", run: @run %>
 
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <h2 class="text-lg font-semibold mb-3">Discussion</h2>
-      <%= render "comments/thread", commentable: @run %>
-    </div>
+    <%= render "share_links", run: @run %>
 
     <%# Context and input are reference material once a run is under way, so
         they start closed rather than pushing the discussion off the screen. %>

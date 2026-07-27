@@ -1,19 +1,25 @@
-<li class="py-2 border-b border-edge last:border-b-0" id="comment_<%= comment.id %>">
-  <div class="flex items-start justify-between gap-2">
-    <div class="min-w-0">
-      <div class="text-xs text-content-muted">
-        <span class="text-content font-medium"><%= comment.user.email %></span>
-        <%= comment.created_at.strftime("%Y-%m-%d %H:%M") %>
-        <% if comment.anchor.present? %>
-          &middot; <a href="#<%= comment.anchor %>" class="hover:underline">on this step</a>
-        <% end %>
-      </div>
-      <div class="text-sm mt-0.5 whitespace-pre-wrap break-words"><%= highlight_mentions(comment.body) %></div>
+<%# One entry in a discussion feed. Broadcast with locals: { comment: } only,
+    so everything shown here must be derivable from the comment itself. %>
+<% on_step = comment.commentable_type == "RunStep" ? comment.commentable : nil %>
+<li class="group/comment flex items-start gap-2.5 py-2.5 border-b border-edge/60 last:border-b-0" id="comment_<%= comment.id %>">
+  <%= avatar_for(comment.user, size: :sm) %>
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 flex-wrap text-xs">
+      <span class="font-semibold text-content" title="<%= comment.user.email %>"><%= comment.user.email.split("@").first %></span>
+      <span class="text-content-muted" title="<%= comment.created_at.strftime("%Y-%m-%d %H:%M") %>"><%= time_ago_short(comment.created_at) %></span>
+      <% if on_step %>
+        <a href="#run_step_<%= on_step.id %>"
+           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-input text-content-muted text-[0.6875rem] font-medium hover:text-accent transition-colors no-underline">
+          <span class="w-1.5 h-1.5 rounded-full bg-accent/60"></span><%= on_step.step.name %>
+        </a>
+      <% end %>
+      <% if current_user && (comment.user_id == current_user.id || current_user.admin?) %>
+        <%= button_to "✕", comment_path(comment), method: :delete,
+              title: "Delete comment",
+              class: "ml-auto shrink-0 text-xs leading-none text-content-muted bg-transparent border-none cursor-pointer opacity-0 group-hover/comment:opacity-100 hover:text-danger transition-opacity",
+              data: { turbo_confirm: "Delete this comment?" } %>
+      <% end %>
     </div>
-    <% if current_user && (comment.user_id == current_user.id || current_user.admin?) %>
-      <%= button_to "Delete", comment_path(comment), method: :delete,
-            class: "shrink-0 text-xs text-content-muted bg-transparent border-none cursor-pointer hover:text-danger",
-            data: { turbo_confirm: "Delete this comment?" } %>
-    <% end %>
+    <div class="text-sm mt-1 whitespace-pre-wrap break-words leading-relaxed"><%= highlight_mentions(comment.body) %></div>
   </div>
 </li>

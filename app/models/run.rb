@@ -33,6 +33,14 @@ class Run < ApplicationRecord
     run_steps.find_by(status: "awaiting_approval")
   end
 
+  # Every comment on this run or any of its steps, oldest first. The run page
+  # shows one unified feed rather than a thread per surface.
+  def discussion_comments
+    Comment.where(commentable: self)
+           .or(Comment.where(commentable_type: "RunStep", commentable_id: run_step_ids))
+           .chronological.includes(:user, :commentable)
+  end
+
   # Most recent approve / reject decision anywhere in this run, used to tell a
   # second approver who got there first.
   def latest_approval_event

@@ -24,6 +24,22 @@ module ComponentsHelper
     "waiting_for_tokens" => "bg-warning"
   }.freeze
 
+  # Timeline node tints for the run steps list. The node carries the step's
+  # status, so there is no separate status dot on the row.
+  STEP_NODE_CLASSES = {
+    "completed" => "node-tint-success text-success",
+    "passed" => "node-tint-success text-success",
+    "failed" => "node-tint-danger text-danger",
+    "running" => "node-tint-info text-info animate-pulse",
+    "retrying" => "node-tint-info text-info animate-pulse",
+    "awaiting_approval" => "node-tint-warning text-warning",
+    "waiting_for_tokens" => "node-tint-warning text-warning"
+  }.freeze
+
+  def step_node_classes(status)
+    STEP_NODE_CLASSES.fetch(status.to_s, "node-tint-muted text-content-muted")
+  end
+
   def chip_tone_classes(tone)
     CHIP_TONES.fetch(tone.to_sym, CHIP_TONES[:neutral])
   end

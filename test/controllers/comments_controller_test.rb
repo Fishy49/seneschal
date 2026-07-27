@@ -84,12 +84,78 @@ class CommentsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "comment.created", Event.recent.first.action
   end
 
-  test "the run page renders the discussion thread" do
+  test "the run page renders the unified discussion feed" do
     @run.comments.create!(user: users(:admin), body: "a prior remark")
     get run_path(@run)
     assert_response :success
-    assert_select "##{"comments_run_#{@run.id}"}"
+    assert_select "#run_discussion"
     assert_match "a prior remark", response.body
+  end
+
+  test "the unified feed aggregates run and step comments chronologically" do
+    step_comment = run_steps(:passed_step).comments.create!(user: users(:admin), body: "step remark")
+    run_comment = @run.comments.create!(user: users(:admin), body: "run remark")
+
+    get run_path(@run)
+    assert_select "#run_discussion #comment_#{step_comment.id}"
+    assert_select "#run_discussion #comment_#{run_comment.id}"
+    assert response.body.index("step remark") < response.body.index("run remark")
+  end
+
+  test "a step comment in the feed wears a chip linking back to its step" do
+    step = run_steps(:passed_step)
+    step.comments.create!(user: users(:admin), body: "slow step")
+
+    get run_path(@run)
+    assert_select "#run_discussion a[href=?]", "#run_step_#{step.id}", text: /#{step.step.name}/
+  end
+
+  test "the composer offers the run and each step as a target" do
+    get run_path(@run)
+    assert_select "#discussion select[name=commentable]" do
+      assert_select "option[value=?]", "Run:#{@run.id}"
+      assert_select "option[value=?]", "RunStep:#{run_steps(:passed_step).id}"
+    end
+  end
+
+  test "POST create accepts the composer's encoded target" do
+    step = run_steps(:passed_step)
+    assert_difference "Comment.count", 1 do
+      post comments_path, params: {
+        commentable: "RunStep:#{step.id}",
+        comment: { body: "via the picker" }
+      }, headers: { "HTTP_REFERER" => run_path(@run) }
+    end
+    assert_equal step, Comment.last.commentable
+  end
+
+  test "POST create refuses an encoded target outside the allowlist" do
+    assert_no_difference "Comment.count" do
+      post comments_path, params: {
+        commentable: "User:#{users(:admin).id}",
+        comment: { body: "sneaky" }
+      }
+    end
+    assert_response :not_found
+  end
+
+  test "POST create over turbo stream appends to the unified feed without a reload" do
+    post comments_path, params: {
+      commentable: "Run:#{@run.id}",
+      comment: { body: "streamed in" }
+    }, as: :turbo_stream
+
+    assert_response :success
+    assert_match(/turbo-stream action="append" target="run_discussion"/, response.body)
+    assert_match "streamed in", response.body
+  end
+
+  test "DELETE destroy over turbo stream removes the comment element" do
+    comment = @run.comments.create!(user: users(:admin), body: "mine")
+    delete comment_path(comment), as: :turbo_stream
+
+    assert_response :success
+    assert_match(/turbo-stream action="remove" target="comment_#{comment.id}"/, response.body)
   end
 
   test "the task page renders the discussion thread" do

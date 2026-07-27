@@ -70,6 +70,16 @@
   --color-info: var(--info);
 }
 
+@layer components {
+  /* Run timeline nodes sit on the connector line, so their fills must be
+     opaque: these are the /15 tints flattened onto the card colour. */
+  .node-tint-success { background-color: color-mix(in oklab, var(--success) 15%, var(--bg-card)); }
+  .node-tint-danger  { background-color: color-mix(in oklab, var(--danger) 15%, var(--bg-card)); }
+  .node-tint-info    { background-color: color-mix(in oklab, var(--info) 15%, var(--bg-card)); }
+  .node-tint-warning { background-color: color-mix(in oklab, var(--warning) 15%, var(--bg-card)); }
+  .node-tint-muted   { background-color: color-mix(in oklab, var(--bg-input) 92%, var(--bg-card)); }
+}
+
 /* CodeJar editor */
 @layer components {
   .codejar-wrap {

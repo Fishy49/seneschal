@@ -9,7 +9,10 @@ class CommentsController < ApplicationController
     )
 
     if @comment.save
-      redirect_back_or_to(root_path)
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_back_or_to(root_path) }
+      end
     else
       redirect_back_or_to(root_path, alert: @comment.errors.full_messages.to_sentence)
     end
@@ -22,7 +25,10 @@ class CommentsController < ApplicationController
     end
 
     @comment.destroy
-    redirect_back_or_to(root_path, notice: "Comment deleted.")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: turbo_stream.remove(@comment) }
+      format.html { redirect_back_or_to(root_path, notice: "Comment deleted.") }
+    end
   end
 
   private
@@ -31,12 +37,18 @@ class CommentsController < ApplicationController
     @comment = Comment.find(params.expect(:id))
   end
 
-  # Allowlisted so the polymorphic type cannot be used to reach an arbitrary
-  # model through a crafted request.
+  # The run page composer posts one "Type:id" value from its target picker;
+  # the task thread still posts split type/id fields. Both funnel through the
+  # same allowlist so the polymorphic type cannot be used to reach an
+  # arbitrary model through a crafted request.
   def commentable
-    type = params.expect(:commentable_type).to_s
+    type, id = if params[:commentable].present?
+                 params.expect(:commentable).to_s.split(":", 2)
+               else
+                 [params.expect(:commentable_type).to_s, params.expect(:commentable_id)]
+               end
     raise ActiveRecord::RecordNotFound unless Comment::COMMENTABLE_TYPES.include?(type)
 
-    type.constantize.find(params.expect(:commentable_id))
+    type.constantize.find(id)
   end
 end

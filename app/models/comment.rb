@@ -37,8 +37,10 @@ class Comment < ApplicationRecord
     end
   end
 
+  # Run and step comments share one feed on the run page, so they all land in
+  # the same list; task comments keep a per-commentable thread.
   def dom_target
-    "comments_#{commentable_type.underscore}_#{commentable_id}"
+    run ? "run_discussion" : "comments_#{commentable_type.underscore}_#{commentable_id}"
   end
 
   private

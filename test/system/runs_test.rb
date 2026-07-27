@@ -47,6 +47,48 @@ class RunsTest < ApplicationSystemTestCase
     assert_text "Deploy Pipeline"
   end
 
+  # --- unified discussion ---
+
+  test "posting a comment appends to the feed without collapsing open steps" do
+    run = runs(:completed_run)
+    step = run.run_steps.first
+    visit run_path(run)
+
+    # Expand a step first; a full page reload would close it again, so it
+    # staying open is the proof the comment went over a stream.
+    find("#run_step_#{step.id} summary", match: :first).click
+    assert_selector "#run_step_#{step.id} details[data-preserve-key='step'][open]"
+
+    fill_in "comment[body]", with: "Streamed, not reloaded."
+    click_button "Comment", exact: true
+
+    within "#run_discussion" do
+      assert_text "Streamed, not reloaded."
+    end
+    assert_no_text "Nothing yet."
+    assert_selector "#run_step_#{step.id} details[data-preserve-key='step'][open]"
+  end
+
+  test "comment on this step preselects the step and chips the comment" do
+    run = runs(:completed_run)
+    step = run.run_steps.first
+    visit run_path(run)
+
+    find("#run_step_#{step.id} summary", match: :first).click
+    within "#run_step_#{step.id}" do
+      click_button "Comment on this step"
+    end
+    assert_equal "RunStep:#{step.id}", find("select[name='commentable']").value
+
+    fill_in "comment[body]", with: "About this step specifically."
+    click_button "Comment", exact: true
+
+    within "#run_discussion" do
+      assert_text "About this step specifically."
+      assert_selector "a[href='#run_step_#{step.id}']", text: step.step.name
+    end
+  end
+
   # --- R10: trajectory replay + diff ---
 
   test "replay timeline filter chip hides matching entries" do
