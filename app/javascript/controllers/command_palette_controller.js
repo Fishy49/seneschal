@@ -52,6 +52,20 @@ export default class extends Controller {
     this.descriptionTarget.focus()
   }
 
+  // Launch buttons that already know which project they mean, so the palette
+  // opens with the workflow list already filtered.
+  async openWithProject(event) {
+    const projectId = String(event.params?.project ?? "")
+    await this.open()
+    if (!projectId) return
+
+    const known = Array.from(this.projectTarget.options).some((option) => option.value === projectId)
+    if (!known) return
+
+    this.projectTarget.value = projectId
+    this.projectChanged()
+  }
+
   close() {
     this.overlayTarget.hidden = true
   }

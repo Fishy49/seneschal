@@ -27,7 +27,7 @@ class WorkflowCopiesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "POST create includes missing-skill notice in flash" do
-    wf = @source_project.workflows.create!(name: "Skill Wf", trigger_type: "manual")
+    wf = @source_project.workflows.create!(name: "Skill Wf")
     wf.steps.create!(
       name: "Check Step",
       step_type: "skill",

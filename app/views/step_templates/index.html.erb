@@ -1,4 +1,6 @@
-<h1 class="text-2xl font-bold mb-6">Step Templates</h1>
+<%= render "shared/library_nav" %>
+<%= render "shared/components/page_header", title: "Templates",
+      subtitle: "Step configurations captured from workflows that already work. Start a new step from one instead of filling in a blank form." %>
 
 <% if @templates.any? %>
   <div data-controller="list-filter">
@@ -8,61 +10,52 @@
              class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
       <select data-list-filter-target="type" data-action="change->list-filter#filter"
               class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        <option value="">All Types</option>
-        <option value="skill">Skill</option>
-        <option value="script">Script</option>
-        <option value="command">Command</option>
-        <option value="ci_check">CI Check</option>
+        <option value="">All types</option>
+        <% StepsHelper::TYPE_OPTIONS.each do |label, value| %>
+          <option value="<%= value %>"><%= label %></option>
+        <% end %>
       </select>
     </div>
 
-    <div class="bg-surface-card border border-edge rounded-xl overflow-hidden">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-edge text-left text-content-muted">
-            <th class="px-4 py-3 font-medium">Name</th>
-            <th class="px-4 py-3 font-medium">Type</th>
-            <th class="px-4 py-3 font-medium">Skill</th>
-            <th class="px-4 py-3 font-medium">Timeout</th>
-            <th class="px-4 py-3 font-medium">Retries</th>
-            <th class="px-4 py-3 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody data-list-filter-target="list">
-          <% @templates.each do |template| %>
-            <% searchable = [template.name, template.step_type, template.skill&.display_name, template.body].compact.join(" ").downcase %>
-            <tr class="border-b border-edge last:border-0" data-type="<%= template.step_type %>" data-searchable="<%= searchable %>">
-              <td class="px-4 py-3 text-content font-medium"><%= template.name %></td>
-              <td class="px-4 py-3">
-                <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full
-                  <%= case template.step_type
-                      when 'skill' then 'bg-accent/15 text-accent'
-                      when 'command' then 'bg-success/15 text-success'
-                      when 'script' then 'bg-warning/15 text-warning'
-                      when 'ci_check' then 'bg-info/15 text-info'
-                      when 'pr' then 'bg-success/15 text-success'
-                      end %>"><%= template.step_type %></span>
-              </td>
-              <td class="px-4 py-3 text-content-muted"><%= template.skill&.display_name || "&mdash;".html_safe %></td>
-              <td class="px-4 py-3 text-content-muted"><%= template.timeout %>s</td>
-              <td class="px-4 py-3 text-content-muted"><%= template.max_retries %></td>
-              <td class="px-4 py-3 text-right">
-                <%= button_to "Delete", step_template_path(template), method: :delete,
-                      data: { turbo_confirm: "Delete template \"#{template.name}\"?" },
-                      class: "px-2 py-1 text-xs text-danger hover:text-danger/80 transition-colors cursor-pointer bg-transparent border-none" %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
+    <div class="grid grid-cols-2 gap-4" data-list-filter-target="list">
+      <% @templates.each do |template| %>
+        <% searchable = [template.name, template.description, template.step_type,
+                         template.skill&.display_name, template.body].compact.join(" ").downcase %>
+        <div class="bg-surface-card border border-edge rounded-lg p-4"
+             data-type="<%= template.step_type %>" data-searchable="<%= searchable %>">
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <h2 class="font-semibold">
+              <%= link_to template.name, step_template_path(template), class: "hover:text-accent transition-colors" %>
+            </h2>
+            <%= type_badge(template.step_type) %>
+          </div>
+          <p class="text-sm text-content-muted mb-2">
+            <%= template.description.presence || "No description yet." %>
+          </p>
+          <div class="text-xs text-content-muted">
+            <% if template.skill %>
+              Skill: <%= template.skill.display_name %> &middot;
+            <% end %>
+            <%= template.timeout %>s timeout &middot; <%= pluralize(template.max_retries, "retry") %>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <%= link_to "Edit", edit_step_template_path(template),
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= button_to "Delete", step_template_path(template), method: :delete,
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                  data: { turbo_confirm: "Delete template '#{template.name}'?" } %>
+          </div>
+        </div>
+      <% end %>
     </div>
 
-    <p data-list-filter-target="empty" class="bg-surface-card border border-edge rounded-xl p-8 text-center text-content-muted text-sm mt-4" style="display:none">
+    <p data-list-filter-target="empty" class="bg-surface-card border border-edge rounded-lg p-8 text-center text-content-muted text-sm mt-4" style="display:none">
       No templates match your filters.
     </p>
   </div>
 <% else %>
-  <div class="bg-surface-card border border-edge rounded-xl p-8 text-center text-content-muted text-sm">
-    No templates yet. Save a step as a template when creating or editing a step.
-  </div>
+  <%= render layout: "shared/components/card" do %>
+    <%= render "shared/components/empty_state",
+          message: "No templates yet. Tick \"Save as a template\" while editing a step to capture one." %>
+  <% end %>
 <% end %>

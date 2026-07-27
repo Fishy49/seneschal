@@ -8,7 +8,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test "GET index renders dashboard" do
     get root_path
     assert_response :success
-    assert_select "h1", /Dashboard/i
+    assert_select "h1", "Home"
   end
 
   test "sidebar badges the number of runs awaiting approval" do
@@ -41,14 +41,35 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test "shows active runs" do
     get root_path
     assert_response :success
+    assert_select "#dashboard_active a[href=?]", run_path(runs(:active_run))
   end
 
-  test "shows actionable tasks with a launch button" do
+  test "the runs card carries one active section and one recent section" do
     get root_path
     assert_response :success
-    assert_select "#dashboard_actionable" do
-      assert_select "form[action=?]", execute_pipeline_task_path(pipeline_tasks(:ready_task))
-    end
+    assert_select "#dashboard_active"
+    assert_select "h2", text: "Runs"
+    assert_select "h3", text: "Active"
+    assert_select "h3", text: "Recent"
+  end
+
+  test "run rows credit whoever launched them" do
+    run = runs(:completed_run)
+    run.update!(started_by: users(:other))
+    get root_path
+    assert_select "span[title=?]", users(:other).email
+  end
+
+  test "each project offers a launch button that preselects it" do
+    get root_path
+    assert_select "button[data-action=?][data-command-palette-project-param=?]",
+                  "command-palette#openWithProject", projects(:seneschal).id.to_s
+  end
+
+  test "Home leads with a launch button" do
+    get root_path
+    assert_select "h1", "Home"
+    assert_select "button[data-action=?]", "command-palette#open"
   end
 
   test "surfaces runs awaiting approval in their own section" do

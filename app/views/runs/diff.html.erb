@@ -28,7 +28,7 @@
       <label class="text-sm text-content-muted whitespace-nowrap">Compare against:</label>
       <%= f.select :against,
             options_from_collection_for_select(@available_targets, :id,
-              ->(r) { "##{r.id} · #{r.status} · #{r.created_at.strftime("%Y-%m-%d %H:%M")}" },
+              ->(r) { "#{r.ordinal ? "run #{r.ordinal}" : "##{r.id}"} · #{r.status} · #{time_ago_short(r.created_at)}" },
               @against&.id),
             { include_blank: @available_targets.any? ? false : "(no other runs of this task yet)" },
             class: "flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
@@ -39,7 +39,7 @@
   <% if @against.nil? %>
     <p class="text-xs text-content-muted mt-2">
       <% if @available_targets.empty? %>
-        No other runs of this task yet — run it again, then come back here to compare.
+        No other runs of this task yet - run it again, then come back here to compare.
       <% else %>
         Pick a run from the dropdown to see a side-by-side diff.
       <% end %>
@@ -48,7 +48,7 @@
 </div>
 
 <% if @against %>
-  <%# Summary diff — top-line metrics side by side, with deltas. %>
+  <%# Summary diff - top-line metrics side by side, with deltas. %>
   <% left_stats = @run.usage_stats || {} %>
   <% right_stats = @against.usage_stats || {} %>
   <div class="grid grid-cols-2 gap-4 mb-4">

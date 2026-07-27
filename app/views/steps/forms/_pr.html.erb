@@ -1,0 +1,71 @@
+<%# Open PR: push the run's branch and open a pull request. Locals: f:, step: %>
+<% cfg = step.config || {} %>
+<div class="space-y-4">
+  <div>
+    <label for="pr_title" class="block text-sm font-medium text-content-muted mb-1.5">Title</label>
+    <input type="text" name="pr_title" id="pr_title"
+           value="<%= cfg["title"] %>" placeholder="e.g. feat: ${task_title}"
+           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    <p class="text-xs text-content-muted mt-1.5">Variables like <code class="bg-surface-input px-1 rounded">${task_title}</code> are substituted first.</p>
+  </div>
+
+  <div>
+    <label for="pr_body" class="block text-sm font-medium text-content-muted mb-1.5">Description</label>
+    <textarea name="pr_body" id="pr_body" rows="5"
+              placeholder="## What changed&#10;&#10;${task_body}"
+              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= cfg["body"] %></textarea>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label for="pr_base" class="block text-sm font-medium text-content-muted mb-1.5">Merge into</label>
+      <input type="text" name="pr_base" id="pr_base"
+             value="<%= cfg["base"] || "main" %>" placeholder="main"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    </div>
+    <div>
+      <label for="pr_branch" class="block text-sm font-medium text-content-muted mb-1.5">From branch</label>
+      <input type="text" name="pr_branch" id="pr_branch"
+             value="<%= cfg["branch"] %>" placeholder="The run's own branch"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    </div>
+  </div>
+
+  <label class="flex items-center gap-2.5 cursor-pointer text-sm text-content">
+    <input type="checkbox" name="pr_draft" value="1" <%= "checked" if cfg.fetch("draft", true) %> class="accent-accent h-4 w-4 rounded cursor-pointer">
+    Open as a draft
+  </label>
+
+  <div>
+    <label for="pr_reviewers" class="block text-sm font-medium text-content-muted mb-1.5">Reviewers</label>
+    <input type="text" name="pr_reviewers" id="pr_reviewers"
+           value="<%= Array(cfg["reviewers"]).join(", ") %>" placeholder="e.g. octocat, my-org/devs"
+           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    <p class="text-xs text-content-muted mt-1.5">Comma separated.</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label for="pr_labels" class="block text-sm font-medium text-content-muted mb-1.5">Labels</label>
+      <input type="text" name="pr_labels" id="pr_labels"
+             value="<%= Array(cfg["labels"]).join(", ") %>" placeholder="e.g. enhancement, bug"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    </div>
+    <div>
+      <label for="pr_assignees" class="block text-sm font-medium text-content-muted mb-1.5">Assignees</label>
+      <input type="text" name="pr_assignees" id="pr_assignees"
+             value="<%= Array(cfg["assignees"]).join(", ") %>" placeholder="e.g. developer-one"
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+    </div>
+  </div>
+
+  <div class="p-3 bg-danger/5 border border-danger/20 rounded-lg">
+    <label class="flex items-start gap-2.5 cursor-pointer text-sm text-danger">
+      <input type="checkbox" name="pr_clean" value="1" <%= "checked" if cfg["clean"] %> class="accent-danger h-4 w-4 rounded cursor-pointer mt-0.5">
+      <span>
+        <span class="block font-medium">Close and re-create any existing pull request</span>
+        <span class="block text-xs text-content-muted mt-0.5">Off by default: the step reuses an open pull request for the same branch.</span>
+      </span>
+    </label>
+  </div>
+</div>

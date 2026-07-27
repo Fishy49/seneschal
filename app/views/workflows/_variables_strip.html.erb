@@ -1,0 +1,25 @@
+<%# Everything a step at the end of this workflow could read. Clicking one
+    lights up the steps that produce and consume it. Locals: workflow:, steps: %>
+<% last_position = steps.map(&:position).max.to_i + 1 %>
+<% variables = Step.available_variables_for(workflow, last_position) %>
+<%= render layout: "shared/components/card", locals: { title: "Variables", class: "mb-4" } do %>
+  <p class="text-xs text-content-muted mb-3">
+    &rarr; produced by this step &middot; &larr; injected into this step. Click a variable to trace it.
+  </p>
+  <% if variables.any? %>
+    <div class="flex flex-wrap gap-1.5">
+      <% variables.each do |variable| %>
+        <button type="button"
+                data-variable="<%= variable["name"] %>"
+                data-variable-highlight-target="pill"
+                data-action="variable-highlight#toggle"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-input border border-edge text-[0.6875rem] font-mono text-content-muted cursor-pointer hover:text-content transition-colors">
+          <%= variable["name"] %>
+          <span class="text-content-muted/60"><%= variable["source"] %></span>
+        </button>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-sm text-content-muted">No variables yet. Steps that produce output add them here.</p>
+  <% end %>
+<% end %>

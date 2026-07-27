@@ -39,6 +39,14 @@ class Run < ApplicationRecord
     ApprovalEvent.joins(:run_step).where(run_steps: { run_id: id }).recent.first
   end
 
+  # This run's 1-based position among its task's runs, so people can say
+  # "run 3" instead of "#47". One COUNT per call; fine at self-hosted scale.
+  def ordinal
+    return nil unless pipeline_task
+
+    pipeline_task.runs.where(id: ..id).count
+  end
+
   # Human-readable attribution. Runs from before attribution existed, and runs
   # fired by cron or a branch watcher, fall back to the trigger reason.
   def started_by_label

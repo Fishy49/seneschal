@@ -38,8 +38,9 @@ Rails.application.routes.draw do
   post  "setup/check_claude",       to: "setup#check_claude",       as: :check_claude_setup
   post  "setup/check_gh",           to: "setup#check_gh",           as: :check_gh_setup
   post  "setup/check_sdk_runner",   to: "setup#check_sdk_runner",   as: :check_sdk_runner_setup
-  patch "setup/allowed_tools",      to: "setup#update_allowed_tools", as: :update_allowed_tools_setup
-  patch "setup/notifications",      to: "setup#update_notifications", as: :update_notifications_setup
+
+  get   "admin/settings", to: "admin_settings#show", as: :admin_settings
+  patch "admin/settings", to: "admin_settings#update"
 
   resources :projects do
     member do
@@ -55,7 +56,7 @@ Rails.application.routes.draw do
       post :suggestions
     end
     resource :workflow_import, only: [:new, :create], controller: "workflow_imports"
-    resources :workflows do
+    resources :workflows, except: [:index] do
       member do
         post :trigger
         get :export
@@ -86,7 +87,7 @@ Rails.application.routes.draw do
   end
   resources :json_schemas
   resources :project_groups
-  resources :step_templates, path: "templates", only: [:index, :destroy]
+  resources :step_templates, path: "templates", only: [:index, :show, :edit, :update, :destroy]
 
   # Data management (admin only)
   get  "data",        to: "data#index",  as: :data_management

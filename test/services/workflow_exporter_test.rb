@@ -65,11 +65,17 @@ class WorkflowExporterTest < ActiveSupport::TestCase
     assert_nil command_step[:skill_ref]
   end
 
-  test "exports trigger_config and workflow config blob" do
-    @workflow.update!(trigger_config: { "cron" => "0 * * * *" }, config: { "runner" => "claude_sdk" })
+  test "exports the workflow config blob" do
+    @workflow.update!(config: { "runner" => "claude_sdk" })
     payload = WorkflowExporter.new(@workflow).call[:seneschal_workflow_export]
 
-    assert_equal({ "cron" => "0 * * * *" }, payload[:workflow][:trigger_config])
     assert_equal({ "runner" => "claude_sdk" }, payload[:workflow][:config])
+  end
+
+  test "no longer exports the retired workflow trigger fields" do
+    payload = WorkflowExporter.new(@workflow).call[:seneschal_workflow_export]
+
+    assert_not payload[:workflow].key?(:trigger_type)
+    assert_not payload[:workflow].key?(:trigger_config)
   end
 end

@@ -43,7 +43,7 @@ class TasksTest < ApplicationSystemTestCase
   end
 
   test "choosing a project narrows the workflow select" do
-    other = projects(:other_project).workflows.create!(name: "Other Project Flow", trigger_type: "manual")
+    other = projects(:other_project).workflows.create!(name: "Other Project Flow")
 
     visit new_pipeline_task_path
     select "Seneschal", from: "Project"

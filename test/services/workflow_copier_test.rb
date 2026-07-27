@@ -17,14 +17,14 @@ class WorkflowCopierTest < ActiveSupport::TestCase
   end
 
   test "appends '(copy N)' suffix when name conflicts" do
-    @target.workflows.create!(name: "Deploy Pipeline", trigger_type: "manual")
+    @target.workflows.create!(name: "Deploy Pipeline")
     result = WorkflowCopier.new(@source, @target).call
     assert_equal "Deploy Pipeline (copy 2)", result.workflow.name
   end
 
   test "appends incrementing suffix for multiple conflicts" do
-    @target.workflows.create!(name: "Deploy Pipeline", trigger_type: "manual")
-    @target.workflows.create!(name: "Deploy Pipeline (copy 2)", trigger_type: "manual")
+    @target.workflows.create!(name: "Deploy Pipeline")
+    @target.workflows.create!(name: "Deploy Pipeline (copy 2)")
     result = WorkflowCopier.new(@source, @target).call
     assert_equal "Deploy Pipeline (copy 3)", result.workflow.name
   end
@@ -38,7 +38,7 @@ class WorkflowCopierTest < ActiveSupport::TestCase
   end
 
   test "reports project-scoped skills missing from target" do
-    wf = projects(:seneschal).workflows.create!(name: "Skill Wf", trigger_type: "manual")
+    wf = projects(:seneschal).workflows.create!(name: "Skill Wf")
     wf.steps.create!(
       name: "Check Step",
       step_type: "skill",
@@ -57,7 +57,7 @@ class WorkflowCopierTest < ActiveSupport::TestCase
   test "uses target project's skill of same name when present" do
     target_skill = @target.skills.create!(name: "deploy_check", source_kind: "project_seneschal",
                                           relative_path: "deploy_check")
-    wf = projects(:seneschal).workflows.create!(name: "Skill Wf 2", trigger_type: "manual")
+    wf = projects(:seneschal).workflows.create!(name: "Skill Wf 2")
     wf.steps.create!(
       name: "Check Step",
       step_type: "skill",
@@ -73,7 +73,7 @@ class WorkflowCopierTest < ActiveSupport::TestCase
   end
 
   test "strips context_projects from copied step config" do
-    wf = projects(:seneschal).workflows.create!(name: "Context Wf", trigger_type: "manual")
+    wf = projects(:seneschal).workflows.create!(name: "Context Wf")
     wf.steps.create!(
       name: "Context Step",
       step_type: "command",
@@ -90,7 +90,6 @@ class WorkflowCopierTest < ActiveSupport::TestCase
   test "copies workflow description and trigger attributes" do
     result = WorkflowCopier.new(@source, @target).call
     assert_equal @source.description, result.workflow.description
-    assert_equal @source.trigger_type, result.workflow.trigger_type
   end
 
   test "result includes copied_steps" do

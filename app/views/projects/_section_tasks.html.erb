@@ -1,0 +1,47 @@
+<%= render layout: "shared/components/card",
+      locals: { title: "Tasks", action: { label: "New task", path: new_pipeline_task_path(project_id: project.id) } } do %>
+  <div class="flex items-center gap-1 mb-3">
+    <%= link_to "All", project_path(project, section: "tasks"),
+          class: nav_tab_classes(params[:status].blank?) %>
+    <% PipelineTask::STATUSES.each do |status| %>
+      <%= link_to status.capitalize, project_path(project, section: "tasks", status: status),
+            class: nav_tab_classes(params[:status] == status) %>
+    <% end %>
+  </div>
+
+  <% if @tasks.any? %>
+    <table class="w-full border-collapse">
+      <thead>
+        <tr>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Title</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
+          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Updated</th>
+          <th class="px-3 py-2 border-b border-edge"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @tasks.each do |task| %>
+          <tr>
+            <td class="px-3 py-2 border-b border-edge"><%= link_to task.title, pipeline_task_path(task) %></td>
+            <td class="px-3 py-2 border-b border-edge"><%= status_badge(task.status) %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= task.workflow&.name || "none" %></td>
+            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(task.updated_at) %></td>
+            <td class="px-3 py-2 border-b border-edge text-right">
+              <% if task.executable? %>
+                <%= button_to "Run", execute_pipeline_task_path(task),
+                      class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% elsif params[:status].present? %>
+    <%= render "shared/components/empty_state", message: "No #{params[:status]} tasks.",
+          cta_label: "Show all tasks", cta_path: project_path(project, section: "tasks") %>
+  <% else %>
+    <%= render "shared/components/empty_state", message: "No tasks yet.",
+          cta_label: "Create the first task", cta_path: new_pipeline_task_path(project_id: project.id) %>
+  <% end %>
+<% end %>

@@ -19,12 +19,16 @@
           class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent resize-y" %>
   </div>
 
-  <div class="mb-4">
-    <%= f.label :body, "Schema Body (JSON)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.text_area :body, rows: 16,
-          placeholder: '{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}',
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
-    <p class="text-xs text-content-muted mt-1">JSON Schema (Draft 4/6/7/2019-09/2020-12) that describes the expected structure.</p>
+  <div class="mb-4" data-controller="code-editor">
+    <%= f.label :body, "Shape", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+    <p class="text-xs text-content-muted mb-2">
+      A JSON Schema describing what a step must answer with. Drafts 4 through 2020-12 all work.
+    </p>
+    <div class="codejar-wrap">
+      <code class="language-json codejar-editor" data-code-editor-target="editor"></code>
+    </div>
+    <%= f.hidden_field :body, value: schema.body.presence || JsonSchemasHelper::STARTER_BODY,
+          data: { code_editor_target: "input" } %>
   </div>
 
   <div class="flex gap-2">

@@ -75,9 +75,9 @@
   <% end %>
 
   <% if @run_steps.none? %>
-    <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-      <p>This run has no RunSteps yet.</p>
-    </div>
+    <%= render layout: "shared/components/card" do %>
+      <%= render "shared/components/empty_state", message: "This run has no steps yet." %>
+    <% end %>
   <% end %>
 </div>
 </div>

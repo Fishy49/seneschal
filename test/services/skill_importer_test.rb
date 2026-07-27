@@ -81,4 +81,40 @@ class SkillImporterTest < ActiveSupport::TestCase
       assert_equal ["fallback-name"], result[:imported]
     end
   end
+
+  test "imports skills written under .seneschal/skills too" do
+    Dir.mktmpdir do |dir|
+      project = Project.new(name: "SeneschalDirTest", repo_url: "https://github.com/t/s.git", local_path: dir)
+      project.save!(validate: false)
+
+      skill_dir = File.join(dir, ".seneschal", "skills", "scaffolded")
+      FileUtils.mkdir_p(skill_dir)
+      File.write(File.join(skill_dir, "SKILL.md"), "---\nname: scaffolded\ndescription: Made here\n---\n\nBody.\n")
+
+      result = SkillImporter.new(project).call
+
+      assert_equal ["scaffolded"], result[:imported]
+      imported = Skill.find_by(project: project, name: "scaffolded")
+      assert_equal "project_seneschal", imported.source_kind
+      assert_includes imported.body, "Body."
+    end
+  end
+
+  test "imports from both skill directories in one pass" do
+    Dir.mktmpdir do |dir|
+      project = Project.new(name: "BothDirsTest", repo_url: "https://github.com/t/b.git", local_path: dir)
+      project.save!(validate: false)
+
+      [".claude", ".seneschal"].each_with_index do |_, index|
+        base = index.zero? ? ".claude" : ".seneschal"
+        skill_dir = File.join(dir, base, "skills", "from-#{base.delete(".")}")
+        FileUtils.mkdir_p(skill_dir)
+        File.write(File.join(skill_dir, "SKILL.md"), "---\nname: from-#{base.delete(".")}\n---\n\nBody.\n")
+      end
+
+      result = SkillImporter.new(project).call
+
+      assert_equal ["from-claude", "from-seneschal"], result[:imported].sort
+    end
+  end
 end

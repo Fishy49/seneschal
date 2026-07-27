@@ -1,38 +1,6 @@
 require "test_helper"
 
 class ApplicationHelperTest < ActionView::TestCase
-  test "status_badge renders span with status text" do
-    html = status_badge("running")
-    assert_includes html, "running"
-    assert_includes html, "bg-accent/15"
-  end
-
-  test "status_badge adds pulse dot for running" do
-    html = status_badge("running")
-    assert_includes html, "animate-pulse"
-  end
-
-  test "status_badge adds pulse dot for retrying" do
-    html = status_badge("retrying")
-    assert_includes html, "animate-pulse"
-  end
-
-  test "status_badge no pulse for completed" do
-    html = status_badge("completed")
-    assert_not_includes html, "animate-pulse"
-  end
-
-  test "status_badge uses pending style for unknown status" do
-    html = status_badge("unknown")
-    assert_includes html, STATUS_CLASSES["pending"]
-  end
-
-  test "type_badge renders span with type text" do
-    html = type_badge("skill")
-    assert_includes html, "skill"
-    assert_includes html, "bg-accent/15"
-  end
-
   test "format_duration formats seconds" do
     assert_equal "5.2s", format_duration(5.23)
   end
@@ -92,5 +60,29 @@ class ApplicationHelperTest < ActionView::TestCase
 
   test "usage_stats_bar returns nil for nil" do
     assert_nil usage_stats_bar(nil)
+  end
+
+  test "workflow_stats_line is nil for a workflow nobody has run" do
+    assert_nil workflow_stats_line(Workflow::Stats.new(run_count: 0, success_rate: nil, median_cost: nil))
+  end
+
+  test "workflow_stats_line joins the parts it has" do
+    line = workflow_stats_line(Workflow::Stats.new(run_count: 34, success_rate: 0.906, median_cost: 1.2))
+    assert_equal "34 runs · 91% succeeded · ~$1.20", line
+  end
+
+  test "workflow_stats_line drops parts with no honest number" do
+    assert_equal "1 run", workflow_stats_line(Workflow::Stats.new(run_count: 1, success_rate: nil, median_cost: nil))
+    assert_equal "2 runs · 0% succeeded",
+                 workflow_stats_line(Workflow::Stats.new(run_count: 2, success_rate: 0.0, median_cost: 0.0))
+  end
+
+  test "run_display_name names a run after its task" do
+    assert_equal "Add search \u00b7 run 1", run_display_name(runs(:completed_run))
+  end
+
+  test "run_display_name falls back to the id without a task" do
+    run = runs(:failed_run)
+    assert_equal "Manual run ##{run.id}", run_display_name(run)
   end
 end

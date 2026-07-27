@@ -4,6 +4,8 @@ class WorkflowsController < ApplicationController
 
   def show
     @steps = @workflow.steps
+    @stats = @workflow.stats
+    @access = WorkflowAccessSummary.for(@workflow)
     @recent_runs = @workflow.runs.includes(:pipeline_task, workflow: :project).recent.limit(10)
   end
 

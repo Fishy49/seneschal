@@ -10,6 +10,19 @@ class AccountControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "GET edit offers to enable 2FA when it is off" do
+    get account_path
+    assert_select "h2", text: "Security"
+    assert_select "a[href=?]", setup_two_factor_path, text: "Enable two-factor authentication"
+  end
+
+  test "GET edit offers to disable 2FA when it is on" do
+    users(:admin).update!(otp_secret: ROTP::Base32.random, otp_required_for_login: true)
+    get account_path
+    assert_select "form[action=?]", disable_two_factor_path
+    assert_select "a[href=?]", setup_two_factor_path, count: 0
+  end
+
   test "PATCH update email" do
     patch account_path, params: { user: { email: "newemail@test.com" } }
     assert_redirected_to account_path

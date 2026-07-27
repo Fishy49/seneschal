@@ -1,6 +1,9 @@
 class ProjectsController < ApplicationController
   before_action :set_project, only: [:show, :edit, :update, :destroy, :clone, :refetch]
 
+  SECTIONS = ["overview", "workflows", "tasks", "runs", "skills", "settings"].freeze
+  RUNS_LIMIT = 50
+
   def index
     @project_groups = ProjectGroup.ordered
     @projects = Project.includes(:project_group).order(:name)
@@ -10,16 +13,18 @@ class ProjectsController < ApplicationController
 
   def show
     @project.refresh_repo_status!
-    @workflows = @project.workflows.order(:name)
-    @tasks = @project.pipeline_tasks.active.recent.limit(10)
-    @recent_runs = @project.runs.includes(:pipeline_task, workflow: :project).recent.limit(10)
+    load_section
   end
 
   def new
     @project = Project.new
   end
 
-  def edit; end
+  # The project form lives on the hub's Settings tab; this route stays valid
+  # for old links and for the Edit Path affordance on a failed clone.
+  def edit
+    redirect_to project_path(@project, section: "settings")
+  end
 
   def create
     @project = Project.new(project_params)
@@ -32,9 +37,10 @@ class ProjectsController < ApplicationController
 
   def update
     if @project.update(project_params)
-      redirect_to @project, notice: "Project updated."
+      redirect_to project_path(@project, section: "settings"), notice: "Project updated."
     else
-      render :edit, status: :unprocessable_content
+      @section = "settings"
+      render :show, status: :unprocessable_content
     end
   end
 
@@ -80,6 +86,34 @@ class ProjectsController < ApplicationController
 
   def set_project
     @project = Project.find(params.expect(:id))
+  end
+
+  # Only the requested tab's data is loaded; the sidebar links straight at the
+  # default tab, so it has to stay cheap.
+  def load_section
+    @section = SECTIONS.include?(params[:section]) ? params[:section] : "overview"
+
+    case @section
+    when "overview"
+      @recent_runs = project_runs.limit(5)
+    when "workflows"
+      @workflows = @project.workflows.includes(:steps, :runs).order(:name)
+      @last_runs = @workflows.to_h { |workflow| [workflow.id, workflow.runs.max_by(&:created_at)] }
+      @stats = @workflows.to_h { |workflow| [workflow.id, workflow.stats] }
+      @access = @workflows.to_h { |workflow| [workflow.id, WorkflowAccessSummary.for(workflow)] }
+    when "tasks"
+      @tasks = @project.pipeline_tasks.includes(:workflow).recent
+      @tasks = @tasks.where(status: params[:status]) if PipelineTask::STATUSES.include?(params[:status])
+    when "runs"
+      @runs = project_runs.limit(RUNS_LIMIT)
+    when "skills"
+      @skills = @project.skills.order(:name)
+      @skill_usage = Step.where(skill_id: @skills.map(&:id)).group(:skill_id).count
+    end
+  end
+
+  def project_runs
+    @project.runs.includes(:pipeline_task, workflow: :project).recent
   end
 
   def project_params

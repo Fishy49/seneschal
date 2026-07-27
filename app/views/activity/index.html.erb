@@ -1,14 +1,14 @@
-<h1 class="text-2xl font-semibold mb-4">Activity</h1>
+<%= render "shared/components/page_header", title: "Activity" %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
   <% if @events.any? %>
     <ul class="list-none">
       <%= render partial: "activity/event", collection: @events %>
     </ul>
   <% else %>
-    <p class="text-center py-8 text-content-muted">Nothing has happened yet.</p>
+    <%= render "shared/components/empty_state", message: "Nothing has happened yet." %>
   <% end %>
-</div>
+<% end %>
 
 <div class="flex items-center gap-2">
   <% if @page > 1 %>

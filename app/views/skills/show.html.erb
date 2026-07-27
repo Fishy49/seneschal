@@ -17,12 +17,17 @@
 
 <% if @skill.filesystem_backed? && @skill.absolute_path %>
   <div class="mb-4 p-4 border border-edge rounded-lg bg-surface-muted/40">
+    <div class="flex items-start gap-2 mb-2"
+         title="A step resolves a skill by name in this order: the project's .claude/skills, then its .seneschal/skills, then the shared folders, then synced skill repositories by priority.">
+      <span class="text-sm font-medium text-content-muted">Resolves from:</span>
+      <span class="text-sm text-content"><%= skill_source_label(@skill) %></span>
+    </div>
     <div class="flex items-start gap-2 mb-2">
       <span class="text-sm font-medium text-content-muted">On disk:</span>
       <code class="text-xs text-content font-mono break-all"><%= @skill.absolute_path %></code>
     </div>
     <p class="text-xs text-content-muted">
-      Edit <code>SKILL.md</code> directly to change the body, frontmatter, or <code>allowed-tools</code>.
+      Edit <code>SKILL.md</code> here or on disk to change the body, frontmatter, or <code>allowed-tools</code>.
       Drop helper files into <code>scripts/</code> (executable utilities that run without consuming context)
       or <code>references/</code> (lazy-loaded docs the agent can read on demand).
       Reloading this page re-syncs cached frontmatter from disk.

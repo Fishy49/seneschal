@@ -87,8 +87,6 @@ class DataExporter
     {
       name: workflow.name,
       description: workflow.description,
-      trigger_type: workflow.trigger_type,
-      trigger_config: workflow.trigger_config,
       steps: workflow.steps.sort_by(&:position).map { |s| export_step(s) }
     }
   end

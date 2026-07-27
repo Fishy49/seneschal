@@ -3,12 +3,15 @@ class JsonSchemasController < ApplicationController
 
   def index
     @schemas = JsonSchema.order(:name)
-    @usage_counts = Step.where("json_extract(config, '$.json_schema_id') IS NOT NULL")
-                        .group("json_extract(config, '$.json_schema_id')")
-                        .count
+    @usage_counts = step_usage_counts
+    @skill_usage_counts = Skill.where.not(default_json_schema_id: nil).group(:default_json_schema_id).count
   end
 
-  def show; end
+  def show
+    @step_count = step_usage_counts[@schema.id].to_i
+    @referencing_skills = Skill.where(default_json_schema_id: @schema.id).includes(:project).order(:name)
+    @exposed_paths = JsonPathResolver.paths_for_schema(@schema.body)
+  end
 
   def new
     @schema = JsonSchema.new
@@ -46,6 +49,14 @@ class JsonSchemasController < ApplicationController
 
   def set_schema
     @schema = JsonSchema.find(params.expect(:id))
+  end
+
+  # Steps store the schema id inside their config JSON, so the count comes out
+  # of json_extract rather than a foreign key.
+  def step_usage_counts
+    Step.where("json_extract(config, '$.json_schema_id') IS NOT NULL")
+        .group("json_extract(config, '$.json_schema_id')")
+        .count
   end
 
   def schema_params

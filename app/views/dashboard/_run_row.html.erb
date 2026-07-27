@@ -1,0 +1,18 @@
+<%# One run in the Home runs card. Locals: run: %>
+<li class="flex items-center gap-3 py-2 border-b border-edge last:border-b-0">
+  <%= status_dot(run.status) %>
+  <div class="min-w-0 flex-1">
+    <div class="truncate text-sm">
+      <%= link_to run_display_name(run), run_path(run), class: "font-medium hover:text-accent transition-colors" %>
+    </div>
+    <div class="text-xs text-content-muted truncate">
+      <%= run.workflow.project.name %> &middot; <%= run.workflow.name %><%
+        %><% if (progress = run_progress_text(run)) %> &middot; on <%= progress %><% end %>
+    </div>
+  </div>
+  <%= avatar_for(run.started_by, size: :xs) %>
+  <% if (cost = format_cost(run.usage_stats&.dig(:cost_usd))) %>
+    <span class="text-xs text-content-muted shrink-0"><%= cost %></span>
+  <% end %>
+  <span class="text-xs text-content-muted shrink-0"><%= time_ago_short(run.finished_at || run.started_at || run.created_at) %></span>
+</li>

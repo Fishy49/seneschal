@@ -1,96 +1,26 @@
 import { Controller } from "@hotwired/stimulus"
 
+// Within-type behaviour for the step inspector. Which fields exist at all is
+// decided on the server by the step's type, so this controller only handles
+// the toggles inside one type.
 export default class extends Controller {
   static targets = [
-    "typeSelect", "skillFields", "bodyFields", "bodyLabel", "claudeConfigFields", "ciCheckFields", "contextFetchFields", "prFields",
     "skillSelect", "skillName", "skillPreview", "previewBody", "previewContent", "previewToggleText",
     "ciMode", "ciPrFields", "ciWorkflowFields", "ciLogFields",
     "fetchMethod", "fetchUrlFields", "fetchProjectFileFields", "fetchPath", "fetchPathDisplay", "fetchSchemaFields",
     "schemaSelect", "schemaOutputFields", "schemaOutputInput", "producesMultiFields", "producesInputWrapper",
     "onFailType", "onFailMaxRounds", "onFailSkillFields", "onFailBodyFields", "onFailReopenFields",
-    "saveTemplateCheck", "saveTemplateFields", "tabBtn", "tabContent"
+    "saveTemplateCheck", "saveTemplateFields"
   ]
-  static values = { skills: Object, templates: Object }
+  static values = { skills: Object }
 
   connect() {
     this.previewVisible = false
-    this.currentTab = "general"
-    this.toggle()
     if (this.hasSkillSelectTarget) this.skillChanged()
     if (this.hasCiModeTarget) this.ciModeChanged()
     if (this.hasFetchMethodTarget) this.fetchMethodChanged()
+    if (this.hasOnFailTypeTarget) this.onFailChanged()
     this.applySchemaMode({ wipeOnEnter: false })
-
-    this.updateTabVisibility()
-    this.activateTab(this.currentTab)
-  }
-
-  toggle() {
-    const type = this.typeSelectTarget.value
-    this.skillFieldsTarget.style.display = type === "skill" ? "" : "none"
-    this.bodyFieldsTarget.style.display = ["script", "command", "prompt"].includes(type) ? "" : "none"
-    if (this.hasClaudeConfigFieldsTarget) {
-      this.claudeConfigFieldsTarget.style.display = ["skill", "prompt"].includes(type) ? "" : "none"
-    }
-    if (this.hasBodyLabelTarget) {
-      const labels = { script: "Script", command: "Command", prompt: "Prompt" }
-      this.bodyLabelTarget.textContent = labels[type] || "Body"
-    }
-    if (this.hasCiCheckFieldsTarget) {
-      this.ciCheckFieldsTarget.style.display = type === "ci_check" ? "" : "none"
-    }
-    if (this.hasContextFetchFieldsTarget) {
-      this.contextFetchFieldsTarget.style.display = type === "context_fetch" ? "" : "none"
-    }
-    if (this.hasPrFieldsTarget) {
-      this.prFieldsTarget.style.display = type === "pr" ? "" : "none"
-    }
-    this.applySchemaMode({ wipeOnEnter: false })
-    this.updateTabVisibility()
-  }
-
-  switchTab(event) {
-    const tabName = event.currentTarget.dataset.tab
-    this.activateTab(tabName)
-  }
-
-  activateTab(tabName) {
-    this.currentTab = tabName
-
-    // Update button states
-    this.tabBtnTargets.forEach(btn => {
-      const active = btn.dataset.tab === tabName
-      if (active) {
-        btn.setAttribute("aria-selected", "true")
-        btn.classList.add("border-accent", "text-accent")
-        btn.classList.remove("border-transparent", "text-content-muted")
-      } else {
-        btn.setAttribute("aria-selected", "false")
-        btn.classList.add("border-transparent", "text-content-muted")
-        btn.classList.remove("border-accent", "text-accent")
-      }
-    })
-
-    // Update panel visibility
-    this.tabContentTargets.forEach(panel => {
-      panel.style.display = panel.dataset.tab === tabName ? "" : "none"
-    })
-  }
-
-  updateTabVisibility() {
-    if (!this.hasTypeSelectTarget) return
-    const type = this.typeSelectTarget.value
-    const isClaude = ["skill", "prompt"].includes(type)
-
-    const aiTabBtn = this.tabBtnTargets.find(btn => btn.dataset.tab === "ai")
-    if (aiTabBtn) {
-      aiTabBtn.style.display = isClaude ? "" : "none"
-    }
-
-    // If active tab was AI settings, but now hidden, fallback to "general"
-    if (this.currentTab === "ai" && !isClaude) {
-      this.activateTab("general")
-    }
   }
 
   schemaChanged() {
@@ -100,14 +30,12 @@ export default class extends Controller {
   applySchemaMode({ wipeOnEnter }) {
     if (!this.hasSchemaOutputFieldsTarget || !this.hasProducesMultiFieldsTarget) return
 
-    const type = this.typeSelectTarget.value
-    const isClaudeStep = type === "skill" || type === "prompt"
     const schemaId = this.hasSchemaSelectTarget ? this.schemaSelectTarget.value : ""
     // The schema picker has three states: inherit (badge shown, schemaId ""),
     // override-with-schema (schemaId set), and override-with-None (schemaId "").
-    // schemaId alone can't tell the first from the third — inherit also counts
+    // schemaId alone can't tell the first from the third - inherit also counts
     // as schema mode (we'll use schema.default_output_variable as produces).
-    const inSchemaMode = isClaudeStep && (!!schemaId || this.isInheritMode())
+    const inSchemaMode = !!schemaId || this.isInheritMode()
 
     this.schemaOutputFieldsTarget.style.display = inSchemaMode ? "" : "none"
     this.producesMultiFieldsTarget.style.display = inSchemaMode ? "none" : ""
@@ -168,8 +96,7 @@ export default class extends Controller {
     if (!this.hasFetchSchemaFieldsTarget) return
     const method = this.hasFetchMethodTarget ? this.fetchMethodTarget.value : ""
     const path = this.hasFetchPathTarget ? this.fetchPathTarget.value.toLowerCase() : ""
-    const visible = method === "project_file" && path.endsWith(".json")
-    this.fetchSchemaFieldsTarget.style.display = visible ? "" : "none"
+    this.fetchSchemaFieldsTarget.style.display = method === "project_file" && path.endsWith(".json") ? "" : "none"
   }
 
   ciModeChanged() {
@@ -186,13 +113,10 @@ export default class extends Controller {
 
     this.skillPreviewTarget.style.display = hasSkill ? "" : "none"
 
-    // Update displayed skill name
     if (this.hasSkillNameTarget) {
       if (hasSkill) {
-        // Try to find the name from the skill panel card, or fall back to the skills data
         const card = document.querySelector(`[data-skill-id="${id}"]`)
-        const name = card ? card.dataset.skillName : `Skill #${id}`
-        this.skillNameTarget.innerHTML = name
+        this.skillNameTarget.innerHTML = card ? card.dataset.skillName : `Skill #${id}`
       } else {
         this.skillNameTarget.innerHTML = '<span class="text-content-muted">No skill selected</span>'
       }
@@ -206,9 +130,7 @@ export default class extends Controller {
       pre.appendChild(code)
       this.previewContentTarget.replaceChildren(pre)
       window.hljs?.highlightElement(code)
-    }
-
-    if (!hasSkill) {
+    } else {
       this.previewVisible = false
       this.previewBodyTarget.style.display = "none"
       this.previewToggleTextTarget.textContent = "Show"
@@ -224,8 +146,7 @@ export default class extends Controller {
   onFailChanged() {
     if (!this.hasOnFailTypeTarget) return
     const type = this.onFailTypeTarget.value
-    const hasAction = type !== ""
-    if (this.hasOnFailMaxRoundsTarget) this.onFailMaxRoundsTarget.style.display = hasAction ? "" : "none"
+    if (this.hasOnFailMaxRoundsTarget) this.onFailMaxRoundsTarget.style.display = type === "" ? "none" : ""
     if (this.hasOnFailSkillFieldsTarget) this.onFailSkillFieldsTarget.style.display = type === "skill" ? "" : "none"
     if (this.hasOnFailReopenFieldsTarget) this.onFailReopenFieldsTarget.style.display = type === "reopen_previous" ? "" : "none"
     if (this.hasOnFailBodyFieldsTarget) this.onFailBodyFieldsTarget.style.display = ["script", "command"].includes(type) ? "" : "none"
@@ -234,111 +155,5 @@ export default class extends Controller {
   toggleSaveTemplate() {
     if (!this.hasSaveTemplateFieldsTarget) return
     this.saveTemplateFieldsTarget.style.display = this.saveTemplateCheckTarget.checked ? "" : "none"
-  }
-
-  loadTemplate(templateId) {
-    const template = this.templatesValue[templateId]
-    if (!template) return
-
-    const cfg = template.config || {}
-
-    // Basic fields
-    this.field("step[name]").value = template.name || ""
-    this.typeSelectTarget.value = template.step_type
-    this.field("step[body]").value = template.body || ""
-    this.field("step[max_retries]").value = template.max_retries
-    this.field("step[timeout]").value = template.timeout
-    this.field("step[input_context]").value = template.input_context || ""
-    // On-fail action
-    const onFail = cfg.on_fail_action || {}
-    this.field("on_fail_type").value = onFail.type || ""
-    this.field("on_fail_max_rounds").value = onFail.max_rounds || 3
-    this.field("on_fail_skill_id").value = onFail.skill_id || ""
-    this.field("on_fail_body").value = onFail.body || ""
-    if (this.hasOnFailTypeTarget) this.onFailChanged()
-
-    // Skill / Prompt config (shared Claude config)
-    if (template.step_type === "skill" || template.step_type === "prompt") {
-      if (template.step_type === "skill" && this.hasSkillSelectTarget && template.skill_id) {
-        this.skillSelectTarget.value = template.skill_id
-        if (this.hasSkillNameTarget && template.skill_name) {
-          this.skillNameTarget.textContent = template.skill_name
-        }
-        this.skillChanged()
-      }
-      this.field("skill_model").value = cfg.model || ""
-      this.field("skill_effort").value = cfg.effort || "medium"
-      this.field("skill_max_turns").value = cfg.max_turns || ""
-      this.field("skill_allowed_tools").value = cfg.allowed_tools || ""
-      this.field("json_schema_id").value = cfg.json_schema_id || ""
-    }
-
-    // Manual approval
-    const ma = this.element.querySelector('[name="step[manual_approval]"]')
-    if (ma) ma.checked = !!template.manual_approval
-
-    // Pipeline: produces / consumes
-    const producesTags = cfg.produces || []
-    const isClaudeStep = template.step_type === "skill" || template.step_type === "prompt"
-    const templateInSchemaMode = isClaudeStep && !!cfg.json_schema_id
-    const producesWrapper = this.element.querySelector('[data-controller~="produces-input"]')
-    const producesCtrl = producesWrapper && this.application.getControllerForElementAndIdentifier(producesWrapper, "produces-input")
-    if (templateInSchemaMode) {
-      if (producesCtrl) producesCtrl.setTags([])
-      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = producesTags[0] || ""
-    } else {
-      if (producesCtrl) {
-        producesCtrl.setTags(producesTags)
-      } else {
-        this.field("produces").value = producesTags.join(",")
-      }
-      if (this.hasSchemaOutputInputTarget) this.schemaOutputInputTarget.value = ""
-    }
-    const consumeCheckboxes = this.element.querySelectorAll('[name="consumes[]"]')
-    const consumes = cfg.consumes || []
-    consumeCheckboxes.forEach(cb => { cb.checked = consumes.includes(cb.value) })
-
-    // Context Fetch config
-    if (template.step_type === "context_fetch") {
-      this.field("fetch_method").value = cfg.method || "url"
-      this.field("fetch_url").value = cfg.url || ""
-      this.field("fetch_context_key").value = cfg.context_key || ""
-      this.field("fetch_json_schema_id").value = cfg.json_schema_id || ""
-      this.setProjectFile(cfg.path || "")
-      if (this.hasFetchMethodTarget) this.fetchMethodChanged()
-    }
-
-    // PR step config
-    if (template.step_type === "pr") {
-      this.field("pr_title").value = cfg.title || ""
-      this.field("pr_body").value = cfg.body || ""
-      this.field("pr_base").value = cfg.base || "main"
-      this.field("pr_branch").value = cfg.branch || ""
-      const draftBox = this.element.querySelector('[name="pr_draft"]')
-      if (draftBox) draftBox.checked = cfg.draft !== false
-      this.field("pr_reviewers").value = (cfg.reviewers || []).join(", ")
-      this.field("pr_labels").value = (cfg.labels || []).join(", ")
-      this.field("pr_assignees").value = (cfg.assignees || []).join(", ")
-    }
-
-    // CI Check config
-    if (template.step_type === "ci_check") {
-      this.field("ci_mode").value = cfg.mode || "pr"
-      this.field("ci_poll_interval").value = cfg.poll_interval || 30
-      this.field("ci_max_log_chars").value = cfg.max_log_chars || 10000
-      this.field("ci_log_from").value = cfg.log_from || "end"
-      this.field("ci_pr").value = cfg.pr || "${pr_number}"
-      this.field("ci_workflow").value = cfg.workflow || ""
-      this.field("ci_ref").value = cfg.ref || "${branch}"
-      const trigger = this.element.querySelector('[name="ci_trigger"]')
-      if (trigger) trigger.checked = !!cfg.trigger
-      if (this.hasCiModeTarget) this.ciModeChanged()
-    }
-
-    this.toggle()
-  }
-
-  field(name) {
-    return this.element.querySelector(`[name="${name}"]`) || { value: "", checked: false }
   }
 }

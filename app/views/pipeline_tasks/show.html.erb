@@ -100,7 +100,10 @@
           <tbody>
             <% @runs.each do |run| %>
               <tr>
-                <td class="px-3 py-2 border-b border-edge"><%= link_to "##{run.id}", run_path(run) %></td>
+                <td class="px-3 py-2 border-b border-edge">
+                  <%= link_to "run #{run.ordinal}", run_path(run) %>
+                  <span class="ml-1 text-xs text-content-muted">#<%= run.id %></span>
+                </td>
                 <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_cost(run.usage_stats&.dig(:cost_usd)) || "\u2014" %></td>
                 <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>

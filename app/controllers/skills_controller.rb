@@ -75,6 +75,11 @@ class SkillsController < ApplicationController
   # longer exposes those fields; `refresh_cached_metadata!` re-pulls the
   # cached metadata from disk when invoked.
   def update
+    if params[:skill_md].present? && (error = write_skill_md)
+      @skill.errors.add(:base, error)
+      return render :edit, status: :unprocessable_content
+    end
+
     if @skill.update(update_params)
       redirect_to @skill, notice: "Skill updated."
     else
@@ -106,6 +111,11 @@ class SkillsController < ApplicationController
 
   def set_skill
     @skill = Skill.find(params.expect(:id))
+  end
+
+  # The destination path comes from the skill itself, never from the request.
+  def write_skill_md
+    SkillMdWriter.call(skill: @skill, content: params[:skill_md]).error
   end
 
   def create_params

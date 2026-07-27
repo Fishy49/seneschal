@@ -1,0 +1,16 @@
+<%# Surface card. Always rendered with `render layout:`; the block is the body.
+    Locals:
+      title:  optional heading
+      action: optional {label:, path:} rendered as a small accent link
+      class:  optional extra classes on the card element %>
+<div class="bg-surface-card border border-edge rounded-lg p-5 <%= local_assigns[:class] %>">
+  <% if local_assigns[:title].present? || local_assigns[:action].present? %>
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h2 class="text-lg font-semibold"><%= local_assigns[:title] %></h2>
+      <% if (action = local_assigns[:action]).present? %>
+        <%= link_to action[:label], action[:path], class: "text-sm text-accent hover:underline" %>
+      <% end %>
+    </div>
+  <% end %>
+  <%= yield %>
+</div>

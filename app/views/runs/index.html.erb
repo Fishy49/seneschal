@@ -1,4 +1,4 @@
-<h1 class="text-2xl font-semibold mb-4">Runs</h1>
+<%= render "shared/components/page_header", title: "Runs" %>
 
 <div class="bg-surface-card border border-edge rounded-lg p-4 mb-4">
   <%= form_with url: runs_path, method: :get, class: "flex items-center gap-3 flex-wrap", data: { turbo_frame: "_top" } do |f| %>
@@ -22,9 +22,9 @@
   <% end %>
 </div>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5">
+<%= render layout: "shared/components/card" do %>
   <% filtered = params[:project_id].present? || params[:status].present? %>
   <%= render "shared/runs_list",
         runs: @runs,
         empty_message: filtered ? "No runs match your filters." : "No runs yet" %>
-</div>
+<% end %>

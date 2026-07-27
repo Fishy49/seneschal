@@ -13,9 +13,7 @@ class WorkflowCopier
     workflow = ActiveRecord::Base.transaction do
       wf = @target.workflows.create!(
         name: unique_name(@source.name),
-        description: @source.description,
-        trigger_type: @source.trigger_type,
-        trigger_config: @source.trigger_config
+        description: @source.description
       )
 
       @source.steps.order(:position).each do |step|

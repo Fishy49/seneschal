@@ -137,8 +137,6 @@ class WorkflowImporter
     @target.workflows.create!(
       name: chosen_name(wf_attrs[:name]),
       description: wf_attrs[:description],
-      trigger_type: wf_attrs[:trigger_type] || "manual",
-      trigger_config: wf_attrs[:trigger_config],
       config: wf_attrs[:config] || {}
     )
   end
@@ -148,8 +146,6 @@ class WorkflowImporter
     @replace_workflow.steps.destroy_all
     @replace_workflow.update!(
       description: wf_attrs[:description],
-      trigger_type: wf_attrs[:trigger_type] || @replace_workflow.trigger_type,
-      trigger_config: wf_attrs[:trigger_config],
       config: wf_attrs[:config] || {}
     )
     @replace_workflow

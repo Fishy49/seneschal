@@ -1,0 +1,70 @@
+<%= render "shared/library_nav" %>
+
+<%= render layout: "shared/components/page_header",
+      locals: { title: @template.name, subtitle: @template.description.presence } do %>
+  <%= link_to "Edit", edit_step_template_path(@template),
+        class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  <%= button_to "Delete", step_template_path(@template), method: :delete,
+        class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+        data: { turbo_confirm: "Delete template '#{@template.name}'?" } %>
+<% end %>
+
+<div class="max-w-3xl space-y-4">
+  <%= render layout: "shared/components/card", locals: { title: "What this template sets up" } do %>
+    <ul class="list-none text-sm space-y-2">
+      <li class="flex items-center gap-2">
+        <span class="text-content-muted w-40 shrink-0">Type</span>
+        <%= type_badge(@template.step_type) %>
+        <span class="text-content-muted"><%= step_type_label(@template.step_type) %></span>
+      </li>
+      <% if @template.skill %>
+        <li class="flex items-center gap-2">
+          <span class="text-content-muted w-40 shrink-0">Skill</span>
+          <%= link_to @template.skill.display_name, skill_path(@template.skill), class: "hover:text-accent transition-colors" %>
+        </li>
+      <% end %>
+      <li class="flex items-center gap-2">
+        <span class="text-content-muted w-40 shrink-0">Gives up after</span>
+        <span><%= @template.timeout %> seconds</span>
+      </li>
+      <li class="flex items-center gap-2">
+        <span class="text-content-muted w-40 shrink-0">Retries</span>
+        <span><%= @template.max_retries %></span>
+      </li>
+      <li class="flex items-center gap-2">
+        <span class="text-content-muted w-40 shrink-0">Pauses for approval</span>
+        <span><%= @template.manual_approval? ? "Yes" : "No" %></span>
+      </li>
+      <% if (produces = Array(@template.config["produces"])).any? %>
+        <li class="flex items-center gap-2">
+          <span class="text-content-muted w-40 shrink-0">Publishes</span>
+          <span class="font-mono text-xs"><%= produces.join(", ") %></span>
+        </li>
+      <% end %>
+      <% if (consumes = Array(@template.config["consumes"])).any? %>
+        <li class="flex items-center gap-2">
+          <span class="text-content-muted w-40 shrink-0">Reads</span>
+          <span class="font-mono text-xs"><%= consumes.join(", ") %></span>
+        </li>
+      <% end %>
+      <% if (on_fail = @template.config["on_fail_action"]).present? %>
+        <li class="flex items-center gap-2">
+          <span class="text-content-muted w-40 shrink-0">On failure</span>
+          <span><%= on_fail["type"].to_s.tr("_", " ") %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <% if @template.body.present? %>
+    <%= render layout: "shared/components/card", locals: { title: "Body" } do %>
+      <pre class="overflow-x-auto text-xs"><code data-controller="highlight"><%= @template.body %></code></pre>
+    <% end %>
+  <% end %>
+
+  <% if @template.input_context.present? %>
+    <%= render layout: "shared/components/card", locals: { title: "Extra instructions" } do %>
+      <p class="text-sm text-content-muted whitespace-pre-wrap"><%= @template.input_context %></p>
+    <% end %>
+  <% end %>
+</div>

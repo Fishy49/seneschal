@@ -20,7 +20,7 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
   test "POST create with valid params" do
     assert_difference "Workflow.count", 1 do
       post project_workflows_path(@project), params: {
-        workflow: { name: "New Workflow", trigger_type: "manual" }
+        workflow: { name: "New Workflow" }
       }
     end
     assert_redirected_to project_workflow_path(@project, Workflow.last)
@@ -29,7 +29,7 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
   test "POST create with invalid params" do
     assert_no_difference "Workflow.count" do
       post project_workflows_path(@project), params: {
-        workflow: { name: "", trigger_type: "manual" }
+        workflow: { name: "" }
       }
     end
     assert_response :unprocessable_content
@@ -47,8 +47,20 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_workflow_path(@project, @workflow)
   end
 
+  test "show offers a delete button" do
+    get project_workflow_path(@project, @workflow)
+    assert_select "form[action=?][method=?]", project_workflow_path(@project, @workflow), "post"
+    assert_select "input[value='delete'][name='_method']"
+  end
+
+  test "there is no workflow index" do
+    assert_raises(ActionController::RoutingError) do
+      Rails.application.routes.recognize_path("/projects/#{@project.id}/workflows", method: :get)
+    end
+  end
+
   test "DELETE destroy removes workflow" do
-    workflow = @project.workflows.create!(name: "Disposable", trigger_type: "manual")
+    workflow = @project.workflows.create!(name: "Disposable")
     assert_difference "Workflow.count", -1 do
       delete project_workflow_path(@project, workflow)
     end
@@ -65,7 +77,7 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "POST create records a workflow.created event" do
-    post project_workflows_path(@project), params: { workflow: { name: "Evented", trigger_type: "manual" } }
+    post project_workflows_path(@project), params: { workflow: { name: "Evented" } }
     assert_equal "workflow.created", Event.recent.first.action
     assert_equal Workflow.last, Event.recent.first.subject
   end
@@ -88,7 +100,7 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
 
   test "GET show disables Run workflow when the repo is not cloned" do
     project = projects(:other_project)
-    workflow = project.workflows.create!(name: "Unclonable", trigger_type: "manual")
+    workflow = project.workflows.create!(name: "Unclonable")
     get project_workflow_path(project, workflow)
     assert_response :success
     assert_select "form[action=?]", trigger_project_workflow_path(project, workflow), false

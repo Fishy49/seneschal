@@ -1,0 +1,54 @@
+<%= render layout: "shared/components/card",
+      locals: { title: "Workflows", action: { label: "New workflow", path: new_project_workflow_path(project) } } do %>
+  <% if @workflows.any? %>
+    <ul class="list-none">
+      <% @workflows.each do |workflow| %>
+        <li class="flex items-start justify-between gap-3 py-3 border-b border-edge last:border-b-0">
+          <div class="min-w-0">
+            <div class="font-medium">
+              <%= link_to workflow.name, project_workflow_path(project, workflow), class: "hover:text-accent transition-colors" %>
+            </div>
+            <% if workflow.description.present? %>
+              <p class="text-[0.8125rem] text-content-muted truncate"><%= workflow.description %></p>
+            <% end %>
+            <div class="text-xs text-content-muted mt-0.5">
+              <%= pluralize(workflow.steps.size, "step") %>
+              <% if (line = workflow_stats_line(@stats[workflow.id])) %>
+                &middot; <%= line %>
+              <% else %>
+                &middot; never run
+              <% end %>
+              <% if (last = @last_runs[workflow.id]) %>
+                &middot; last <%= time_ago_short(last.created_at) %> <%= status_badge(last.status) %>
+              <% end %>
+            </div>
+            <div class="flex flex-wrap items-center gap-1 mt-1.5">
+              <%= render "shared/components/chip", text: workflow_engine_label(workflow), tone: :neutral %>
+              <% @access[workflow.id].each do |chip| %>
+                <%= render "shared/components/chip", text: chip.label, tone: chip.tone, title: chip.title %>
+              <% end %>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <% if project.repo_ready? %>
+              <%= button_to "Run", trigger_project_workflow_path(project, workflow),
+                    class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors" %>
+            <% end %>
+            <%= link_to "Edit", project_workflow_path(project, workflow),
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= link_to "Copy", new_project_workflow_copy_path(project, workflow),
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= link_to "Export", export_project_workflow_path(project, workflow),
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= button_to "Delete", project_workflow_path(project, workflow), method: :delete,
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                  data: { turbo_confirm: "Delete \"#{workflow.name}\"? Its #{pluralize(workflow.steps.size, "step")} and #{pluralize(workflow.runs.size, "run")} go with it." } %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <%= render "shared/components/empty_state", message: "No workflows yet.",
+          cta_label: "Add the first workflow", cta_path: new_project_workflow_path(project) %>
+  <% end %>
+<% end %>

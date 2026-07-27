@@ -1,0 +1,166 @@
+<% field = "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent" %>
+<% label = "block text-sm font-medium text-content-muted mb-1.5" %>
+<% hint = "text-xs text-content-muted mt-1.5" %>
+
+<%= render "shared/admin_nav" %>
+<%= render "shared/components/page_header", title: "Server settings",
+      subtitle: "How this server runs work, and where it keeps things. Applies to everyone." %>
+
+<div class="max-w-3xl space-y-4">
+  <%= render layout: "shared/components/card", locals: { title: "Host tools" } do %>
+    <p class="<%= hint %> mb-3">Seneschal shells out to these. A run cannot start until the first two are verified.</p>
+    <%= render "shared/health_checks", claude: @claude, gh: @gh, sdk_runner: @sdk_runner %>
+  <% end %>
+
+  <%= form_with url: admin_settings_path, method: :patch, class: "space-y-4" do %>
+    <%= render layout: "shared/components/card", locals: { title: "Execution defaults" } do %>
+      <div class="space-y-4">
+        <div>
+          <label for="default_runner" class="<%= label %>">Engine</label>
+          <select name="default_runner" id="default_runner" class="<%= field %>">
+            <option value="claude_cli" <%= "selected" if Runners.default_name == "claude_cli" %>>Standard (Claude CLI)</option>
+            <option value="claude_sdk" <%= "selected" if Runners.default_name == "claude_sdk" %>>Advanced (Agent SDK)</option>
+          </select>
+          <p class="<%= hint %>">
+            Standard suits almost everything. Advanced adds structured outputs, hooks, subagents and MCP
+            servers, and needs the Agent SDK sidecar above. Any step can override this.
+          </p>
+        </div>
+
+        <div>
+          <label for="default_allowed_tools" class="<%= label %>">Allowed tools</label>
+          <input type="text" name="default_allowed_tools" id="default_allowed_tools"
+                 value="<%= Setting["default_allowed_tools"] %>"
+                 placeholder="<%= StepExecutor::DEFAULT_ALLOWED_TOOLS %>" class="<%= field %>">
+          <p class="<%= hint %>">
+            Comma-separated. Anything not on this list is refused. Patterns work, for example
+            <code class="bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>. Blank uses the built-in list.
+          </p>
+        </div>
+
+        <div>
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="hidden" name="confine_writes_to_cwd" value="false">
+            <input type="checkbox" name="confine_writes_to_cwd" value="true" class="mt-0.5"
+                   <%= "checked" if ActiveModel::Type::Boolean.new.cast(Setting["confine_writes_to_cwd"] || "true") %>>
+            <span>
+              <span class="text-sm font-medium">Keep writes inside the checkout</span>
+              <span class="block <%= hint %>">
+                Steps can only write inside the working copy they were given. Turn this off only if a
+                workflow genuinely needs to touch the rest of the machine.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+    <% end %>
+
+    <%= render layout: "shared/components/card", locals: { title: "Paths" } do %>
+      <div class="space-y-4">
+        <div>
+          <label for="skills_global_roots" class="<%= label %>">Shared skill folders</label>
+          <textarea name="skills_global_roots" id="skills_global_roots" rows="3"
+                    class="<%= field %> resize-y"><%= Setting["skills_global_roots"] %></textarea>
+          <p class="<%= hint %>">
+            One path per line, searched in order. A project's own skills always win.
+            <% if @legacy_global_root %>
+              An older single-folder setting is still in place and will be used if this is blank:
+              <code class="bg-surface-input px-1 py-0.5 rounded"><%= @legacy_global_root %></code>.
+            <% end %>
+          </p>
+        </div>
+
+        <div>
+          <label for="skill_repo_root" class="<%= label %>">Skill repo checkouts</label>
+          <input type="text" name="skill_repo_root" id="skill_repo_root"
+                 value="<%= Setting["skill_repo_root"] %>" placeholder="storage/skill_repos" class="<%= field %>">
+          <p class="<%= hint %>">Where synced skill repositories are cloned.</p>
+        </div>
+
+        <div>
+          <label for="worktree_root" class="<%= label %>">Worktrees</label>
+          <input type="text" name="worktree_root" id="worktree_root"
+                 value="<%= Setting["worktree_root"] %>" placeholder="tmp/worktrees" class="<%= field %>">
+          <p class="<%= hint %>">Each run gets its own git working copy under here.</p>
+        </div>
+
+        <div>
+          <label for="worktree_retention_days" class="<%= label %>">Keep worktrees for</label>
+          <div class="flex items-center gap-2">
+            <input type="number" name="worktree_retention_days" id="worktree_retention_days" min="1"
+                   value="<%= Setting["worktree_retention_days"] %>"
+                   placeholder="<%= WorktreeManager::DEFAULT_RETENTION_DAYS %>" class="<%= field %> w-32">
+            <span class="text-sm text-content-muted">days</span>
+          </div>
+          <p class="<%= hint %>">Older worktrees are cleaned up. Whole days, 1 or more.</p>
+        </div>
+
+        <div>
+          <label for="run_assets_root" class="<%= label %>">Run assets</label>
+          <input type="text" name="run_assets_root" id="run_assets_root"
+                 value="<%= Setting["run_assets_root"] %>" class="<%= field %>">
+          <p class="<%= hint %>">Where images and other files produced by a run are kept.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <%= render layout: "shared/components/card", locals: { title: "Agent SDK sidecar" } do %>
+      <div class="space-y-4">
+        <div>
+          <label for="python_bin" class="<%= label %>">Python</label>
+          <input type="text" name="python_bin" id="python_bin"
+                 value="<%= Setting["python_bin"] %>" class="<%= field %>">
+          <p class="<%= hint %>">Full path. Blank uses the bundled environment, then whatever is on PATH.</p>
+        </div>
+
+        <div>
+          <label for="sdk_runner_script" class="<%= label %>">Runner script</label>
+          <input type="text" name="sdk_runner_script" id="sdk_runner_script"
+                 value="<%= Setting["sdk_runner_script"] %>" class="<%= field %>">
+          <p class="<%= hint %>">Blank uses the script that ships with Seneschal.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <%= render layout: "shared/components/card", locals: { title: "MCP servers" } do %>
+      <label for="mcp_servers" class="<%= label %>">Available to every step</label>
+      <textarea name="mcp_servers" id="mcp_servers" rows="6" spellcheck="false"
+                class="<%= field %> resize-y"><%= Setting["mcp_servers"] %></textarea>
+      <p class="<%= hint %>">
+        A JSON object naming each server and how to start it. A step with its own list ignores this one.
+        Leave blank for none.
+      </p>
+    <% end %>
+
+    <%= render layout: "shared/components/card", locals: { title: "Notifications" } do %>
+      <div class="space-y-4">
+        <p class="<%= hint %>">
+          Seneschal posts JSON when a run needs approval, fails, finishes, or parks waiting on rate limits.
+          Blank turns notifications off.
+        </p>
+        <div>
+          <label for="webhook_url" class="<%= label %>">Webhook URL</label>
+          <input type="url" name="webhook_url" id="webhook_url" value="<%= Setting["webhook_url"] %>"
+                 placeholder="https://example.com/hooks/seneschal" class="<%= field %>">
+        </div>
+        <div>
+          <label for="slack_webhook_url" class="<%= label %>">Slack incoming webhook</label>
+          <input type="url" name="slack_webhook_url" id="slack_webhook_url" value="<%= Setting["slack_webhook_url"] %>"
+                 placeholder="https://hooks.slack.com/services/..." class="<%= field %>">
+          <p class="<%= hint %>">The same events also arrive in Slack with a button back to the run.</p>
+        </div>
+        <div>
+          <label for="app_base_url" class="<%= label %>">This server's address</label>
+          <input type="url" name="app_base_url" id="app_base_url" value="<%= Setting["app_base_url"] %>"
+                 placeholder="https://seneschal.internal" class="<%= field %>">
+          <p class="<%= hint %>">Used to build links in notifications. Blank leaves the link out rather than guessing.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <button type="submit"
+            class="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">
+      Save settings
+    </button>
+  <% end %>
+</div>

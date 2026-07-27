@@ -1,0 +1,7 @@
+<%# Project hub sections. Locals: project:, section: %>
+<div class="flex items-center gap-1 border-b border-edge mb-6">
+  <% ProjectsController::SECTIONS.each do |name| %>
+    <%= link_to name.titleize, project_path(project, section: name),
+          class: nav_tab_classes(section == name) %>
+  <% end %>
+</div>

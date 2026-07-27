@@ -143,4 +143,17 @@ class RunTest < ActiveSupport::TestCase
   test "awaiting_run_step returns nil when none" do
     assert_nil runs(:active_run).awaiting_run_step
   end
+
+  test "ordinal counts this run's position among its task's runs" do
+    task = pipeline_tasks(:completed_task)
+    first = runs(:completed_run)
+    second = Run.create!(workflow: first.workflow, pipeline_task: task, status: "pending", context: {}, input: {})
+
+    assert_equal 1, first.ordinal
+    assert_equal 2, second.ordinal
+  end
+
+  test "ordinal is nil for a run with no task" do
+    assert_nil runs(:failed_run).ordinal
+  end
 end

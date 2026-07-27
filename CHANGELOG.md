@@ -1,5 +1,260 @@
 # Changelog
 
+## Unreleased - UI overhaul phase B
+
+Authoring surfaces from `PRODUCT_REDESIGN.md`; see
+`plans/PHASE_B_AUTHORING.md`.
+
+### B.10 Templates become a real gallery
+
+- Step templates gain a nullable `description`, asked for when capturing one.
+- The index is a card gallery (name, description, type, skill, timeout and
+  retries) rather than a table whose only action was Delete.
+- New show and edit pages. Show explains in plain terms what a template sets
+  up, including what it publishes and reads. Edit changes the name and
+  description only: the configuration was captured from a step that worked, so
+  it is re-captured from a step rather than hand-edited here.
+
+### B.9 Output schemas grow up
+
+- The schema body is a syntax-highlighted editor rather than a bare textarea,
+  and a new schema starts from a small worked example instead of an empty box.
+  Save-time validation errors still render beside it.
+- The show page lists "Exposes to downstream steps": the dotted paths a step
+  publishing this shape makes readable, so the blast radius of a schema edit
+  is visible before making it.
+- Used-by counts now include skills that name the schema as their default,
+  counted separately from steps ("3 steps · 2 skills"), and an unreferenced
+  schema says "unused" rather than "0 steps".
+
+### B.8 Skills are editable in the app
+
+- The skill edit page carries a raw `SKILL.md` editor covering the whole file,
+  frontmatter included. Saving writes it back to disk and re-reads the cached
+  frontmatter, so the next run picks up the new prompt.
+- Guardrails: the destination is always the skill's own resolved path and
+  never anything from the request; skills synced from a git repository are
+  read-only, with a notice naming the repository, and a posted write to one is
+  refused; and a change to the frontmatter `name:` is rejected, because
+  renaming also moves the folder.
+- The show page states which of the four resolution tiers a skill came from,
+  with the precedence order in its tooltip.
+- `SkillImporter` now scans both `.claude/skills` and `.seneschal/skills`. It
+  only ever read the first, while the scaffolder writes to the second, so
+  skills created in Seneschal were invisible to Import skills.
+
+### B.7 Retire the dead workflow trigger columns
+
+- `workflows.trigger_type` and `workflows.trigger_config` are dropped. No form
+  set them, no job read them, and every row said "manual"; real scheduling
+  lives on `PipelineTask`, whose trigger columns are untouched.
+- Exporters stop writing the two keys. Importers still accept and ignore them,
+  so export files written before this change keep importing - there is a test
+  for exactly that.
+
+### B.6 Access and engine chips
+
+- New `WorkflowAccessSummary` derives, from steps that already exist, what a
+  workflow can reach: "opens PRs", "runs shell", "writes files", "approval
+  gated", the project's "danger mode", or "read-only" when it touches nothing.
+  A step with no allowed-tools list counts as writing, because blank inherits
+  a server default that contains Edit.
+- The chips render on the workflow editor header and on project hub rows, each
+  titled with the steps responsible. Nothing about execution changes.
+
+### B.5 Data wiring, in plain language
+
+Landed with B.4, since it relabels the same markup that item decomposed.
+
+- The consumes table's columns are "Include value in prompt" and "Queryable in
+  workspace (advanced)"; the `seneschal-context` and jq detail moved into that
+  column's tooltip instead of leading the legend.
+- Inheriting a skill's schema now reads as one line - "Using skill default:
+  plan (Feature plan) Change" - rather than a badge cluster.
+- The `output` block and `::set-output` protocol text is preserved verbatim
+  inside a collapsed "How outputs work" disclosure, so power users keep it and
+  newcomers do not read it first.
+
+### B.4 One form per step type
+
+- The 806-line multiplexed step form is gone. Each type renders its own
+  partial under `app/views/steps/forms/`, so a Wait-for-CI step no longer
+  ships hidden pull-request fields. The controller's config builders are
+  unchanged, and a test per type pins every key each one writes.
+- Four JavaScript tabs become three disclosure groups: **Data** (open when the
+  step already wires something), **Model and tools**, and **Guards and
+  recovery**. Validation errors sit at the top where they are always visible.
+- Position is gone from the form; B.3 made the server append.
+- Script and Command were the same behaviour under two names. The form offers
+  one **Shell** type; existing script steps open and save as Shell.
+- **Self review** is selectable at last. It was fully implemented in the
+  executor and unreachable from the UI; it now has `base_ref` and `focus`
+  fields and a `build_self_review_config`.
+- Changing a saved step's type warns first and names what it will discard,
+  then re-fetches the inspector for the new type.
+- Templates apply on the server, so every captured key survives - including
+  `queries`, `context_projects`, `preview_assets` and the reopen
+  instructions, all of which the old JavaScript loader silently dropped.
+- Copy fixes: the Wait-for-CI branch field defaults to `${branch_name}`, which
+  is the variable a PR step actually publishes (it was `${branch}`, which
+  nothing sets); the allowed-tools help says blank inherits the server default
+  rather than claiming "full capability"; model ids moved to `StepsHelper`;
+  and the marketing register is gone throughout.
+- New field: how many times a step retries when its answer does not match the
+  output shape. The executor already read `validation_max_attempts`; nothing
+  could set it.
+
+### B.3 The workflow editor: canvas and inspector
+
+- The workflow page is now one editing surface. The step list on the left is
+  the canvas; a step's name opens it in a `step_inspector` Turbo Frame on the
+  right. Saving refreshes both the canvas and the inspector in place, so
+  editing a step never leaves the workflow page. A direct visit to a step form
+  still works and still redirects.
+- Steps carry a visible drag grip; per-row Edit links are gone (the name is
+  the link) and Remove stays.
+- Adding a step no longer requires choosing a position: the server appends
+  `max(position) + 1` whenever one is not supplied.
+- A Variables strip lists everything available at the end of the workflow.
+  Clicking one highlights every step that produces or consumes it, with a
+  one-line legend for the arrow pills.
+- The header gains the engine chip and the B.2 stats line, and collects Edit,
+  Copy, Export and Delete into one menu.
+
+### B.2 Workflow stats
+
+- New `Workflow#stats`: total run count, success rate and median cost. Rate
+  and cost come from the last 20 finished runs so one bad week long ago stops
+  dragging the number down forever; cost is read from each run's step results,
+  since there is no cost column.
+- `workflow_stats_line` renders "34 runs · 91% succeeded · ~$1.20", dropping
+  any part there is no honest number for and returning nothing at all for a
+  workflow nobody has run, which the hub reports as "never run".
+
+### B.1 Project hub
+
+- The project page becomes a tabbed hub: Overview, Workflows, Tasks, Runs,
+  Skills, Settings, chosen with a `section` param. Only the requested tab's
+  data is loaded.
+- The header drops from six buttons to a repo chip, a Danger-mode chip when
+  the project has permissions skipped, one **New** menu (Workflow, Task,
+  Import workflow) and a **Launch** button that opens the palette with this
+  project chosen. Refetch and Import skills move into the Overview repo card.
+- Tasks are one filterable table instead of five stacked status tables, with
+  a Run button on each executable row. Runs gains a project-scoped list.
+  Workflows rows carry their step count, last-run status and every action
+  (Run, Edit, Copy, Export, Delete).
+- Settings holds the project form plus the Danger zone. `/projects/:id/edit`
+  redirects there and keeps working.
+- Where a missing clone blocks running a workflow, the actual Clone button is
+  offered instead of a disabled control with the reason hidden in a tooltip.
+
+## Unreleased - UI overhaul phase A
+
+Foundation work for the redesign in `PRODUCT_REDESIGN.md`; see
+`plans/PHASE_A_FOUNDATION.md`.
+
+### A.1 Shared component kit
+
+- New partials under `app/views/shared/components/`: `page_header` (title,
+  optional subtitle, optional actions block), `card` (optional title and
+  header action, body block), `empty_state` (message plus optional CTA) and
+  `chip` (five tones). Later screens compose these instead of repeating
+  utility-class strings.
+- New `ComponentsHelper` with `avatar_for(user, size:)` (initials circle,
+  email tooltip, nil-safe) and `status_dot(status)`. `avatar_for` follows the
+  same initials rule as `presence_controller.js`, so a server-rendered avatar
+  and a live presence chip show the same letters.
+- Activity, Runs and Tasks indexes now build their headers, cards and empty
+  states from the components. No visual change intended.
+
+### A.2 2FA management on the Account page
+
+- The Account page gains a "Security" card showing whether two-factor
+  authentication is on, with the enable link or the disable button (which
+  keeps its confirmation - turning 2FA off is destructive). The two_factor
+  controller and setup flow are untouched; this is a second entry point, and
+  the sidebar shortcuts go away in A.3.
+
+### A.3 Six-section navigation
+
+- The sidebar drops from thirteen entries to Home, Runs, Projects, Library,
+  Activity and an admin block. Skills, Output schemas, Templates and Skill
+  repos merge into **Library**; Users, Groups, Data and Setup move under
+  **Admin**; Tasks and the 2FA shortcuts lose their slots (tasks live in the
+  Runs and project surfaces, 2FA on Account). No routes were removed.
+- New `shared/_library_nav` and `shared/_admin_nav` tab rows carry the
+  merged sections, rendered atop those index pages. The admin row renders
+  nothing for non-admins, so /setup stays usable during first boot.
+- New `NavigationHelper` maps a controller to its sidebar section, so a
+  nested page (a workflow, a task, a schema) highlights the section it
+  belongs to.
+- The footer gains a real **Launch** button next to the ⌘K hint; the
+  command-palette Stimulus controller now sits on `<body>` so Launch buttons
+  anywhere on the page are in its scope. The account link shows the signed-in
+  user's avatar.
+
+### A.4 Vocabulary and copy pass
+
+- `PipelineTask` is "Task" in validation messages and default form labels.
+- The replay empty state no longer says "RunSteps".
+- Status and type badges carry a plain-language tooltip per value
+  ("awaiting approval" reads "Paused until a person approves this step"), so
+  the legend lives on the badge instead of on a page nobody visits.
+- The badge machinery moves out of `ApplicationHelper` into a new
+  `BadgeHelper`, keeping both modules under the rubocop length limit.
+
+### A.5 Human run names
+
+- New `Run#ordinal` (this run's 1-based position among its task's runs) and
+  `run_display_name(run)`, which reads "Add search · run 2" and falls back to
+  "Manual run #47" for runs with no task.
+- Run lists, the Needs-you queue and the compare picker lead with the name;
+  the database id survives as a muted column on the task page, in run
+  details, and in URLs.
+
+### A.6 Dead ends
+
+- `GET /projects/:id/workflows` was routed at a controller action and view
+  that never existed, so it answered with a 500. The index route is gone;
+  create still POSTs to the same path.
+- Workflows can be deleted from their own page, and projects from a Danger
+  zone on their edit page. Both confirms state what actually happens: the
+  cascade counts, and the fact that a deleted project leaves its git
+  checkout on disk.
+
+### A.7 Server settings, and Setup slims to health checks
+
+- New admin-only **Server settings** page at `/admin/settings` covering every
+  setting that previously had to be written from a Rails console: the default
+  engine, allowed tools, write confinement, the four filesystem paths and
+  worktree retention, the Agent SDK sidecar's python and script paths, MCP
+  servers, and the three notification keys (moved off Setup).
+- Saving validates before writing: retention must be a whole number of days
+  of 1 or more, and MCP servers must be a JSON object. A rejected save
+  changes nothing and says why. A blank field deletes the key so its built-in
+  default applies again, rather than storing an empty string.
+- The three host-tool checks move into `shared/_health_checks`, rendered both
+  by Server settings (as a panel) and by `/setup`, which is now just an intro,
+  the checks, and Continue. Its permissions and notifications forms are gone,
+  along with the two actions that backed them. The `require_setup` gate is
+  unchanged.
+- Admin navigation gains "Server settings"; "Setup" is now "Health checks".
+
+### A.8 Home, mission control
+
+- The dashboard is now "Home" and leads with a Launch button.
+- Active Runs, Recent Runs and Ready-to-run collapse into a single **Runs**
+  card with an Active and a Recent section. Rows carry a status dot, the run's
+  human name, what step it is on, who launched it, and its cost.
+- The Needs-you queue credits whoever launched each run and, when anyone has
+  the run open, shows their avatars, so two people do not review the same gate
+  at once.
+- The Projects rail gains a per-project Launch button that opens the palette
+  with that project already chosen (new `openWithProject` action).
+- Empty regions use the shared empty state; the launch-palette variant of the
+  component renders a Stimulus-backed button rather than a link.
+
 ## Unreleased - UX + collaboration redesign
 
 Work in progress. Items land one at a time; see `IMPLEMENTATION_PLAN.md`.

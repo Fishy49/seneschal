@@ -3,17 +3,27 @@ class StepsController < ApplicationController
   before_action :set_step, only: [:edit, :update, :destroy, :move]
 
   def new
-    next_position = (@workflow.steps.maximum(:position) || 0) + 1
-    @step = @workflow.steps.build(position: next_position)
+    @step = @workflow.steps.build(position: next_position, step_type: requested_type || "skill")
+    apply_template(@step, params[:template_id])
+    @step.name = params[:name] if params[:name].present?
   end
 
-  def edit; end
+  # `step_type` here is the inspector re-fetching itself for a different type.
+  # It is never saved from this action - the form just renders the other type's
+  # fields, and the old config goes when the user saves.
+  def edit
+    @step.step_type = requested_type if requested_type
+  end
 
   def create
-    @step = @workflow.steps.build(step_params)
+    attributes = step_params
+    # Steps are appended; nobody should have to pick a number to add one.
+    attributes[:position] = next_position if attributes[:position].blank?
+    @step = @workflow.steps.build(attributes)
+
     if @step.save
       save_as_template(@step)
-      redirect_to project_workflow_path(@project, @workflow), notice: "Step added."
+      saved(@step, "Step added.")
     else
       render :new, status: :unprocessable_content
     end
@@ -22,7 +32,7 @@ class StepsController < ApplicationController
   def update
     if @step.update(step_params)
       save_as_template(@step)
-      redirect_to project_workflow_path(@project, @workflow), notice: "Step updated."
+      saved(@step, "Step updated.")
     else
       render :edit, status: :unprocessable_content
     end
@@ -70,11 +80,59 @@ class StepsController < ApplicationController
     @step = @workflow.steps.find(params.expect(:id))
   end
 
+  def next_position
+    (@workflow.steps.maximum(:position) || 0) + 1
+  end
+
+  def requested_type
+    params[:step_type] if Step::STEP_TYPES.include?(params[:step_type])
+  end
+
+  # Applying a template server-side means the form renders straight from the
+  # captured config, so nothing can be dropped in translation.
+  def apply_template(step, template_id)
+    template = StepTemplate.find_by(id: template_id) if template_id.present?
+    return unless template
+
+    step.assign_attributes(
+      name: template.name,
+      step_type: template.step_type,
+      body: template.body,
+      config: template.config,
+      skill_id: template.skill_id,
+      max_retries: template.max_retries,
+      timeout: template.timeout,
+      input_context: template.input_context,
+      manual_approval: template.manual_approval
+    )
+  end
+
+  # Saving from the inspector refreshes the canvas and the inspector in place,
+  # so editing a step never leaves the workflow page. A plain HTML post (a
+  # direct visit to the step form) still redirects.
+  def saved(step, notice)
+    respond_to do |format|
+      format.turbo_stream do
+        @steps = @workflow.steps.reload
+        render turbo_stream: [
+          turbo_stream.replace("workflow_steps",
+                               partial: "workflows/steps_canvas",
+                               locals: { project: @project, workflow: @workflow, steps: @steps }),
+          turbo_stream.replace("step_inspector",
+                               partial: "steps/inspector",
+                               locals: { project: @project, workflow: @workflow, step: step })
+        ]
+      end
+      format.html { redirect_to project_workflow_path(@project, @workflow), notice: notice }
+    end
+  end
+
   def save_as_template(step)
     return unless params[:save_as_template] == "1" && params[:template_name].present?
 
     StepTemplate.create(
       name: params[:template_name],
+      description: params[:template_description].presence,
       step_type: step.step_type,
       body: step.body,
       config: step.config.except("context_projects"),
@@ -119,7 +177,7 @@ class StepsController < ApplicationController
   end
 
   # Schema mode is on whenever the form's schema-output single-input is the
-  # canonical produces source — i.e. EITHER the step has an explicit
+  # canonical produces source - i.e. EITHER the step has an explicit
   # json_schema_id OR the form is in inherit mode (the "From skill" badge is
   # showing). Inherit mode used to fall through to the multi-tag widget here,
   # which silently wiped produces on every edit save.
@@ -136,8 +194,16 @@ class StepsController < ApplicationController
     when "skill", "prompt" then build_skill_config(raw, skill_id)
     when "context_fetch" then build_context_fetch_config(raw)
     when "pr" then build_pr_config(raw)
+    when "self_review" then build_self_review_config(raw)
     else {}
     end
+  end
+
+  def build_self_review_config(raw)
+    {
+      "base_ref" => raw["review_base_ref"].to_s.strip.presence,
+      "focus" => raw["review_focus"].to_s.strip.presence
+    }.compact
   end
 
   def build_ci_check_config(raw)
@@ -160,6 +226,7 @@ class StepsController < ApplicationController
     config["max_turns"] = raw["skill_max_turns"].to_i if raw["skill_max_turns"].present?
     config["allowed_tools"] = raw["skill_allowed_tools"] if raw["skill_allowed_tools"].present?
     config["preview_assets"] = raw["skill_preview_assets"] == "1"
+    config["validation_max_attempts"] = raw["skill_validation_max_attempts"].to_i if raw["skill_validation_max_attempts"].present?
 
     # Schema picker has three persisted shapes (see app/views/steps/_form.html.erb):
     #   "inherit"  → resolve through skill.default_json_schema_id and persist

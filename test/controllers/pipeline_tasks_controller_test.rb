@@ -184,7 +184,7 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "POST create rejects a workflow from another project" do
-    foreign = projects(:other_project).workflows.create!(name: "Foreign", trigger_type: "manual")
+    foreign = projects(:other_project).workflows.create!(name: "Foreign")
     assert_no_difference "PipelineTask.count" do
       post pipeline_tasks_path, params: {
         pipeline_task: {

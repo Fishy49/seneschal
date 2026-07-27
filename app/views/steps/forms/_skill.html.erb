@@ -1,0 +1,35 @@
+<%# Skill step: pick the SKILL.md the agent runs. Locals: f:, step: %>
+<div>
+  <label class="block text-sm font-medium text-content-muted mb-1.5">Skill</label>
+  <%= f.hidden_field :skill_id, data: { step_form_target: "skillSelect" } %>
+
+  <div class="flex items-center justify-between gap-4 p-4 bg-surface-input/30 border border-edge rounded-xl">
+    <div class="flex-1 min-w-0">
+      <span data-step-form-target="skillName" class="font-medium text-sm text-content">
+        <% if step.skill %>
+          <%= step.skill.display_name %>
+        <% else %>
+          <span class="text-content-muted">No skill selected</span>
+        <% end %>
+      </span>
+      <p class="text-xs text-content-muted mt-0.5">The instructions this step runs. Skills live in the Library.</p>
+    </div>
+    <button type="button" data-action="skill-panel#open"
+            class="shrink-0 px-3.5 py-1.5 bg-surface-input border border-edge rounded-lg text-xs font-semibold text-content hover:bg-edge transition-colors cursor-pointer">
+      Choose skill
+    </button>
+  </div>
+</div>
+
+<div data-step-form-target="skillPreview" style="<%= "display:none" unless step.skill %>">
+  <div class="flex items-center justify-between mb-2">
+    <label class="text-sm font-medium text-content-muted">Prompt preview</label>
+    <button type="button" data-action="step-form#togglePreview"
+            class="inline-flex items-center gap-1 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+      <span data-step-form-target="previewToggleText">Show</span>
+    </button>
+  </div>
+  <div data-step-form-target="previewBody" style="display:none" class="mt-2 rounded-lg overflow-hidden border border-edge">
+    <div class="code-preview max-h-96 overflow-y-auto" data-step-form-target="previewContent"></div>
+  </div>
+</div>

@@ -88,8 +88,8 @@ class ProjectTest < ActiveSupport::TestCase
       name: "Disposable", repo_url: "https://github.com/t/d.git",
       local_path: Rails.root.join("tmp/test_repos/disposable").to_s
     )
-    project.workflows.create!(name: "w1", trigger_type: "manual")
-    project.workflows.create!(name: "w2", trigger_type: "manual")
+    project.workflows.create!(name: "w1")
+    project.workflows.create!(name: "w2")
     assert_difference "Workflow.count", -2 do
       project.destroy
     end

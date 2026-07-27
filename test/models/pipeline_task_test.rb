@@ -84,7 +84,7 @@ class PipelineTaskTest < ActiveSupport::TestCase
   end
 
   test "rejects a workflow from another project" do
-    other = projects(:other_project).workflows.create!(name: "Foreign", trigger_type: "manual")
+    other = projects(:other_project).workflows.create!(name: "Foreign")
     t = pipeline_tasks(:ready_task)
     t.workflow = other
     assert_not t.valid?

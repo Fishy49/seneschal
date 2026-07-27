@@ -15,6 +15,55 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "GET show defaults to the overview section" do
+    get project_path(projects(:seneschal))
+    assert_select "h2", text: "Repository"
+    assert_select "h2", text: "Recent runs"
+  end
+
+  test "an unknown section falls back to overview" do
+    get project_path(projects(:seneschal), section: "nonsense")
+    assert_response :success
+    assert_select "h2", text: "Repository"
+  end
+
+  test "the hub offers all six sections" do
+    get project_path(projects(:seneschal))
+    ProjectsController::SECTIONS.each do |section|
+      assert_select "a[href=?]", project_path(projects(:seneschal), section: section)
+    end
+  end
+
+  test "the workflows section lists workflows with their actions" do
+    get project_path(projects(:seneschal), section: "workflows")
+    assert_select "a[href=?]", project_workflow_path(projects(:seneschal), workflows(:deploy)), text: workflows(:deploy).name
+    assert_select "a[href=?]", export_project_workflow_path(projects(:seneschal), workflows(:deploy))
+  end
+
+  test "the tasks section runs an executable task and filters by status" do
+    project = projects(:seneschal)
+    get project_path(project, section: "tasks")
+    assert_select "form[action=?]", execute_pipeline_task_path(pipeline_tasks(:ready_task))
+
+    get project_path(project, section: "tasks", status: "draft")
+    assert_select "a[href=?]", pipeline_task_path(pipeline_tasks(:draft_task))
+    assert_select "a[href=?]", pipeline_task_path(pipeline_tasks(:ready_task)), count: 0
+  end
+
+  test "the runs section shows only this project's runs" do
+    get project_path(projects(:seneschal), section: "runs")
+    assert_select "a[href=?]", run_path(runs(:completed_run))
+
+    get project_path(projects(:other_project), section: "runs")
+    assert_select "a[href=?]", run_path(runs(:completed_run)), count: 0
+  end
+
+  test "the skills section lists the project's own skills" do
+    get project_path(projects(:seneschal), section: "skills")
+    assert_response :success
+    assert_select "h2", text: "Skills"
+  end
+
   test "GET new renders form" do
     get new_project_path
     assert_response :success
@@ -43,7 +92,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "GET edit renders form" do
-    get edit_project_path(projects(:seneschal))
+    get project_path(projects(:seneschal), section: "settings")
     assert_response :success
   end
 
@@ -51,8 +100,15 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     patch project_path(projects(:seneschal)), params: {
       project: { description: "Updated description" }
     }
-    assert_redirected_to project_path(projects(:seneschal))
+    assert_redirected_to project_path(projects(:seneschal), section: "settings")
     assert_equal "Updated description", projects(:seneschal).reload.description
+  end
+
+  test "edit offers a danger zone that says what survives" do
+    get project_path(projects(:seneschal), section: "settings")
+    assert_select "h2", text: "Danger zone"
+    assert_select "input[value='delete'][name='_method']"
+    assert_select "p", text: /stays on disk/
   end
 
   test "DELETE destroy removes project" do
@@ -113,7 +169,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     patch project_path(projects(:seneschal)), params: {
       project: { markdown_context: "# Updated\n\nNew guidelines." }
     }
-    assert_redirected_to project_path(projects(:seneschal))
+    assert_redirected_to project_path(projects(:seneschal), section: "settings")
     assert_equal "# Updated\n\nNew guidelines.", projects(:seneschal).reload.markdown_context
   end
 
@@ -123,7 +179,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select "div[data-controller=\"code-editor\"]"
     assert_select "input[name=\"project[markdown_context]\"][type=\"hidden\"]"
 
-    get edit_project_path(projects(:seneschal))
+    get project_path(projects(:seneschal), section: "settings")
     assert_response :success
     assert_select "div[data-controller=\"code-editor\"]"
     assert_select "input[name=\"project[markdown_context]\"][type=\"hidden\"]"
@@ -144,7 +200,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "GET edit renders group select and danger toggle" do
-    get edit_project_path(projects(:seneschal))
+    get project_path(projects(:seneschal), section: "settings")
     assert_response :success
     assert_select "select[name='project[project_group_id]']"
     assert_select "input[type='checkbox'][name='project[skip_permissions]']"
@@ -153,7 +209,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "PATCH update toggles skip_permissions" do
     projects(:seneschal).update!(skip_permissions: false)
     patch project_path(projects(:seneschal)), params: { project: { skip_permissions: "1" } }
-    assert_redirected_to project_path(projects(:seneschal))
+    assert_redirected_to project_path(projects(:seneschal), section: "settings")
     assert_equal true, projects(:seneschal).reload.skip_permissions
   end
 end

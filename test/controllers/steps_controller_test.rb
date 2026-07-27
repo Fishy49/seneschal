@@ -44,6 +44,36 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_workflow_path(@project, @workflow)
   end
 
+  test "POST create without a position appends to the end" do
+    last = @workflow.steps.maximum(:position)
+    post project_workflow_steps_path(@project, @workflow), params: {
+      step: { name: "Appended", step_type: "command", body: "echo hi" }
+    }
+    assert_equal last + 1, Step.find_by(name: "Appended").position
+  end
+
+  test "POST create respects an explicit position" do
+    post project_workflow_steps_path(@project, @workflow), params: {
+      step: { name: "Placed", step_type: "command", body: "echo hi", position: 1 }
+    }
+    assert_equal 1, Step.find_by(name: "Placed").position
+  end
+
+  test "the step form renders inside the inspector frame" do
+    get edit_project_workflow_step_path(@project, @workflow, steps(:skill_step))
+    assert_select "turbo-frame#step_inspector"
+  end
+
+  test "saving from the inspector refreshes the canvas and the inspector" do
+    patch project_workflow_step_path(@project, @workflow, steps(:skill_step)),
+          params: { step: { name: "Renamed in place" } },
+          as: :turbo_stream
+    assert_response :success
+    assert_match "workflow_steps", response.body
+    assert_match "step_inspector", response.body
+    assert_match "Renamed in place", response.body
+  end
+
   test "POST create with invalid params" do
     assert_no_difference "Step.count" do
       post project_workflow_steps_path(@project, @workflow), params: {
@@ -92,7 +122,8 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
           max_retries: 1
         },
         save_as_template: "1",
-        template_name: "Build Step"
+        template_name: "Build Step",
+        template_description: "Builds and uploads"
       }
     end
     template = StepTemplate.find_by(name: "Build Step")
@@ -100,6 +131,7 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "command", template.step_type
     assert_equal "make build", template.body
     assert_equal 120, template.timeout
+    assert_equal "Builds and uploads", template.description
   end
 
   test "POST create without save_as_template does not create template" do
@@ -513,5 +545,170 @@ class StepsControllerTest < ActionDispatch::IntegrationTest
     end
     assert_equal ["alpha", "beta"], Step.last.config["produces"]
     assert_equal ["alpha", "beta"], Step.last.produces
+  end
+
+  # The controller's config builders are the contract between the form and the
+  # executor. These pin every key each type writes, so decomposing the view
+  # cannot quietly drop one.
+  def created_step(params)
+    post project_workflow_steps_path(@project, @workflow), params: params
+    assert_response :redirect
+    Step.order(:id).last
+  end
+
+  test "a skill step round-trips every model and tool key" do
+    step = created_step(
+      step: { name: "Round trip skill", step_type: "skill", skill_id: skills(:project_skill).id },
+      skill_model: "claude-opus-4-7", skill_effort: "high", skill_max_turns: "12",
+      skill_allowed_tools: "Bash(git *),Read", skill_preview_assets: "1",
+      skill_validation_max_attempts: "5", schema_picker_mode: "override", json_schema_id: "",
+      skill_context_projects: [projects(:other_project).id.to_s],
+      produces: "plan", consumes: ["task_title"]
+    )
+
+    assert_equal "claude-opus-4-7", step.config["model"]
+    assert_equal "high", step.config["effort"]
+    assert_equal 12, step.config["max_turns"]
+    assert_equal "Bash(git *),Read", step.config["allowed_tools"]
+    assert_equal true, step.config["preview_assets"]
+    assert_equal 5, step.config["validation_max_attempts"]
+    assert_equal [projects(:other_project).id], step.config["context_projects"]
+    assert_equal ["plan"], step.config["produces"]
+    assert_equal ["task_title"], step.config["consumes"]
+  end
+
+  test "a shell step round-trips its command" do
+    step = created_step(step: { name: "Round trip shell", step_type: "command", body: "npm run build" })
+    assert_equal "command", step.step_type
+    assert_equal "npm run build", step.body
+  end
+
+  test "a ci_check step round-trips every watcher key" do
+    step = created_step(
+      step: { name: "Round trip ci", step_type: "ci_check" },
+      ci_mode: "workflow", ci_workflow: "test.yml", ci_ref: "${branch_name}", ci_trigger: "1",
+      ci_poll_interval: "45", ci_max_log_chars: "5000", ci_log_from: "beginning"
+    )
+
+    assert_equal "workflow", step.config["mode"]
+    assert_equal "test.yml", step.config["workflow"]
+    assert_equal "${branch_name}", step.config["ref"]
+    assert_equal true, step.config["trigger"]
+    assert_equal 45, step.config["poll_interval"]
+    assert_equal 5000, step.config["max_log_chars"]
+    assert_equal "beginning", step.config["log_from"]
+  end
+
+  test "a context_fetch step round-trips both methods" do
+    url_step = created_step(
+      step: { name: "Round trip fetch url", step_type: "context_fetch" },
+      fetch_method: "url", fetch_url: "https://example.com/data", fetch_context_key: "external"
+    )
+    assert_equal "url", url_step.config["method"]
+    assert_equal "https://example.com/data", url_step.config["url"]
+    assert_equal "external", url_step.config["context_key"]
+    assert_equal "external", url_step.config["capture_output"]
+
+    file_step = created_step(
+      step: { name: "Round trip fetch file", step_type: "context_fetch" },
+      fetch_method: "project_file", fetch_path: "config/app.json",
+      fetch_json_schema_id: json_schemas(:simple_schema).id.to_s, fetch_context_key: "app_config"
+    )
+    assert_equal "project_file", file_step.config["method"]
+    assert_equal "config/app.json", file_step.config["path"]
+    assert_equal json_schemas(:simple_schema).id, file_step.config["json_schema_id"]
+  end
+
+  test "a pr step round-trips every pull request key" do
+    step = created_step(
+      step: { name: "Round trip pr", step_type: "pr" },
+      pr_title: "feat: ${task_title}", pr_body: "## Changes", pr_base: "develop", pr_branch: "feature/x",
+      pr_draft: "1", pr_clean: "1", pr_reviewers: "octocat, my-org/devs",
+      pr_labels: "enhancement", pr_assignees: "dev-one"
+    )
+
+    assert_equal "feat: ${task_title}", step.config["title"]
+    assert_equal "## Changes", step.config["body"]
+    assert_equal "develop", step.config["base"]
+    assert_equal "feature/x", step.config["branch"]
+    assert_equal true, step.config["draft"]
+    assert_equal true, step.config["clean"]
+    assert_equal ["octocat", "my-org/devs"], step.config["reviewers"]
+    assert_equal ["enhancement"], step.config["labels"]
+    assert_equal ["dev-one"], step.config["assignees"]
+  end
+
+  test "a self_review step can be created from the UI" do
+    step = created_step(
+      step: { name: "Review my work", step_type: "self_review" },
+      review_base_ref: "develop", review_focus: "Check the error handling."
+    )
+
+    assert_equal "self_review", step.step_type
+    assert_equal "develop", step.config["base_ref"]
+    assert_equal "Check the error handling.", step.config["focus"]
+  end
+
+  test "a self_review step with no settings stores no keys" do
+    step = created_step(step: { name: "Plain review", step_type: "self_review" }, review_base_ref: "", review_focus: "")
+    assert_empty step.config.slice("base_ref", "focus")
+  end
+
+  test "on_fail recovery round-trips including reopen instructions" do
+    step = created_step(
+      step: { name: "Recovers", step_type: "command", body: "true" },
+      on_fail_type: "reopen_previous", on_fail_max_rounds: "2",
+      on_fail_instructions: "Look at the lockfile."
+    )
+
+    assert_equal "reopen_previous", step.config.dig("on_fail_action", "type")
+    assert_equal 2, step.config.dig("on_fail_action", "max_rounds")
+    assert_equal "Look at the lockfile.", step.config.dig("on_fail_action", "instructions")
+  end
+
+  test "each type renders only its own fields" do
+    get new_project_workflow_step_path(@project, @workflow), params: { step_type: "pr" }
+    assert_select "input#pr_title"
+    assert_select "select#ci_mode", count: 0
+    assert_select "select#skill_model", count: 0
+
+    get new_project_workflow_step_path(@project, @workflow), params: { step_type: "ci_check" }
+    assert_select "select#ci_mode"
+    assert_select "input#pr_title", count: 0
+  end
+
+  test "the form no longer asks for a position" do
+    get new_project_workflow_step_path(@project, @workflow)
+    assert_select "input[name='step[position]']", count: 0
+  end
+
+  test "a script step edits as a shell step" do
+    script = @workflow.steps.create!(name: "Legacy script", step_type: "script", body: "./build.sh", position: 99)
+    get edit_project_workflow_step_path(@project, @workflow, script)
+    assert_select "textarea[name='step[body]']"
+    assert_select "select[name='step[step_type]'] option[value='script']", count: 0
+  end
+
+  test "editing with a step_type param previews the other type without saving" do
+    step = steps(:skill_step)
+    get edit_project_workflow_step_path(@project, @workflow, step), params: { step_type: "pr" }
+    assert_select "input#pr_title"
+    assert_equal "skill", step.reload.step_type
+  end
+
+  test "new with a template_id applies the whole captured config" do
+    template = StepTemplate.create!(
+      name: "Captured", step_type: "ci_check", timeout: 900, max_retries: 4,
+      input_context: "Extra guidance", manual_approval: true,
+      config: { "mode" => "workflow", "workflow" => "ci.yml", "queries" => ["plan"],
+                "context_projects" => [projects(:other_project).id],
+                "on_fail_action" => { "type" => "reopen_previous", "instructions" => "Retry it." } }
+    )
+
+    get new_project_workflow_step_path(@project, @workflow), params: { template_id: template.id }
+    assert_select "input[name='step[name]'][value=?]", "Captured"
+    assert_select "input#ci_workflow[value=?]", "ci.yml"
+    assert_select "input[name='step[timeout]'][value=?]", "900"
+    assert_select "textarea#on_fail_instructions", text: "Retry it."
   end
 end

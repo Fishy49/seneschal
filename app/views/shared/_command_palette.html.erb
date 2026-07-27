@@ -1,8 +1,7 @@
 <%# The Cmd/Ctrl+K launch bar. Rendered once per page from the layout; hidden
-    until the controller opens it. %>
-<div data-controller="command-palette"
-     data-command-palette-options-url-value="<%= quick_launch_options_path %>"
-     data-command-palette-launch-url-value="<%= quick_launch_path %>">
+    until the controller opens it. The controller itself lives on <body> so
+    Launch buttons elsewhere on the page can target it. %>
+<div>
   <div data-command-palette-target="overlay" hidden
        class="fixed inset-0 z-50 bg-black/60 flex items-start justify-center pt-[12vh] px-4"
        data-action="click->command-palette#backdropClick">

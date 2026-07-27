@@ -40,8 +40,6 @@ class WorkflowExporter
     {
       name: @workflow.name,
       description: @workflow.description,
-      trigger_type: @workflow.trigger_type,
-      trigger_config: @workflow.trigger_config,
       config: @workflow.config,
       steps: steps.map { |s| export_step(s) }
     }

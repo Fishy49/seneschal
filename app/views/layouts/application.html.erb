@@ -21,19 +21,30 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
+  <%# The palette controller sits on body so a Launch button anywhere on the
+      page is inside its scope. %>
+  <body data-controller="<%= "command-palette" if current_user %>"
+        data-command-palette-options-url-value="<%= quick_launch_options_path %>"
+        data-command-palette-launch-url-value="<%= quick_launch_path %>">
     <div class="grid grid-cols-[220px_1fr] min-h-screen">
       <nav class="bg-surface-card border-r border-edge p-6 px-4 flex flex-col gap-2 sticky top-0 h-screen overflow-y-auto">
         <div class="flex items-center gap-2 text-xl font-bold text-content px-2 mb-4">
           <%= image_tag "logo.png", size: 28, class: "rounded-md" %>
           Seneschal
         </div>
-        <%= link_to "Dashboard", root_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'dashboard' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+        <%= link_to "Home", root_path, class: nav_link_classes(:home) %>
+        <%= link_to runs_path,
+              class: "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors #{nav_section == :runs ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" do %>
+          <span>Runs</span>
+          <% if (needs_you = awaiting_approval_count).positive? %>
+            <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-warning text-white text-[0.6875rem] font-semibold"
+                  title="<%= pluralize(needs_you, "run") %> awaiting approval"><%= needs_you %></span>
+          <% end %>
+        <% end %>
         <div data-controller="sidebar-toggle">
           <div class="flex items-center justify-between">
             <%= link_to "Projects", projects_path,
-                  class: "flex-1 block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'projects' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+                  class: "flex-1 #{nav_link_classes(:projects)}" %>
             <% if Project.exists? %>
               <button type="button" class="bg-transparent border-none text-content-muted cursor-pointer px-2 py-1 text-xs rounded-lg hover:text-content hover:bg-surface-input" data-action="sidebar-toggle#toggle" data-sidebar-toggle-target="btn">
                 <span data-sidebar-toggle-target="icon">&#9656;</span>
@@ -88,54 +99,30 @@
             <% end %>
           </div>
         </div>
-        <%= link_to "Groups", project_groups_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'project_groups' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <%= link_to "Tasks", pipeline_tasks_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'pipeline_tasks' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <%= link_to "Skills", skills_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'skills' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+        <%= link_to "Library", skills_path, class: nav_link_classes(:library) %>
+        <%= link_to "Activity", activity_path, class: nav_link_classes(:activity) %>
         <% if current_user&.admin? %>
-          <%= link_to "Skill Repos", skill_repos_path,
-                class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'skill_repos' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <% end %>
-        <%= link_to "Schemas", json_schemas_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'json_schemas' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <%= link_to runs_path,
-              class: "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'runs' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" do %>
-          <span>Runs</span>
-          <% if (needs_you = awaiting_approval_count).positive? %>
-            <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-warning text-white text-[0.6875rem] font-semibold"
-                  title="<%= pluralize(needs_you, "run") %> awaiting approval"><%= needs_you %></span>
-          <% end %>
-        <% end %>
-        <%= link_to "Activity", activity_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'activity' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <%= link_to "Templates", step_templates_path,
-              class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'step_templates' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-        <% if current_user&.admin? %>
-          <%= link_to "Users", users_path,
-                class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'users' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
-          <%= link_to "Data", data_management_path,
-                class: "block px-3 py-2 rounded-lg text-sm transition-colors #{controller_name == 'data' ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" %>
+          <div class="border-t border-edge pt-3 mt-2">
+            <div class="px-3 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Admin</div>
+            <% NavigationHelper::ADMIN_TABS.each do |tab| %>
+              <%= link_to tab[:label], send(tab[:path]), class: nav_sublink_classes(tab[:controller]) %>
+            <% end %>
+          </div>
         <% end %>
 
         <div class="flex-1"></div>
         <% if current_user %>
           <div class="border-t border-edge pt-3 mt-2 space-y-1">
-            <div class="px-3 py-1 text-xs text-content-muted">
-              Launch: <kbd class="px-1 py-0.5 rounded bg-surface-input border border-edge font-mono text-[0.6875rem]">&#8984;K</kbd>
-            </div>
-            <%= link_to current_user.email, account_path,
-                  class: "block px-3 py-1 text-xs text-content-muted truncate hover:text-content transition-colors" %>
-            <% if current_user.otp_required_for_login? %>
-              <%= link_to "Disable 2FA", disable_two_factor_path, data: { turbo_method: :post, turbo_confirm: "Disable two-factor authentication?" },
-                    class: "block px-3 py-1.5 rounded-lg text-[0.8125rem] text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
-            <% else %>
-              <%= link_to "Enable 2FA", setup_two_factor_path,
-                    class: "block px-3 py-1.5 rounded-lg text-[0.8125rem] text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
+            <button type="button" data-action="command-palette#open"
+                    class="w-full flex items-center justify-between gap-2 px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium border-none cursor-pointer hover:bg-accent-hover transition-colors">
+              <span>Launch</span>
+              <kbd class="px-1 py-0.5 rounded bg-white/20 font-mono text-[0.6875rem]">&#8984;K</kbd>
+            </button>
+            <%= link_to account_path,
+                  class: "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-content-muted hover:bg-surface-input hover:text-content transition-colors" do %>
+              <%= avatar_for(current_user, size: :xs) %>
+              <span class="truncate"><%= current_user.email %></span>
             <% end %>
-            <%= link_to "Setup", setup_path,
-                  class: "block px-3 py-1.5 rounded-lg text-[0.8125rem] text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
             <%= button_to "Sign Out", logout_path, method: :delete,
                   class: "block w-full text-left px-3 py-1.5 rounded-lg text-[0.8125rem] text-content-muted hover:bg-surface-input hover:text-content transition-colors bg-transparent border-none cursor-pointer" %>
           </div>
