@@ -24,7 +24,13 @@
 
 <%= render layout: "shared/components/card" do %>
   <% filtered = params[:project_id].present? || params[:status].present? %>
-  <%= render "shared/runs_list",
-        runs: @runs,
-        empty_message: filtered ? "No runs match your filters." : "No runs yet" %>
+  <% if filtered %>
+    <%= render "shared/runs_list", runs: @runs,
+          empty_message: "No runs match your filters.",
+          empty_cta_label: "Clear filters", empty_cta_path: runs_path %>
+  <% else %>
+    <%= render "shared/runs_list", runs: @runs,
+          empty_message: "No runs yet.",
+          empty_cta_label: "Launch your first run", empty_cta_action: "command-palette#open" %>
+  <% end %>
 <% end %>

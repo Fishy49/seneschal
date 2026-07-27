@@ -1,5 +1,135 @@
 # Changelog
 
+## Unreleased - UI overhaul phase D
+
+Adoption: the layer that makes Seneschal worth picking up. See
+`plans/PHASE_D_ADOPTION.md`.
+
+### D.5 Provenance and credit
+
+- Copying a workflow stamps where it came from, and both the editor header and
+  the hub rows say "Copied from <project>/<workflow>". Good pipelines spread by
+  being copied; the copy should name what it learned from.
+- Workflows show who added them, with an avatar.
+- The hub's Workflows tab can be sorted by Name, Most run or Recently run,
+  ordered in SQL rather than cached anywhere.
+
+### D.6 Empty states that teach
+
+- Every empty region now says what the thing is for and what to do next:
+  projects, groups, skills, output schemas, templates, runs (globally, per
+  project and per workflow), and the code map card, which explains that
+  generating one is what makes file suggestions possible.
+- `shared/_runs_list` takes an optional call to action, so "No runs yet" can
+  offer to launch one rather than being a dead end.
+
+### D.3 First boot goes somewhere
+
+- With no projects yet, Setup's Continue button becomes "Add your first
+  project" and lands on a trimmed form asking only for a name and a
+  repository. Everything else is editable later on the project's Settings tab.
+- Creating it starts the clone immediately and returns to the project with a
+  banner pointing at the starter gallery.
+- The `require_setup` gate itself is unchanged. This is routing, not a new
+  gate: every step is escapable through normal navigation.
+
+### D.4 A checklist for somebody's first day
+
+- A member who has never launched a run sees a three-item checklist on Home:
+  connect your accounts, find your project, launch your first run. Each item
+  shows whether it is already done and links to where it happens.
+- It disappears entirely once that person has started a run.
+
+### D.1 The starter template pack
+
+- Five workflows ship with Seneschal as real `seneschal_workflow_export`
+  payloads under `lib/seneschal/starter_templates/`, so using one is the same
+  code path as importing a workflow somebody exported: **Plan, build, review,
+  ship**; **Diagnose, then fix**; **Refactor with a checkpoint** (an approval
+  gate); **Documentation pass** (no CI); and **Dependency update** (built to
+  pair with a scheduled task).
+- Each bundles well-written shared skills with real frontmatter, and each is
+  covered by a test that imports it into a temporary project and checks its
+  steps and materialised SKILL.md files. The pack cannot silently rot when the
+  export format changes.
+
+### D.2 Nobody starts from a blank workflow
+
+- **New workflow** leads with the starter gallery - name, what it teaches, and
+  its step sequence as badges - with the blank form underneath.
+- `create_from_template` runs the bundled payload through `WorkflowImporter`,
+  so a second use of the same template suffixes rather than failing, and an
+  unknown key is refused.
+- The Library's Templates tab gains a "Workflow starters" section with a
+  project picker, so a starter can be dropped into any project from there.
+
+## Unreleased - UI overhaul phase C
+
+Runs and launching; see `plans/PHASE_C_RUNS.md`.
+
+### C.4 Palette polish
+
+- Choosing a workflow in the ⌘K palette now shows the same one-line glance the
+  composer's cards give: run count, success rate, typical cost, and what the
+  workflow can touch. The wording is formatted server-side so the palette and
+  the composer cannot drift apart.
+- A "Full composer" link carries the typed description and chosen project over
+  to `/tasks/new`, so switching to the deliberate flow costs no retyping.
+
+### C.3 The launch composer
+
+- Workflows are chosen from cards showing step count, run stats and what each
+  one can touch, instead of a select whose options were bare names. A dashed
+  "Not yet" card saves the task as a draft.
+- Relevant files is always present and explains itself in all three states: a
+  ready code map offers Suggest with Claude, a project without one offers to
+  generate it, and no project yet says to pick one.
+- "When to run" is a chip row (Now / On a schedule / When a branch changes)
+  rather than a select labelled Trigger. The cron and branch panels are
+  unchanged.
+- The buttons are **Launch** and **Save draft**.
+- Kind is demoted to an optional "Tag" under Advanced and defaults to feature,
+  so nothing has to be decided about it before launching.
+- `/tasks/new` accepts `description` and `project_id`, so the palette can hand
+  off to the full composer without losing what was typed.
+
+### C.2 Overview reads like a report
+
+- Each step is now a row that says what happened - status, name, type,
+  duration, cost, attempt - and one line of result: what it produced, the
+  first line of its error, or "Waiting on a human".
+- Opening a row shows the curated layer: produced values, the error, approval
+  history, the discussion and Retry from here. Everything raw (inputs, todo
+  list, context queries, activity log, assets, raw output, stderr, View
+  context) moves one disclosure deeper under "Raw details". Nothing was
+  removed.
+- A running step opens itself, so its live log is visible without a click.
+- The right rail leads with Run info (which now carries the raw run id) and
+  the discussion; Context and Input start collapsed.
+- `preserve_details_controller` gained an explicit `data-preserve-key`. It
+  keyed open/closed state by summary text, which now contains a duration that
+  ticks up between broadcasts - a streaming step would have collapsed itself
+  on every update.
+- The step partial keeps its path and its `run_step_<id>` element, and a test
+  renders it exactly the way `ExecuteRunJob` broadcasts it, since system tests
+  cannot see broadcasts.
+
+### C.1 One run, three modes
+
+- Overview, Transcript and Compare now share one header and a mode tab bar
+  instead of looking like three separate products. URLs are unchanged, so
+  permalinks and share links still work.
+- The header leads with the run's name and status, and its meta line carries
+  who launched it, when, what it cost, how many tokens it used, and the
+  project and workflow. The raw id retires to the Run info card.
+- Every action stays reachable: Stop, Re-run, Resume, Share and Follow up.
+- The presence roster moves up beside the tab bar as overlapping avatars, and
+  deliberately sits outside `#run_header`: that element is replaced on every
+  step broadcast, and re-mounting the Stimulus controller there would make a
+  viewer appear to leave and rejoin dozens of times per run.
+- The ids and partial paths that `ExecuteRunJob` broadcasts into
+  (`run_header`, `run_info`, `run_context`, `run_steps_list`) are unchanged.
+
 ## Unreleased - UI overhaul phase B
 
 Authoring surfaces from `PRODUCT_REDESIGN.md`; see

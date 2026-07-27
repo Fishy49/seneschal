@@ -28,9 +28,15 @@ class RunsTest < ApplicationSystemTestCase
     assert_selector "[data-presence-target='roster']", visible: :all
   end
 
-  test "view run with usage stats" do
+  test "the run header summarises cost and tokens" do
     visit run_path(runs(:completed_run))
     assert_text "$0.05"
+    assert_text "24.0k tokens"
+  end
+
+  test "the full metrics breakdown lives on the transcript" do
+    visit replay_run_path(runs(:completed_run))
+    assert_text(/turns/i)
     assert_text "5 turns"
   end
 

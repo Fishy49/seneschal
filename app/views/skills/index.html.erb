@@ -58,8 +58,9 @@
 <% end %>
 
 <% if @skills.empty? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-    <p>No skills yet.</p>
-    <p class="mt-2"><%= link_to "Create your first skill", new_skill_path %></p>
-  </div>
+  <%= render layout: "shared/components/card" do %>
+    <%= render "shared/components/empty_state",
+          message: "No skills yet. A skill is a reusable SKILL.md an agent step runs; starting a workflow from a template creates a few.",
+          cta_label: "Create a skill", cta_path: new_skill_path %>
+  <% end %>
 <% end %>

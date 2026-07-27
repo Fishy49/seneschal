@@ -4,12 +4,12 @@ class QuickLaunchController < ApplicationController
   # request.
 
   def options
-    payload = Project.includes(:workflows).order(:name).map do |project|
+    payload = Project.includes(workflows: [:steps, :runs]).order(:name).map do |project|
       {
         id: project.id,
         name: project.name,
         repo_status: project.repo_status,
-        workflows: project.workflows.order(:name).map { |w| { id: w.id, name: w.name } }
+        workflows: project.workflows.sort_by(&:name).map { |w| workflow_option(w) }
       }
     end
 
@@ -41,6 +41,17 @@ class QuickLaunchController < ApplicationController
   end
 
   private
+
+  # Stats and access are pre-formatted here so the palette can show the same
+  # confidence glance as the composer without duplicating the wording in JS.
+  def workflow_option(workflow)
+    {
+      id: workflow.id,
+      name: workflow.name,
+      stats: helpers.workflow_stats_line(workflow.stats) || "never run",
+      access: WorkflowAccessSummary.for(workflow).map(&:label).join(", ")
+    }
+  end
 
   # The first line becomes the title; the whole description stays as the body,
   # so a one-line launch still satisfies the body presence validation.

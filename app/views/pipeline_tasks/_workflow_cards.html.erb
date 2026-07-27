@@ -1,0 +1,44 @@
+<%# Pick a workflow by looking at what it does, not by reading a select.
+    Every workflow is rendered and tagged with its project; task_form_controller
+    narrows the visible set. Locals: f:, task: %>
+<% workflows = Workflow.includes(:steps, :runs, project: []).order(:name) %>
+<span class="block text-sm font-medium text-content-muted mb-1.5">Workflow</span>
+<div class="grid grid-cols-2 gap-3" data-task-form-target="workflowCards">
+  <% workflows.each do |workflow| %>
+    <label data-project-id="<%= workflow.project_id %>"
+           data-task-form-target="workflowCard"
+           class="block p-3 rounded-lg border border-edge cursor-pointer transition-colors hover:bg-surface-input has-[:checked]:border-accent has-[:checked]:ring-2 has-[:checked]:ring-accent/40">
+      <%= f.radio_button :workflow_id, workflow.id, class: "sr-only",
+            data: { task_form_target: "workflowRadio" } %>
+      <div class="font-medium text-sm"><%= workflow.name %></div>
+      <% if workflow.description.present? %>
+        <p class="text-xs text-content-muted mt-0.5 line-clamp-2"><%= workflow.description %></p>
+      <% end %>
+      <div class="text-xs text-content-muted mt-1">
+        <%= pluralize(workflow.steps.size, "step") %>
+        <% if (line = workflow_stats_line(workflow.stats)) %>
+          &middot; <%= line %>
+        <% else %>
+          &middot; never run
+        <% end %>
+      </div>
+      <div class="flex flex-wrap items-center gap-1 mt-2">
+        <% WorkflowAccessSummary.for(workflow).each do |chip| %>
+          <%= render "shared/components/chip", text: chip.label, tone: chip.tone, title: chip.title %>
+        <% end %>
+      </div>
+    </label>
+  <% end %>
+
+  <label data-project-id=""
+         data-task-form-target="workflowCard"
+         class="block p-3 rounded-lg border border-edge border-dashed cursor-pointer transition-colors hover:bg-surface-input has-[:checked]:border-accent has-[:checked]:ring-2 has-[:checked]:ring-accent/40">
+    <%= f.radio_button :workflow_id, "", class: "sr-only", data: { task_form_target: "workflowRadio" } %>
+    <div class="font-medium text-sm">Not yet</div>
+    <p class="text-xs text-content-muted mt-0.5">Save this as a draft and pick a workflow later.</p>
+  </label>
+</div>
+
+<p class="text-sm text-content-muted mt-2" data-task-form-target="noWorkflows" hidden>
+  This project has no workflows yet.
+</p>

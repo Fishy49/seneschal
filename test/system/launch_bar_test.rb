@@ -33,7 +33,7 @@ class LaunchBarTest < ApplicationSystemTestCase
     select "Deploy Pipeline", from: "Workflow"
     find("[data-command-palette-target='submit']").click
 
-    assert_selector "h1", text: /Run #\d+/
+    assert_selector "h1", text: "Try the launch bar · run 1"
     assert_equal "Try the launch bar", PipelineTask.last.title
   end
 
@@ -44,5 +44,27 @@ class LaunchBarTest < ApplicationSystemTestCase
     find("[data-command-palette-target='submit']").click
     assert_text "Describe what you want run."
     assert_selector "[data-command-palette-target='description']", visible: true
+  end
+
+  test "choosing a workflow shows what it costs and what it can touch" do
+    visit runs_path
+    find("body").send_keys([:control, "k"])
+
+    select "Seneschal", from: "Project"
+    select "Deploy Pipeline", from: "Workflow"
+
+    assert_selector "[data-command-palette-target='summary']", visible: true
+  end
+
+  test "the composer link carries what has been typed" do
+    visit runs_path
+    find("body").send_keys([:control, "k"])
+
+    fill_in "What should Claude do?", with: "Add rate limiting"
+    select "Seneschal", from: "Project"
+
+    link = find("[data-command-palette-target='composer']")
+    assert_includes link[:href], "description=Add+rate+limiting"
+    assert_includes link[:href], "project_id=#{projects(:seneschal).id}"
   end
 end

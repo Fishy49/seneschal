@@ -91,7 +91,7 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     run = workflows(:deploy).runs.create!(status: "running", context: {})
     get run_path(run)
     assert_response :success
-    assert_match(/Danger Mode/, response.body)
+    assert_match(/Danger mode/, response.body)
   end
 
   test "GET runs index shows danger indicator next to runs" do
@@ -99,7 +99,7 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     workflows(:deploy).runs.create!(status: "running", context: {})
     get runs_path
     assert_response :success
-    assert_match(/Danger Mode/, response.body)
+    assert_match(/Danger mode/, response.body)
   end
 
   test "GET show renders awaiting_approval badge and approve/reject actions" do
@@ -232,8 +232,8 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
   test "GET replay renders the trajectory view" do
     get replay_run_path(runs(:completed_run))
     assert_response :success
-    assert_select "h1", /Run ##{runs(:completed_run).id}/
-    assert_select "h1", /Replay/
+    assert_select "h1", text: /#{runs(:completed_run).pipeline_task.title}/
+    assert_select "a", text: "Transcript"
   end
 
   test "GET replay gives every step and entry an addressable id" do
@@ -317,5 +317,117 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     # Falls through to the empty state because no candidate matched.
     assert_no_match(/Run ##{foreign.id}/, response.body)
+  end
+
+  test "all three run modes share one chrome and tab bar" do
+    run = runs(:completed_run)
+
+    [run_path(run), replay_run_path(run), diff_run_path(run)].each do |path|
+      get path
+      assert_response :success
+      assert_select "#run_header h1", text: /#{run.pipeline_task.title}/
+      assert_select "a[href=?]", run_path(run), text: "Overview"
+      assert_select "a[href=?]", replay_run_path(run), text: "Transcript"
+      assert_select "a[href=?]", diff_run_path(run), text: "Compare"
+      assert_select "[data-controller=?]", "presence"
+    end
+  end
+
+  test "the header keeps the id and partial that broadcasts target" do
+    get run_path(runs(:active_run))
+    assert_select "#run_header"
+    assert_select "#run_steps_list"
+  end
+
+  test "the header carries every run action" do
+    run = runs(:completed_run)
+    get run_path(run)
+
+    assert_select "form[action=?]", execute_pipeline_task_path(run.pipeline_task)
+    assert_select "a[href=?]", run_path(run, anchor: "share"), text: "Share"
+  end
+
+  test "an active run offers Stop" do
+    get run_path(runs(:active_run))
+    assert_select "form[action=?]", stop_run_path(runs(:active_run))
+  end
+
+  # C.2: the row says what happened, the raw material is one disclosure deeper.
+  test "a failed step leads with the first line of its error" do
+    get run_path(runs(:failed_run))
+    assert_select "#run_step_#{run_steps(:failed_step).id} summary p", text: /Build failed: missing dependency/
+  end
+
+  test "a completed step names what it produced" do
+    run = runs(:completed_run)
+    run.update!(context: { "pr_number" => "42" })
+    steps(:skill_step).update!(config: steps(:skill_step).config.merge("produces" => ["pr_number"]))
+
+    get run_path(run)
+    assert_select "#run_step_#{run_steps(:passed_step).id} summary p", text: /Produced pr_number/
+  end
+
+  test "a step waiting on approval says so" do
+    get run_path(runs(:awaiting_run))
+    assert_select "#run_step_#{run_steps(:awaiting_step_run_step).id} summary p", text: /Waiting on a human/
+  end
+
+  test "stderr is not in the collapsed row but is present under raw details" do
+    failed = run_steps(:failed_step)
+    get run_path(runs(:failed_run))
+
+    row = css_select("#run_step_#{failed.id} > div > details > summary").to_s
+    assert_not_includes row, "stderr"
+    assert_not_includes row, "raw output"
+
+    assert_select "#run_step_#{failed.id} details[data-preserve-key=?]", "raw"
+    assert_match(/Raw details/, response.body)
+  end
+
+  test "a streaming step opens itself so its live log stays visible" do
+    get run_path(runs(:active_run))
+    assert_select "#run_step_#{run_steps(:running_step).id} > div > details[open]"
+    assert_select "#run_step_#{run_steps(:running_step).id} details[data-preserve-key='raw'][open]"
+  end
+
+  test "the run info card carries the raw id" do
+    run = runs(:completed_run)
+    get run_path(run)
+    assert_select "#run_info td", text: "##{run.id}"
+  end
+
+  # ExecuteRunJob broadcasts `replace target: "run_step_<id>", partial:
+  # "runs/run_step"`. Rendering it the same way proves the restructured
+  # partial still produces an element the broadcast can land on. System tests
+  # cannot see broadcasts, so this is the guard against silently killing them.
+  test "the broadcast render path still produces the element it targets" do
+    run_step = run_steps(:running_step)
+    html = ApplicationController.render(
+      partial: "runs/run_step",
+      locals: { run_step: run_step, run: run_step.run }
+    )
+
+    assert_match(/id="run_step_#{run_step.id}"/, html)
+    assert_match(/Plan Feature/, html)
+  end
+
+  test "the broadcast render path for the header and lists still matches" do
+    run = runs(:active_run)
+
+    assert_match(/id="run_header"/, ApplicationController.render(partial: "runs/run_header", locals: { run: run }))
+    assert_match(/id="run_info"/, ApplicationController.render(partial: "runs/run_info", locals: { run: run }))
+    assert_match(/id="run_context"/, ApplicationController.render(partial: "runs/run_context", locals: { run: run }))
+    assert_match(/id="run_steps_list"/, ApplicationController.render(partial: "runs/run_steps_list", locals: { run: run }))
+  end
+
+  test "an empty runs list names the next action" do
+    Run.destroy_all
+    get runs_path
+    assert_select "button[data-action=?]", "command-palette#open", text: "Launch your first run"
+  end
+
+  test "a filtered runs list offers to clear the filter" do
+    get runs_path, params: { status: "stopped" }
+    assert_select "a[href=?]", runs_path, text: "Clear filters"
   end
 end

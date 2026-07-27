@@ -4,7 +4,11 @@
        data-poll-status-url-value="<%= status_project_code_map_path(project) %>"
      <% end %>>
   <% if code_map.nil? || code_map.status == "pending" %>
-    <%= button_to "Generate Code Map",
+    <p class="text-sm text-content-muted mb-2">
+      No code map yet. Generating one lets Seneschal suggest which files matter for a given task,
+      so an agent starts in the right place.
+    </p>
+    <%= button_to "Generate code map",
           generate_project_code_map_path(project),
           class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
 

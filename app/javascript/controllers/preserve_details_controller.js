@@ -45,8 +45,16 @@ export default class extends Controller {
     }
   }
 
-  // Build a stable key from the details element's position and summary text
+  // Build a stable key from the details element's position and summary text.
+  // A summary containing live numbers (a duration that ticks up between
+  // broadcasts) would key differently on every render and collapse itself, so
+  // those carry an explicit data-preserve-key instead.
   keyFor(details) {
+    const parentEl = details.closest("[id]")
+    if (details.dataset.preserveKey) {
+      return `${parentEl ? parentEl.id : ""}::${details.dataset.preserveKey}`
+    }
+
     const summary = details.querySelector(":scope > summary")
     if (!summary) return null
 

@@ -42,6 +42,11 @@ class Workflow < ApplicationRecord
     config["runner"].presence if config.is_a?(Hash)
   end
 
+  # "<project>/<workflow>" when this was copied from somewhere, else nil.
+  def copied_from
+    config["copied_from"].presence if config.is_a?(Hash)
+  end
+
   private
 
   def median(values)

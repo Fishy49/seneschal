@@ -212,4 +212,95 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_path(projects(:seneschal), section: "settings")
     assert_equal true, projects(:seneschal).reload.skip_permissions
   end
+
+  # D.3: first boot walks the operator from setup to a working project.
+  test "setup sends a fresh install to the first-project form" do
+    clear_projects
+    get setup_path
+    assert_select "a[href=?]", new_project_path(onboarding: 1), text: "Add your first project"
+  end
+
+  test "setup sends an established install to Home" do
+    get setup_path
+    assert_select "a[href=?]", root_path, text: "Continue to Home"
+  end
+
+  test "the onboarding form asks only for a name and a repository" do
+    get new_project_path(onboarding: 1)
+    assert_select "h1", text: "Create your first project"
+    assert_select "input[name=?]", "project[name]"
+    assert_select "input[name=?]", "project[repo_url]"
+    assert_select "textarea[name=?]", "project[description]", count: 0
+    assert_select "select[name=?]", "project[project_group_id]", count: 0
+  end
+
+  test "onboarding create fills in a local path and starts the clone" do
+    clear_projects
+    assert_enqueued_with(job: CloneRepoJob) do
+      post projects_path, params: {
+        onboarding: "1",
+        project: { name: "First Project", repo_url: "git@example.com:acme/first.git", local_path: "" }
+      }
+    end
+
+    project = Project.find_by(name: "First Project")
+    assert_equal Rails.root.join("repos/first_project").to_s, project.local_path
+    assert_equal "cloning", project.reload.repo_status
+    assert_redirected_to project_path(project, onboarding: 1)
+  end
+
+  test "the onboarding banner points at the template gallery" do
+    project = projects(:seneschal)
+    get project_path(project, onboarding: 1)
+    assert_select "a[href=?]", new_project_workflow_path(project), text: "Start from a template"
+  end
+
+  test "an ordinary project create is unaffected" do
+    assert_no_enqueued_jobs only: CloneRepoJob do
+      post projects_path, params: {
+        project: { name: "Plain", repo_url: "git@example.com:acme/plain.git",
+                   local_path: Rails.root.join("tmp/test_repos/plain").to_s }
+      }
+    end
+    assert_redirected_to project_path(Project.find_by(name: "Plain"))
+  end
+
+  test "the workflows tab can be sorted by activity" do
+    project = projects(:seneschal)
+    busy = project.workflows.create!(name: "ZZZ busy")
+    # Comfortably more runs than the fixture workflow, and a name that sorts
+    # last alphabetically so only the sort can put it first.
+    (workflows(:deploy).runs.count + 2).times do
+      busy.runs.create!(status: "completed", context: {}, input: {})
+    end
+
+    get project_path(project, section: "workflows", sort: "most_run")
+    assert_response :success
+    body = response.body
+    assert body.index(busy.name) < body.index(workflows(:deploy).name),
+           "expected the most-run workflow first"
+  end
+
+  test "an unknown sort falls back to name" do
+    get project_path(projects(:seneschal), section: "workflows", sort: "nonsense")
+    assert_response :success
+    assert_equal "name", ProjectsController.workflow_sort("nonsense")
+  end
+
+  test "workflow rows credit their author and name their source" do
+    project = projects(:seneschal)
+    project.workflows.create!(name: "Borrowed", created_by: users(:admin),
+                              config: { "copied_from" => "Other/Thing" })
+
+    get project_path(project, section: "workflows")
+    assert_select "p", text: %r{Copied from Other/Thing}
+  end
+
+  private
+
+  def clear_projects
+    Run.destroy_all
+    PipelineTask.destroy_all
+    Project.destroy_all
+  end
 end

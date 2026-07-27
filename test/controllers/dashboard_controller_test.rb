@@ -107,4 +107,44 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_match "Frontend", response.body
     assert_match project_path(projects(:seneschal)), response.body
   end
+
+  # D.4: the checklist teaches a new member and then gets out of the way.
+  test "a member who has never launched sees the checklist" do
+    sign_in users(:other)
+    get root_path
+
+    assert_select "h2", text: "Getting started"
+    assert_select "li", text: /Connect your accounts/
+    assert_select "li", text: /Launch your first run/
+  end
+
+  test "the checklist ticks off what is already done" do
+    sign_in users(:other)
+    users(:other).user_credentials.create!(kind: "github_token", value: "ghp_example")
+    get root_path
+
+    assert_select "li", text: /Connect your accounts/ do
+      assert_select "div.line-through"
+    end
+    # A project exists in the fixtures, so that item is done too.
+    assert_select "li a[href=?]", projects_path, text: "Browse projects"
+  end
+
+  test "the checklist offers to add a project when there are none" do
+    sign_in users(:other)
+    Run.destroy_all
+    PipelineTask.destroy_all
+    Project.destroy_all
+
+    get root_path
+    assert_select "li a[href=?]", new_project_path, text: "Add a project"
+  end
+
+  test "the checklist disappears once you have launched something" do
+    sign_in users(:other)
+    runs(:completed_run).update!(started_by: users(:other))
+
+    get root_path
+    assert_select "h2", text: "Getting started", count: 0
+  end
 end

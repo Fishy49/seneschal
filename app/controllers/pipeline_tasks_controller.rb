@@ -20,9 +20,13 @@ class PipelineTasksController < ApplicationController
     @runs = @task.runs.includes(:workflow).recent.limit(10)
   end
 
+  # `description` and `project_id` let the launch palette hand off to the full
+  # composer without the typing being lost.
   def new
     @task = PipelineTask.new(
       project_id: params[:project_id],
+      title: params[:title].presence || params[:description].to_s.truncate(80).presence,
+      body: params[:description],
       kind: "feature",
       status: "draft"
     )

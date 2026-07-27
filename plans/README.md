@@ -41,23 +41,37 @@ design intent.
 
 ## Status
 
-- [x] Phase A - Foundation (built on `feat/ui-phase-a`, awaiting merge)
-- [x] Phase B - Authoring (built on `feat/ui-phase-b`, awaiting merge)
-- [ ] Phase C - Runs
-- [ ] Phase D - Adoption
+- [x] Phase A - Foundation (squashed into `feat/ux-collab-redesign`)
+- [x] Phase B - Authoring (squashed into `feat/ux-collab-redesign`)
+- [x] Phase C - Runs (`feat/ui-phase-c`)
+- [x] Phase D - Adoption (`feat/ui-phase-d`)
 
-Both branches were cut from `feat/ux-collab-redesign` rather than `main`,
-because the collaboration work they depend on has not merged to main yet. The
-order still holds: merge collab, then A, then B.
+All four phases are built. A and B were squashed into
+`feat/ux-collab-redesign`; C and D sit on branches stacked above it. None of
+it is on `main` yet, because the collaboration work underneath has not merged
+either.
 
-Notes for Phase C:
+Things a later change should not undo:
 
 - B.5's relabels landed inside B.4, since both touched the same markup.
-- The step inspector answers `turbo_stream` (replacing `workflow_steps` and
-  `step_inspector`) with an HTML redirect fallback. C.1's run chrome should
-  follow the same pattern rather than inventing another.
-- `test/application_system_test_case.rb#sign_in_as` waits on `h1` "Home". Any
-  further change to the dashboard heading breaks every system test at once.
+- `ExecuteRunJob` broadcasts into `run_header`, `run_info`, `run_context`,
+  `run_steps_list` and `run_step_<id>`. Those element ids and partial paths
+  are a contract. `test/controllers/runs_controller_test.rb` renders each
+  partial the way the job does; system tests cannot see broadcasts.
+- The presence roster sits OUTSIDE `#run_header` on purpose. Inside, it would
+  be re-mounted on every step broadcast and the viewer would appear to leave
+  and rejoin constantly.
+- `preserve_details_controller` keys open/closed state on summary text unless
+  a `data-preserve-key` is given. Anything whose summary contains a live
+  number needs the explicit key or it will collapse itself mid-stream.
+- `test/application_system_test_case.rb#sign_in_as` waits on `h1` "Home".
+  Changing the dashboard heading breaks every system test at once.
+- The starter pack under `lib/seneschal/starter_templates/` is validated by
+  importing each file for real. If the export format changes, fix the pack.
+
+Not verified: live Turbo Stream delivery during a real run. It needs `bin/dev`
+plus a cloned repo and the Claude CLI. Worth one manual smoke run before
+merging.
 
 Check a box when the phase branch is merged. `IMPLEMENTATION_PLAN.md` at
 the repo root is the previous (completed) plan and is kept for history;

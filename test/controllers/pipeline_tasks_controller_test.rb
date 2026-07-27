@@ -197,11 +197,45 @@ class PipelineTasksControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
   end
 
-  test "GET new tags every workflow option with its project id" do
+  test "GET new offers a workflow card per workflow, tagged with its project" do
     get new_pipeline_task_path
-    assert_response :success
-    assert_select "select[name='pipeline_task[workflow_id]'] option[data-project-id=?]",
-                  workflows(:deploy).project_id.to_s
+    assert_select "label[data-project-id=?]", projects(:seneschal).id.to_s
+    assert_select "input[type=radio][name=?][value=?]",
+                  "pipeline_task[workflow_id]", workflows(:deploy).id.to_s
+  end
+
+  test "GET new offers a draft card that selects no workflow" do
+    get new_pipeline_task_path
+    assert_select "input[type=radio][name=?][value=?]", "pipeline_task[workflow_id]", ""
+  end
+
+  test "the composer prefills from the palette handoff" do
+    get new_pipeline_task_path, params: {
+      description: "Add rate limiting to the public endpoints",
+      project_id: projects(:seneschal).id
+    }
+    assert_select "input[name=?][value=?]", "pipeline_task[title]", "Add rate limiting to the public endpoints"
+    assert_select "input[name=?][value=?]", "pipeline_task[body]", "Add rate limiting to the public endpoints"
+    assert_select "select[name=?] option[selected][value=?]", "pipeline_task[project_id]", projects(:seneschal).id.to_s
+  end
+
+  test "when to run is a chip row, not a select" do
+    get new_pipeline_task_path
+    assert_select "input[type=radio][name=?][value=?]", "pipeline_task[trigger_type]", "manual"
+    assert_select "input[type=radio][name=?][value=?]", "pipeline_task[trigger_type]", "cron"
+    assert_select "select[name=?]", "pipeline_task[trigger_type]", count: 0
+  end
+
+  test "kind is optional and defaults to feature" do
+    post pipeline_tasks_path, params: {
+      pipeline_task: {
+        title: "No tag given", body: "Do the thing",
+        project_id: projects(:seneschal).id, workflow_id: workflows(:deploy).id,
+        status: "ready", trigger_type: "manual"
+      }
+    }
+    assert_response :redirect
+    assert_equal "feature", PipelineTask.find_by(title: "No tag given").kind
   end
 
   test "DELETE destroy removes task" do

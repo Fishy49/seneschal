@@ -29,8 +29,9 @@
     </div>
   <% end %>
 <% else %>
-  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-    <p>No project groups yet.</p>
-    <p class="mt-2"><%= link_to "Create your first group", new_project_group_path %></p>
-  </div>
+  <%= render layout: "shared/components/card" do %>
+    <%= render "shared/components/empty_state",
+          message: "No groups yet. Groups tidy the project list in the sidebar once you have a few.",
+          cta_label: "Create a group", cta_path: new_project_group_path %>
+  <% end %>
 <% end %>

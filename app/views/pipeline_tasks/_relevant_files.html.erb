@@ -1,0 +1,53 @@
+<%# Always rendered, so the section explains itself whether or not the project
+    has a code map. Locals: f:, task: %>
+<% project = task.project %>
+<% code_map = project&.code_map %>
+<div>
+  <div class="flex items-center justify-between mb-1.5">
+    <span class="block text-sm font-medium text-content-muted">Relevant files</span>
+    <% if code_map&.ready? %>
+      <button type="button" data-action="task-suggestions#suggest" data-task-suggestions-target="btn"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+        Suggest with Claude
+      </button>
+    <% end %>
+  </div>
+
+  <% if project.nil? %>
+    <p class="text-sm text-content-muted">Pick a project first.</p>
+  <% elsif code_map&.ready? %>
+    <div data-controller="task-suggestions"
+         data-task-suggestions-url-value="<%= suggestions_project_code_map_path(project) %>">
+      <p class="text-xs text-content-muted mb-2">
+        Files listed here are pointed out to the agent up front, so it does not have to go looking.
+      </p>
+      <div data-task-suggestions-target="results" class="text-sm">
+        <% Array(task.context_files).each do |entry| %>
+          <% path = entry.is_a?(Hash) ? entry["path"] : entry.to_s %>
+          <% reason = entry.is_a?(Hash) ? entry["reason"] : "" %>
+          <label class="flex items-start gap-2 py-1.5 cursor-pointer hover:bg-surface-input rounded px-2 -mx-2">
+            <input type="checkbox" checked value="<%= path %>"
+                   data-reason="<%= reason %>"
+                   data-action="change->task-suggestions#updateSelected"
+                   class="mt-0.5 rounded border-edge" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-mono text-content truncate"><%= path %></div>
+              <% if reason.present? %>
+                <div class="text-xs text-content-muted"><%= reason %></div>
+              <% end %>
+            </div>
+          </label>
+        <% end %>
+      </div>
+      <%= f.hidden_field :context_files, value: Array(task.context_files).to_json,
+            data: { task_suggestions_target: "selectedFiles" } %>
+    </div>
+  <% else %>
+    <p class="text-sm text-content-muted mb-2">
+      <%= project.name %> has no code map yet. Generating one lets Seneschal suggest which files matter for a
+      given spec, so the agent starts in the right place.
+    </p>
+    <%= button_to "Generate code map", generate_project_code_map_path(project),
+          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+  <% end %>
+</div>

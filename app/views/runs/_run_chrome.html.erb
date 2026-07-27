@@ -1,0 +1,22 @@
+<%# One identity for all three run modes. Locals: run:, mode: (:overview,
+    :transcript, :compare)
+
+    The presence roster deliberately sits out here rather than inside
+    #run_header: that element is replaced on every step broadcast, which would
+    disconnect and reconnect the Stimulus controller and make this viewer
+    appear to leave and rejoin dozens of times per run. %>
+<%= render "runs/run_header", run: run %>
+
+<div class="flex items-center justify-between gap-4 border-b border-edge mt-4 mb-6">
+  <div class="flex items-center gap-1">
+    <%= link_to "Overview", run_path(run), class: nav_tab_classes(mode == :overview) %>
+    <%= link_to "Transcript", replay_run_path(run), class: nav_tab_classes(mode == :transcript) %>
+    <%= link_to "Compare", diff_run_path(run), class: nav_tab_classes(mode == :compare) %>
+  </div>
+
+  <div class="flex items-center gap-2 pb-2" hidden
+       data-controller="presence" data-presence-run-id-value="<%= run.id %>">
+    <span class="text-xs text-content-muted">Watching</span>
+    <div class="flex items-center -space-x-1.5" data-presence-target="roster"></div>
+  </div>
+</div>

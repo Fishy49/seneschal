@@ -27,8 +27,9 @@
     </table>
   </div>
 <% else %>
-  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-    <p>No schemas yet.</p>
-    <p class="mt-2"><%= link_to "Create your first schema", new_json_schema_path %></p>
-  </div>
+  <%= render layout: "shared/components/card" do %>
+    <%= render "shared/components/empty_state",
+          message: "No output schemas yet. A schema makes a step answer in a fixed shape, so later steps can read individual fields.",
+          cta_label: "Create a schema", cta_path: new_json_schema_path %>
+  <% end %>
 <% end %>

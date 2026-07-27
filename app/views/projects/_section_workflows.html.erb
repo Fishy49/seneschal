@@ -1,5 +1,12 @@
 <%= render layout: "shared/components/card",
       locals: { title: "Workflows", action: { label: "New workflow", path: new_project_workflow_path(project) } } do %>
+  <div class="flex items-center gap-1 mb-3">
+    <% { "name" => "Name", "most_run" => "Most run", "recent" => "Recently run" }.each do |value, label| %>
+      <%= link_to label, project_path(project, section: "workflows", sort: value),
+            class: nav_tab_classes(ProjectsController.workflow_sort(params[:sort]) == value) %>
+    <% end %>
+  </div>
+
   <% if @workflows.any? %>
     <ul class="list-none">
       <% @workflows.each do |workflow| %>
@@ -10,6 +17,16 @@
             </div>
             <% if workflow.description.present? %>
               <p class="text-[0.8125rem] text-content-muted truncate"><%= workflow.description %></p>
+            <% end %>
+            <% if workflow.created_by || workflow.copied_from %>
+              <p class="text-xs text-content-muted mt-0.5 flex items-center gap-1.5">
+                <%= avatar_for(workflow.created_by, size: :xs) %>
+                <% if workflow.copied_from %>
+                  <span>Copied from <%= workflow.copied_from %></span>
+                <% elsif workflow.created_by %>
+                  <span><%= workflow.created_by.email %></span>
+                <% end %>
+              </p>
             <% end %>
             <div class="text-xs text-content-muted mt-0.5">
               <%= pluralize(workflow.steps.size, "step") %>

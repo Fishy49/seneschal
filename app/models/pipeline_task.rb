@@ -17,6 +17,10 @@ class PipelineTask < ApplicationRecord
     { label: "Weekly (Monday 9am)",  cron: "0 9 * * 1" }
   ].freeze
 
+  # Kind gates nothing but a template variable, so it is not a decision anyone
+  # should have to make before launching.
+  before_validation { self.kind = "feature" if kind.blank? }
+
   validates :title, presence: true
   validates :body, presence: true
   validates :kind, presence: true, inclusion: { in: KINDS }

@@ -12,7 +12,7 @@ function escapeHtml(value) {
 // Cmd/Ctrl+K from anywhere: describe the work, confirm project + workflow,
 // launch. Project and workflow default to whatever was used last.
 export default class extends Controller {
-  static targets = ["overlay", "description", "project", "workflow", "error", "submit"]
+  static targets = ["overlay", "description", "project", "workflow", "error", "submit", "summary", "composer"]
   static values = { optionsUrl: String, launchUrl: String }
 
   connect() {
@@ -116,6 +116,44 @@ export default class extends Controller {
     this.workflowTarget.innerHTML = workflows.length
       ? workflows.map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join("")
       : '<option value="">No workflows in this project</option>'
+
+    this.workflowChanged()
+  }
+
+  // The same glance the composer's cards give: how often this workflow has
+  // worked, what it costs, and what it can touch.
+  workflowChanged() {
+    if (!this.hasSummaryTarget) return
+
+    const workflow = this.selectedWorkflow()
+    const parts = workflow ? [workflow.stats, workflow.access].filter(Boolean) : []
+
+    this.summaryTarget.textContent = parts.join(" · ")
+    this.summaryTarget.hidden = parts.length === 0
+    this.updateComposerLink()
+  }
+
+  selectedWorkflow() {
+    const project = (this.projects || []).find((p) => String(p.id) === this.projectTarget.value)
+    if (!project) return null
+
+    return project.workflows.find((w) => String(w.id) === this.workflowTarget.value)
+  }
+
+  // Carries what has been typed over to the full composer rather than making
+  // someone retype it.
+  updateComposerLink() {
+    if (!this.hasComposerTarget) return
+
+    const url = new URL(this.composerTarget.dataset.baseHref || this.composerTarget.href, window.location.origin)
+    this.composerTarget.dataset.baseHref ||= url.pathname
+
+    url.search = ""
+    const description = this.descriptionTarget.value.trim()
+    if (description) url.searchParams.set("description", description)
+    if (this.projectTarget.value) url.searchParams.set("project_id", this.projectTarget.value)
+
+    this.composerTarget.href = url.toString()
   }
 
   async launch() {

@@ -111,4 +111,27 @@ class QuickLaunchControllerTest < ActionDispatch::IntegrationTest
     get quick_launch_options_path
     assert_redirected_to login_path
   end
+
+  test "options carry pre-formatted stats and access per workflow" do
+    get quick_launch_options_path, as: :json
+    assert_response :success
+
+    project = response.parsed_body["projects"].find { |p| p["id"] == projects(:seneschal).id }
+    workflow = project["workflows"].find { |w| w["id"] == workflows(:deploy).id }
+
+    assert workflow.key?("stats")
+    assert workflow.key?("access")
+    assert workflow["stats"].present?
+  end
+
+  test "a never-run workflow says so rather than showing zeros" do
+    fresh = projects(:seneschal).workflows.create!(name: "Never used")
+
+    get quick_launch_options_path, as: :json
+    project = response.parsed_body["projects"].find { |p| p["id"] == projects(:seneschal).id }
+    workflow = project["workflows"].find { |w| w["id"] == fresh.id }
+
+    assert_equal "never run", workflow["stats"]
+    assert_equal "read-only", workflow["access"]
+  end
 end

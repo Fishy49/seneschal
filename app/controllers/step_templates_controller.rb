@@ -3,6 +3,7 @@ class StepTemplatesController < ApplicationController
 
   def index
     @templates = StepTemplate.ordered.includes(skill: :project)
+    @projects = Project.order(:name)
   end
 
   def show; end

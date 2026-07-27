@@ -96,4 +96,21 @@ class WorkflowCopierTest < ActiveSupport::TestCase
     result = WorkflowCopier.new(@source, @target).call
     assert_equal @source.steps.count, result.copied_steps.count
   end
+
+  test "a copy records where it came from" do
+    result = WorkflowCopier.new(@source, @target).call
+    assert_equal "#{@source.project.name}/#{@source.name}", result.workflow.copied_from
+  end
+
+  test "a copy keeps the source's other config" do
+    @source.update!(config: { "runner" => "claude_sdk" })
+    result = WorkflowCopier.new(@source, @target).call
+
+    assert_equal "claude_sdk", result.workflow.runner_name
+    assert result.workflow.copied_from.present?
+  end
+
+  test "a workflow nobody copied has no provenance" do
+    assert_nil workflows(:deploy).copied_from
+  end
 end

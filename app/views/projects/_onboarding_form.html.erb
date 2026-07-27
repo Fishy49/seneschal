@@ -1,0 +1,36 @@
+<%# First-boot project form: a name, a repository, and nothing else to decide.
+    Everything left off here is editable later on the project's Settings tab.
+    Locals: project: %>
+<%= form_with model: project do |f| %>
+  <% if project.errors.any? %>
+    <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+      <% project.errors.full_messages.each do |msg| %>
+        <p><%= msg %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= hidden_field_tag :onboarding, "1" %>
+
+  <div class="mb-4" data-controller="default-path" data-default-path-base-value="<%= Rails.root.join("repos") %>">
+    <div class="mb-4">
+      <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_field :name, placeholder: "supertextadventure",
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    </div>
+
+    <div class="mb-4">
+      <%= f.label :repo_url, "Repository", class: "block text-sm font-medium text-content-muted mb-1.5" %>
+      <%= f.text_field :repo_url, placeholder: "git@github.com:you/your-repo.git",
+            data: { action: "input->default-path#populate" },
+            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+      <p class="text-xs text-content-muted mt-1.5">Cloned with the host's git credentials.</p>
+    </div>
+
+    <%= f.hidden_field :local_path, value: project.local_path.presence,
+          data: { default_path_target: "input" } %>
+  </div>
+
+  <%= f.submit "Create and clone",
+        class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
+<% end %>

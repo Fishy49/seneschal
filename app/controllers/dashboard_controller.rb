@@ -16,5 +16,9 @@ class DashboardController < ApplicationController
                       .recent.limit(RECENT_LIMIT)
     @projects = Project.order(:name)
     @recent_events = Event.includes(:user, :subject).recent.limit(5)
+    # The checklist retires the moment somebody has launched something of
+    # their own; it has nothing left to teach them.
+    @show_onboarding = Run.where(started_by: current_user).none?
+    @has_credentials = current_user.user_credentials.exists?
   end
 end

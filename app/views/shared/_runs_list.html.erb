@@ -1,8 +1,9 @@
 <%# Renders a consistent 3-column table of runs.
     Locals:
       runs:          collection of Run records
-      empty_message: text shown when the collection is empty (default: "No runs yet") %>
-<% empty_message = local_assigns.fetch(:empty_message, "No runs yet") %>
+      empty_message: text shown when the collection is empty (default: "No runs yet")
+      empty_cta_label / empty_cta_path / empty_cta_action: optional next step %>
+<% empty_message = local_assigns.fetch(:empty_message, "No runs yet.") %>
 <% if runs.any? %>
   <table class="w-full border-collapse">
     <thead>
@@ -20,7 +21,7 @@
             <div>
               <%= link_to run_display_name(run), run_path(run) %>
               <% if run.workflow.project.skip_permissions? %>
-                <span class="ml-1 text-danger" title="Danger Mode">&#9888;</span>
+                <span class="ml-1 text-danger" title="Danger mode">&#9888;</span>
               <% end %>
             </div>
             <div class="text-xs text-content-muted">
@@ -41,5 +42,8 @@
     </tbody>
   </table>
 <% else %>
-  <p class="text-center py-8 text-content-muted"><%= empty_message %></p>
+  <%= render "shared/components/empty_state", message: empty_message,
+        cta_label: local_assigns[:empty_cta_label],
+        cta_path: local_assigns[:empty_cta_path],
+        cta_action: local_assigns[:empty_cta_action] %>
 <% end %>

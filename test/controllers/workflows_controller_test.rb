@@ -1,10 +1,23 @@
 require "test_helper"
+require "tmpdir"
 
 class WorkflowsControllerTest < ActionDispatch::IntegrationTest
   setup do
     sign_in users(:admin)
     @project = projects(:seneschal)
     @workflow = workflows(:deploy)
+  end
+
+  # Importing a starter materialises shared SKILL.md files. Redirect the global
+  # skills root at a temp dir first, or the test writes into the repo's own
+  # fixture tree and leaves the working copy dirty.
+  def with_temporary_skills_root
+    Dir.mktmpdir("seneschal-import") do |dir|
+      Setting["skills_global_roots"] = dir
+      yield
+    ensure
+      Setting["skills_global_roots"] = FilesystemSkillFixtures::FIXTURE_SKILLS_ROOT
+    end
   end
 
   test "GET show displays workflow" do
@@ -144,5 +157,56 @@ class WorkflowsControllerTest < ActionDispatch::IntegrationTest
     }
     assert_response :redirect
     assert_not_includes @workflow.reload.config.fetch("runner", "missing"), "fake"
+  end
+
+  test "GET new leads with the starter gallery" do
+    get new_project_workflow_path(@project)
+    assert_select "h2", text: "Start from a template"
+    Seneschal::StarterTemplates.list.each do |template|
+      assert_select "h3", text: template.name
+    end
+    assert_select "h2", text: "Start blank"
+  end
+
+  test "POST create_from_template builds a wired workflow" do
+    with_temporary_skills_root do
+      assert_difference "Workflow.count", 1 do
+        post create_from_template_project_workflows_path(@project), params: { template: "classic_feature" }
+      end
+
+      workflow = Workflow.last
+      assert_redirected_to project_workflow_path(@project, workflow)
+      assert_equal @project.id, workflow.project_id
+      assert_equal users(:admin), workflow.created_by
+      assert_equal ["skill", "skill", "self_review", "pr", "ci_check"],
+                   workflow.steps.order(:position).map(&:step_type)
+      assert(workflow.steps.where(step_type: "skill").all? { |s| s.skill.present? })
+    end
+  end
+
+  test "POST create_from_template records the creation event" do
+    with_temporary_skills_root do
+      post create_from_template_project_workflows_path(@project), params: { template: "bugfix" }
+      assert_equal "workflow.created", Event.recent.first.action
+    end
+  end
+
+  test "using the same template twice suffixes rather than failing" do
+    with_temporary_skills_root do
+      post create_from_template_project_workflows_path(@project), params: { template: "docs_pass" }
+      first = Workflow.last
+
+      assert_difference "Workflow.count", 1 do
+        post create_from_template_project_workflows_path(@project), params: { template: "docs_pass" }
+      end
+      assert_not_equal first.name, Workflow.last.name
+    end
+  end
+
+  test "POST create_from_template rejects an unknown template" do
+    assert_no_difference "Workflow.count" do
+      post create_from_template_project_workflows_path(@project), params: { template: "../../etc/passwd" }
+    end
+    assert_redirected_to new_project_workflow_path(@project)
   end
 end

@@ -1,124 +1,95 @@
+<%# One step in the run timeline. ExecuteRunJob broadcasts a replace of
+    #run_step_<id> with this partial, so the outer element id and the partial
+    path are a contract. The reading order is deliberate: the row says what
+    happened, opening it shows the result, and everything raw is one more
+    disclosure down.
+
+    Locals: run_step:, run:, nested: (optional) %>
 <% nested = local_assigns.fetch(:nested, false) %>
-<li class="flex items-start gap-2 py-2 border-b border-edge last:border-b-0 <%= 'ml-9 border-l border-edge pl-3' if nested %>" id="run_step_<%= run_step.id %>">
+<% streaming = run_step.status.in?(["running", "retrying"]) %>
+<% step_cost = format_cost(run_step.usage_stats&.dig(:cost_usd)) %>
+<% output_vars = run_step.step.produces.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
+<li class="flex items-start gap-2 py-2 border-b border-edge last:border-b-0 <%= "ml-9 border-l border-edge pl-3" if nested %>" id="run_step_<%= run_step.id %>">
   <% if nested %>
     <span class="w-5 h-5 rounded-full bg-surface-input text-content-muted text-[0.625rem] font-semibold flex items-center justify-center shrink-0 mt-0.5">&hookrightarrow;</span>
   <% else %>
-    <span class="w-7 h-7 rounded-full <%= run_step.status == "queued" ? "bg-info/15 text-info" : "bg-surface-input text-content-muted" %> text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5"><%= run_step.position.to_i > 0 ? run_step.position : "&middot;".html_safe %></span>
+    <span class="w-7 h-7 rounded-full <%= run_step.status == "queued" ? "bg-info/15 text-info" : "bg-surface-input text-content-muted" %> text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5"><%= run_step.position.to_i.positive? ? run_step.position : "&middot;".html_safe %></span>
   <% end %>
+
   <div class="flex-1 min-w-0">
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="font-medium text-sm"><%= run_step.step.name %></span>
-      <%= status_badge(run_step.status) %>
-      <% if run_step.duration %>
-        <span class="text-xs text-content-muted"><%= format_duration(run_step.duration) %></span>
-      <% end %>
-      <% if run_step.attempt > 1 %>
-        <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
-      <% end %>
-      <% if run_step.step.step_type.in?(%w[skill prompt]) %>
-        <%= render "runs/step_context_modal", run_step: run_step %>
-      <% end %>
-    </div>
-    <% input_vars = run_step.step.consumes.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
-    <% if nested && run_step.resolved_input_context.present? %>
-      <% input_vars += [["failure_context", run_step.resolved_input_context]] %>
-    <% end %>
-    <% if input_vars.any? || run_step.resolved_input_context.present? %>
-      <% all_input = input_vars %>
-      <% all_input += [["input_context", run_step.resolved_input_context]] if run_step.resolved_input_context.present? %>
-      <details class="mt-1">
-        <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">input <span class="text-content-muted">(<%= all_input.size %> var<%= "s" if all_input.size != 1 %>)</span></summary>
-        <div class="mt-1 space-y-0.5">
-          <% all_input.each do |key, value| %>
-            <details class="ml-2">
-              <summary class="text-xs font-semibold text-info cursor-pointer select-none hover:text-info/80"><%= key %></summary>
-              <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
-            </details>
+    <details data-preserve-key="step" <%= "open" if streaming || run_step.status == "awaiting_approval" %>>
+      <summary class="cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+        <div class="flex items-center gap-2 flex-wrap">
+          <%= status_dot(run_step.status) %>
+          <span class="font-medium text-sm"><%= run_step.step.name %></span>
+          <%= type_badge(run_step.step.step_type) %>
+          <% if run_step.duration %>
+            <span class="text-xs text-content-muted"><%= format_duration(run_step.duration) %></span>
+          <% end %>
+          <% if step_cost %>
+            <span class="text-xs text-content-muted"><%= step_cost %></span>
+          <% end %>
+          <% if run_step.attempt > 1 %>
+            <span class="text-xs text-content-muted">attempt <%= run_step.attempt %></span>
           <% end %>
         </div>
-      </details>
-    <% end %>
-    <%= render "runs/todo_list", run_step: run_step %>
-    <% query_logs = run_step.context_query_logs.recent_first %>
-    <% if query_logs.any? %>
-      <details class="mt-1">
-        <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">
-          context queries <span class="text-content-muted">(<%= query_logs.size %>, <%= number_to_human_size(query_logs.sum(:returned_bytes)) %> total)</span>
-        </summary>
-        <div class="mt-1 ml-2 space-y-0.5 text-xs font-mono">
-          <% query_logs.each do |q| %>
-            <div class="flex items-baseline gap-2 <%= 'text-danger' if q.error.present? %>">
-              <code class="text-info"><%= q.variable %></code>
-              <code class="text-content-muted"><%= q.expression %></code>
-              <span class="text-content-muted">→ <%= q.error.present? ? "error" : number_to_human_size(q.returned_bytes) %></span>
-              <% if q.error.present? %>
-                <span class="text-danger truncate"><%= q.error %></span>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      </details>
-    <% end %>
-    <% if run_step.step.step_type == "ci_check" && run_step.status.in?(%w[running retrying]) %>
-      <%= render "runs/ci_check_status", run_step: run_step %>
-    <% elsif run_step.stream_log.present? || run_step.status.in?(%w[running retrying]) %>
-      <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
-      <details class="mt-1" <%= "open" if run_step.status.in?(%w[running retrying]) %>>
-        <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
-          activity log<% if cost_summary.present? %> <span class="text-content-muted">(<%= cost_summary %>)</span><% end %>
-        </summary>
-        <%= render "runs/stream_log", run_step: run_step %>
-      </details>
-    <% end %>
-    <%= render "runs/step_assets", run_step: run_step %>
-    <% output_vars = run_step.step.produces.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
-    <% if output_vars.any? || run_step.output.present? || run_step.error_output.present? %>
-      <div class="mt-1">
-        <% if output_vars.any? %>
-          <details class="mt-0.5">
-            <summary class="text-[0.8125rem] text-success cursor-pointer select-none hover:text-success/80">output <span class="text-content-muted">(<%= output_vars.size %> var<%= "s" if output_vars.size != 1 %>)</span></summary>
-            <div class="mt-1 space-y-0.5">
-              <% output_vars.each do |key, value| %>
-                <details class="ml-2">
-                  <summary class="text-xs font-semibold text-success cursor-pointer select-none hover:text-success/80"><%= key %></summary>
-                  <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
-                </details>
-              <% end %>
-            </div>
-          </details>
+        <% if (result = run_step_result_line(run_step, output_vars)) %>
+          <p class="text-xs text-content-muted mt-0.5 truncate"><%= result %></p>
         <% end %>
-        <% if run_step.output.present? %>
-          <details class="mt-0.5">
-            <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">raw output</summary>
-            <div class="output-block mt-2"><%= run_step.output %></div>
-          </details>
-        <% end %>
-        <% if run_step.error_output.present? %>
-          <% stderr_is_error = run_step.status == "failed" %>
-          <details class="mt-0.5">
-            <summary class="text-[0.8125rem] cursor-pointer select-none <%= stderr_is_error ? 'text-danger' : 'text-content-muted hover:text-content' %>"><%= stderr_is_error ? "error" : "stderr" %></summary>
-            <div class="output-block mt-2" style="<%= "border-color:var(--danger)" if stderr_is_error %>"><%= run_step.error_output %></div>
-          </details>
-        <% end %>
-      </div>
-    <% end %>
-    <%# The awaiting step already shows its history inside the approval panel. %>
-    <% unless run_step.status == "awaiting_approval" %>
-      <%= render "runs/approval_history", run_step: run_step %>
-    <% end %>
-    <details class="mt-2">
-      <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">
-        discussion<% if (count = run_step.comments.size).positive? %> (<%= count %>)<% end %>
       </summary>
-      <%= render "comments/thread", commentable: run_step, compact: true,
-            anchor: "replay_step_#{run_step.id}" %>
-    </details>
-    <% if run.status.in?(%w[failed stopped]) && run_step.status == "failed" %>
-      <div class="mt-2">
-        <%= button_to "Retry from here",
-              retry_from_run_path(run, step_id: run_step.step_id),
-              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+
+      <div class="mt-2 pl-1">
+        <% if run_step.step.step_type == "ci_check" && streaming %>
+          <%= render "runs/ci_check_status", run_step: run_step %>
+        <% end %>
+
+        <% if output_vars.any? %>
+          <div class="mb-2">
+            <p class="text-[0.8125rem] text-success mb-1">Produced</p>
+            <% output_vars.each do |key, value| %>
+              <details class="ml-2" data-preserve-key="out-<%= key %>">
+                <summary class="text-xs font-semibold text-success cursor-pointer select-none hover:text-success/80"><%= key %></summary>
+                <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
+              </details>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if run_step.status == "failed" && run_step.error_output.present? %>
+          <div class="mb-2">
+            <p class="text-[0.8125rem] text-danger mb-1">Error</p>
+            <div class="output-block text-xs" style="border-color:var(--danger)"><%= run_step.error_output %></div>
+          </div>
+        <% end %>
+
+        <%# The awaiting step already shows its history inside the approval panel. %>
+        <% unless run_step.status == "awaiting_approval" %>
+          <%= render "runs/approval_history", run_step: run_step %>
+        <% end %>
+
+        <details class="mt-2" data-preserve-key="discussion">
+          <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">
+            Discussion<% if (count = run_step.comments.size).positive? %> (<%= count %>)<% end %>
+          </summary>
+          <%= render "comments/thread", commentable: run_step, compact: true,
+                anchor: "replay_step_#{run_step.id}" %>
+        </details>
+
+        <% if run.status.in?(["failed", "stopped"]) && run_step.status == "failed" %>
+          <div class="mt-2">
+            <%= button_to "Retry from here",
+                  retry_from_run_path(run, step_id: run_step.step_id),
+                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          </div>
+        <% end %>
+
+        <details class="mt-2" data-preserve-key="raw" <%= "open" if streaming %>>
+          <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">Raw details</summary>
+          <div class="mt-1">
+            <%= render "runs/run_step_raw", run_step: run_step, run: run, nested: nested, streaming: streaming %>
+          </div>
+        </details>
       </div>
-    <% end %>
+    </details>
   </div>
 </li>

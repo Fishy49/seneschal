@@ -57,6 +57,9 @@ Rails.application.routes.draw do
     end
     resource :workflow_import, only: [:new, :create], controller: "workflow_imports"
     resources :workflows, except: [:index] do
+      collection do
+        post :create_from_template
+      end
       member do
         post :trigger
         get :export

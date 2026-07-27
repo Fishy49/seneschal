@@ -15,6 +15,22 @@ class WorkflowsController < ApplicationController
 
   def edit; end
 
+  # Starting from a template is the same code path as importing one somebody
+  # exported; the bundled packs are ordinary export payloads.
+  def create_from_template
+    template = Seneschal::StarterTemplates.find(params.expect(:template))
+    return redirect_to(new_project_workflow_path(@project), alert: "Unknown template.") unless template
+
+    result = WorkflowImporter.new(template.payload, target_project: @project).call
+    result.workflow.update(created_by: current_user)
+    Event.record("workflow.created", subject: result.workflow, user: current_user)
+
+    redirect_to project_workflow_path(@project, result.workflow),
+                notice: "Created \"#{result.workflow.name}\" from a template. Edit any step to make it yours."
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_to new_project_workflow_path(@project), alert: "Could not use that template: #{e.message}"
+  end
+
   def create
     @workflow = @project.workflows.build(workflow_params)
     @workflow.created_by = current_user

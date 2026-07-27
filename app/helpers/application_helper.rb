@@ -31,6 +31,19 @@ module ApplicationHelper
     (workflow.runner_name || Runners.default_name) == "claude_sdk" ? "Advanced SDK" : "Standard"
   end
 
+  # The one line a collapsed step row shows about how it went. nil when there
+  # is nothing worth saying, so the row stays a single line.
+  def run_step_result_line(run_step, output_vars)
+    case run_step.status
+    when "awaiting_approval" then "Waiting on a human"
+    when "failed" then run_step.error_output.to_s.lines.first&.strip.presence ||
+      run_step.output.to_s.lines.first&.strip.presence
+    when "passed"
+      "Produced #{output_vars.map(&:first).join(", ")}" if output_vars.any?
+    when "skipped" then "Skipped"
+    end
+  end
+
   def manual_approval_actions(run)
     return unless run.awaiting_approval?
 

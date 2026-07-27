@@ -20,10 +20,9 @@ class TasksTest < ApplicationSystemTestCase
   test "create new task" do
     visit new_pipeline_task_path
     fill_in "Title", with: "Brand New Task"
-    page.execute_script("document.querySelector('input[name=\"pipeline_task[body]\"]').value = 'Implement this feature'")
-    select "Feature", from: "Kind"
+    fill_in_spec "Implement this feature"
     select "Seneschal", from: "Project"
-    click_on "Save"
+    click_on "Save draft"
 
     assert_text "Brand New Task"
   end
@@ -31,7 +30,7 @@ class TasksTest < ApplicationSystemTestCase
   test "edit task" do
     visit edit_pipeline_task_path(pipeline_tasks(:draft_task))
     fill_in "Title", with: "Updated Task Title"
-    click_on "Save"
+    click_on "Save draft"
 
     assert_text "Updated Task Title"
   end
@@ -42,34 +41,43 @@ class TasksTest < ApplicationSystemTestCase
            "highlight.js did not load from the vendored asset"
   end
 
-  test "choosing a project narrows the workflow select" do
+  test "choosing a project narrows the workflow cards" do
     other = projects(:other_project).workflows.create!(name: "Other Project Flow")
 
     visit new_pipeline_task_path
     select "Seneschal", from: "Project"
-    assert_select_options "pipeline_task_workflow_id", includes: "Deploy Pipeline", excludes: other.name
+    assert_selector "label", text: "Deploy Pipeline"
+    assert_no_selector "label", text: other.name
 
     select "OtherProject", from: "Project"
-    assert_select_options "pipeline_task_workflow_id", includes: other.name, excludes: "Deploy Pipeline"
+    assert_selector "label", text: other.name
+    assert_no_selector "label", text: "Deploy Pipeline"
   end
 
-  test "save and run starts a run in one submission" do
+  test "a workflow card carries its stats and what it can touch" do
+    visit new_pipeline_task_path
+    select "Seneschal", from: "Project"
+
+    within("label", text: "Deploy Pipeline") do
+      assert_text(/step/)
+      assert_text(/never run|runs/)
+    end
+  end
+
+  test "launching composes and starts a run in one submission" do
     visit new_pipeline_task_path
     fill_in "Title", with: "Launch straight away"
-    page.execute_script("document.querySelector('input[name=\"pipeline_task[body]\"]').value = 'Do the thing'")
+    fill_in_spec "Do the thing"
     select "Seneschal", from: "Project"
-    select "Deploy Pipeline", from: "Workflow"
-    click_on "Save & Run"
+    choose_workflow "Deploy Pipeline"
+    click_on "Launch"
 
     assert_text "Run started for 'Launch straight away'"
   end
 
-  private
-
-  def assert_select_options(select_id, includes:, excludes:)
-    options = find("##{select_id}").all("option", visible: :all).map(&:text)
-    assert_includes options, includes
-    assert_not_includes options, excludes
+  test "the composer prefills from a palette handoff" do
+    visit new_pipeline_task_path(description: "Add rate limiting", project_id: projects(:seneschal).id)
+    assert_field "Title", with: "Add rate limiting"
   end
 
   test "filter tasks by status" do
@@ -83,5 +91,18 @@ class TasksTest < ApplicationSystemTestCase
   test "task shows runs" do
     visit pipeline_task_path(pipeline_tasks(:completed_task))
     assert_text "Runs"
+  end
+
+  private
+
+  # The spec field is a CodeJar editor writing into a hidden input.
+  def fill_in_spec(text)
+    page.execute_script(
+      "document.querySelector('input[name=\"pipeline_task[body]\"]').value = arguments[0]", text
+    )
+  end
+
+  def choose_workflow(name)
+    find("label", text: name).click
   end
 end

@@ -13,8 +13,15 @@ export default class extends Controller {
     this.presetChanged()
   }
 
+  // The trigger is a row of radios, so read whichever is checked rather than
+  // the first target.
+  get selectedType() {
+    const checked = this.typeTargets.find((input) => input.checked)
+    return checked ? checked.value : this.typeTargets[0]?.value
+  }
+
   typeChanged() {
-    const type = this.typeTarget.value
+    const type = this.selectedType
     this.cronPanelTarget.hidden = type !== "cron"
     this.watchPanelTarget.hidden = type !== "github_watch"
   }

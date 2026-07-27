@@ -6,6 +6,15 @@
     <% if @workflow.description.present? %>
       <p class="text-sm text-content-muted mt-1"><%= @workflow.description %></p>
     <% end %>
+    <p class="text-xs text-content-muted mt-1 flex items-center gap-1.5">
+      <% if @workflow.created_by %>
+        <%= avatar_for(@workflow.created_by, size: :xs) %>
+        <span>Added by <%= @workflow.created_by.email %></span>
+      <% end %>
+      <% if @workflow.copied_from %>
+        <span>Copied from <%= @workflow.copied_from %></span>
+      <% end %>
+    </p>
     <div class="flex items-center gap-2 mt-2 flex-wrap">
       <%= render "shared/components/chip", text: "Engine: #{workflow_engine_label(@workflow)}", tone: :neutral %>
       <% @access.each do |chip| %>
@@ -53,7 +62,8 @@
     <%= render "workflows/steps_canvas", project: @project, workflow: @workflow, steps: @steps %>
 
     <%= render layout: "shared/components/card", locals: { title: "Recent runs", class: "mb-4" } do %>
-      <%= render "shared/runs_list", runs: @recent_runs, empty_message: "No runs yet." %>
+      <%= render "shared/runs_list", runs: @recent_runs,
+            empty_message: "This workflow has not run yet." %>
     <% end %>
   </div>
 

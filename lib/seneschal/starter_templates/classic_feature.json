@@ -1,0 +1,143 @@
+{
+  "seneschal_workflow_export": {
+    "version": 1,
+    "exported_at": "2026-07-27T00:00:00Z",
+    "source_project_name": "Seneschal starter templates",
+    "workflow": {
+      "name": "Plan, build, review, ship",
+      "description": "The standard loop: plan the work, implement it, review your own diff, open a pull request, wait for CI.",
+      "config": {},
+      "steps": [
+        {
+          "name": "Plan",
+          "position": 1,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "produces": [
+              "plan"
+            ],
+            "consumes": [
+              "task_title",
+              "task_body"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "plan-the-work"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 900,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Implement",
+          "position": 2,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "consumes": [
+              "plan",
+              "task_title"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "implement-the-plan"
+          },
+          "json_schema_ref": null,
+          "max_retries": 1,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Self review",
+          "position": 3,
+          "step_type": "self_review",
+          "body": null,
+          "config": {
+            "focus": "Check error handling, missing tests, and anything left half-finished."
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 900,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Open PR",
+          "position": 4,
+          "step_type": "pr",
+          "body": null,
+          "config": {
+            "title": "${task_title}",
+            "body": "${task_body}",
+            "base": "main",
+            "draft": true,
+            "produces": [
+              "pr_number",
+              "branch_name"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Wait for CI",
+          "position": 5,
+          "step_type": "ci_check",
+          "body": null,
+          "config": {
+            "mode": "pr",
+            "pr": "${pr_number}",
+            "poll_interval": 30,
+            "max_log_chars": 10000,
+            "log_from": "end",
+            "consumes": [
+              "pr_number"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        }
+      ]
+    },
+    "skills": [
+      {
+        "name": "plan-the-work",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "plan-the-work",
+        "description": "Turns a request into a short implementation plan grounded in the actual code.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: plan-the-work\ndescription: Turns a request into a short implementation plan grounded in the actual code.\n---\n\nRead the request below and write a short implementation plan.\n\nRequest: ${task_title}\n\n${task_body}\n\nLook at how the code is laid out before deciding anything. Name the files you\nexpect to touch and why, call out anything that looks risky, and say what you\nare deliberately leaving alone. Keep it to what a reviewer needs.\n\nFinish by writing the plan into an output block named `plan`.\n"
+      },
+      {
+        "name": "implement-the-plan",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "implement-the-plan",
+        "description": "Carries out an agreed plan, with tests, matching the surrounding style.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: implement-the-plan\ndescription: Carries out an agreed plan, with tests, matching the surrounding style.\n---\n\nCarry out this plan:\n\n${plan}\n\nOriginal request: ${task_title}\n\nWork in small steps. Match the style already in the files you touch. Add or\nupdate tests for anything you change in behaviour, and run them before you\nfinish. If the plan turns out to be wrong, do the right thing and say so.\n"
+      }
+    ],
+    "json_schemas": []
+  }
+}

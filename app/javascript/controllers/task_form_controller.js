@@ -1,23 +1,31 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Keeps the Workflow select in sync with the Project select. The ERB renders
-// every workflow tagged with its project id; this narrows the list down and
-// drops a selection that no longer belongs to the chosen project.
+// Keeps the workflow cards in sync with the chosen project. Every workflow is
+// rendered and tagged with its project id; this hides the ones that do not
+// belong, and clears a selection the new project no longer offers.
 export default class extends Controller {
-  static targets = ["projectSelect", "workflowSelect"]
+  static targets = ["projectSelect", "workflowCard", "noWorkflows"]
 
   connect() {
-    this.allOptions = Array.from(this.workflowSelectTarget.options).map((option) => option.cloneNode(true))
     this.projectChanged()
   }
 
   projectChanged() {
     const projectId = this.projectSelectTarget.value
-    const previous = this.workflowSelectTarget.value
+    let visibleWorkflows = 0
 
-    const matching = this.allOptions.filter((option) => !option.value || option.dataset.projectId === projectId)
-    this.workflowSelectTarget.replaceChildren(...matching.map((option) => option.cloneNode(true)))
+    this.workflowCardTargets.forEach((card) => {
+      // The draft card carries no project and is always on offer.
+      const belongs = !card.dataset.projectId || card.dataset.projectId === projectId
+      card.hidden = !belongs
+      if (belongs && card.dataset.projectId) visibleWorkflows += 1
 
-    this.workflowSelectTarget.value = matching.some((option) => option.value === previous) ? previous : ""
+      if (!belongs) {
+        const radio = card.querySelector("input[type=radio]")
+        if (radio) radio.checked = false
+      }
+    })
+
+    if (this.hasNoWorkflowsTarget) this.noWorkflowsTarget.hidden = visibleWorkflows > 0
   }
 }
