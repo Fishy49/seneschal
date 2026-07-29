@@ -1,15 +1,10 @@
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <p class="text-sm text-content-muted">JSON Schema</p>
-    <h1 class="text-2xl font-semibold"><%= @schema.name %></h1>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= link_to "Edit", edit_json_schema_path(@schema), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= button_to "Delete", json_schema_path(@schema), method: :delete,
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
-          data: { turbo_confirm: "Delete schema '#{@schema.name}'?" } %>
-  </div>
-</div>
+<%= render layout: "shared/components/page_header",
+      locals: { title: @schema.name, subtitle: "JSON Schema" } do %>
+  <%= link_to "Edit", edit_json_schema_path(@schema), class: btn_classes(:ghost, size: :sm) %>
+  <%= button_to "Delete", json_schema_path(@schema), method: :delete,
+        class: btn_classes(:danger, size: :sm),
+        data: { turbo_confirm: "Delete schema '#{@schema.name}'?" } %>
+<% end %>
 
 <% if @schema.description.present? %>
   <p class="text-content-muted mb-4"><%= @schema.description %></p>
@@ -34,16 +29,15 @@
   <% end %>
 <% end %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-  <h2 class="text-lg font-semibold mb-3">Shape</h2>
+<%= render layout: "shared/components/card", locals: { title: "Shape", class: "mb-4" } do %>
   <pre class="overflow-x-auto"><code class="language-json" data-controller="highlight"><%= @schema.parsed_body ? JSON.pretty_generate(@schema.parsed_body) : @schema.body %></code></pre>
-</div>
+<% end %>
 
 <% if @referencing_skills.any? %>
   <%= render layout: "shared/components/card", locals: { title: "Default for these skills", class: "mb-4" } do %>
     <ul class="list-none">
       <% @referencing_skills.each do |skill| %>
-        <li class="py-2 border-b border-edge last:border-b-0">
+        <li class="py-[var(--row-y)] border-b border-edge last:border-b-0">
           <%= link_to skill.display_name, skill_path(skill), class: "hover:text-accent transition-colors" %>
         </li>
       <% end %>
@@ -53,25 +47,26 @@
 
 <% referencing_steps = @schema.referencing_steps.includes(workflow: :project) %>
 <% if referencing_steps.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">Used in Steps</h2>
-    <table class="w-full border-collapse">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Step</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% referencing_steps.each do |step| %>
+  <%= render layout: "shared/components/card", locals: { title: "Used in Steps", class: "mb-4" } do %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
           <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= step.name %></td>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to step.workflow.name, project_workflow_path(step.workflow.project, step.workflow) %></td>
-            <td class="px-3 py-2 border-b border-edge text-content-muted"><%= step.workflow.project.name %></td>
+            <th class="<%= th_classes %>">Step</th>
+            <th class="<%= th_classes %>">Workflow</th>
+            <th class="<%= th_classes %>">Project</th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          <% referencing_steps.each do |step| %>
+            <tr>
+              <td class="<%= td_classes %>"><%= step.name %></td>
+              <td class="<%= td_classes %>"><%= link_to step.workflow.name, project_workflow_path(step.workflow.project, step.workflow) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= step.workflow.project.name %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
 <% end %>

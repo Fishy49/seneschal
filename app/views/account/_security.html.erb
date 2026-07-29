@@ -19,11 +19,11 @@
     </div>
     <% if current_user.otp_required_for_login? %>
       <%= button_to "Disable", disable_two_factor_path, method: :post,
-            class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+            class: btn_classes(:ghost, size: :sm, extra: "shrink-0 hover:text-danger"),
             data: { turbo_confirm: "Disable two-factor authentication?" } %>
     <% else %>
       <%= link_to "Enable two-factor authentication", setup_two_factor_path,
-            class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            class: btn_classes(:ghost, size: :sm, extra: "shrink-0") %>
     <% end %>
   </div>
 <% end %>

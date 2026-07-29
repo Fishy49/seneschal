@@ -2,10 +2,9 @@
 
 <%= render layout: "shared/components/page_header",
       locals: { title: @template.name, subtitle: @template.description.presence } do %>
-  <%= link_to "Edit", edit_step_template_path(@template),
-        class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  <%= link_to "Edit", edit_step_template_path(@template), class: btn_classes(:ghost, size: :sm) %>
   <%= button_to "Delete", step_template_path(@template), method: :delete,
-        class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+        class: btn_classes(:danger, size: :sm),
         data: { turbo_confirm: "Delete template '#{@template.name}'?" } %>
 <% end %>
 
@@ -25,11 +24,11 @@
       <% end %>
       <li class="flex items-center gap-2">
         <span class="text-content-muted w-40 shrink-0">Gives up after</span>
-        <span><%= @template.timeout %> seconds</span>
+        <span class="font-mono tabular-nums"><%= @template.timeout %> seconds</span>
       </li>
       <li class="flex items-center gap-2">
         <span class="text-content-muted w-40 shrink-0">Retries</span>
-        <span><%= @template.max_retries %></span>
+        <span class="font-mono tabular-nums"><%= @template.max_retries %></span>
       </li>
       <li class="flex items-center gap-2">
         <span class="text-content-muted w-40 shrink-0">Pauses for approval</span>

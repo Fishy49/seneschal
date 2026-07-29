@@ -11,7 +11,7 @@
 <% step_cost = format_cost(run_step.usage_stats&.dig(:cost_usd)) %>
 <% comment_count = run_step.comments.size %>
 <% output_vars = run_step.step.produces.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
-<li class="flex items-start gap-3 py-2.5 <%= "ml-9 border-l border-edge pl-3" if nested %>" id="run_step_<%= run_step.id %>">
+<li class="flex items-start gap-3 py-[var(--row-y)] <%= "ml-9 border-l border-edge pl-3" if nested %>" id="run_step_<%= run_step.id %>">
   <% if nested %>
     <span class="relative w-5 h-5 rounded-full <%= step_node_classes(run_step.status) %> text-[0.625rem] font-semibold flex items-center justify-center shrink-0 mt-0.5" title="<%= run_step.status.tr("_", " ") %>">&hookrightarrow;</span>
   <% else %>
@@ -63,7 +63,7 @@
         <% if run_step.status == "failed" && run_step.error_output.present? %>
           <div class="mb-2">
             <p class="text-[0.8125rem] text-danger mb-1">Error</p>
-            <div class="output-block text-xs" style="border-color:var(--danger)"><%= run_step.error_output %></div>
+            <div class="output-block text-xs border-danger"><%= run_step.error_output %></div>
           </div>
         <% end %>
 
@@ -83,13 +83,13 @@
           <button type="button"
                   data-action="discussion#composeFor"
                   data-discussion-value-param="RunStep:<%= run_step.id %>"
-                  class="text-[0.8125rem] text-content-muted hover:text-accent bg-transparent border-none cursor-pointer p-0 transition-colors">
+                  class="<%= btn_classes(:quiet, size: :xs) %>">
             Comment on this step
           </button>
           <% if run.status.in?(["failed", "stopped"]) && run_step.status == "failed" %>
             <%= button_to "Retry from here",
                   retry_from_run_path(run, step_id: run_step.step_id),
-                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+                  class: btn_classes(:ghost, size: :sm) %>
           <% end %>
         </div>
       </div>

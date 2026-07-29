@@ -9,7 +9,7 @@
 
 <%# data-controller="discussion" sits up here so a step row in the left column
     can reach the composer in the right one ("Comment on this step"). %>
-<div class="grid grid-cols-[2fr_1fr] gap-4" data-controller="discussion">
+<div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4" data-controller="discussion">
   <div class="min-w-0">
     <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="preserve-details">
       <div class="flex items-baseline justify-between gap-2 mb-3">
@@ -46,14 +46,16 @@
           Input
         </summary>
         <div class="bg-surface-card border border-edge rounded-lg p-5 mt-2">
-          <table class="w-full border-collapse">
-            <% @run.input.each do |key, value| %>
-              <tr>
-                <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted"><%= key %></th>
-                <td class="px-3 py-2 border-b border-edge text-sm"><code class="font-mono text-[0.8125rem] break-all"><%= value %></code></td>
-              </tr>
-            <% end %>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse">
+              <% @run.input.each do |key, value| %>
+                <tr>
+                  <th class="<%= th_classes %>"><%= key %></th>
+                  <td class="<%= td_classes %>"><code class="font-mono text-[0.8125rem] break-all"><%= value %></code></td>
+                </tr>
+              <% end %>
+            </table>
+          </div>
         </div>
       </details>
     <% end %>

@@ -14,7 +14,7 @@ class ApplicationHelperTest < ActionView::TestCase
   end
 
   test "format_duration returns dash for nil" do
-    assert_equal "\u2014", format_duration(nil)
+    assert_equal "-", format_duration(nil)
   end
 
   test "format_cost formats small amounts with 4 decimals" do

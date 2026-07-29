@@ -1,12 +1,14 @@
 module BadgeHelper
   BADGE_BASE = "inline-block px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide".freeze
 
+  # Brass is reserved for states waiting on a person; the accent stays out of
+  # status duty entirely now that it is a per-user preference.
   STATUS_CLASSES = {
     "pending" => "bg-surface-input text-content-muted",
     "queued" => "bg-info/15 text-info",
-    "running" => "bg-accent/15 text-accent",
-    "awaiting_approval" => "bg-warning/15 text-warning",
-    "waiting_for_tokens" => "bg-warning/15 text-warning",
+    "running" => "bg-info/15 text-info",
+    "awaiting_approval" => "bg-brass/15 text-brass",
+    "waiting_for_tokens" => "bg-brass/15 text-brass",
     "completed" => "bg-success/15 text-success",
     "passed" => "bg-success/15 text-success",
     "failed" => "bg-danger/15 text-danger",

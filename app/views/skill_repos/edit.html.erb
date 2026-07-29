@@ -1,10 +1,8 @@
 <div class="max-w-2xl">
-  <div class="mb-4">
-    <p class="text-sm text-content-muted"><%= link_to "← #{@skill_repo.name}", skill_repo_path(@skill_repo) %></p>
-    <h1 class="text-2xl font-semibold mt-1">Edit Skill Repo</h1>
-  </div>
+  <p class="text-sm text-content-muted mb-1"><%= link_to "← #{@skill_repo.name}", skill_repo_path(@skill_repo) %></p>
+  <%= render "shared/components/page_header", title: "Edit Skill Repo" %>
 
-  <div class="bg-surface-card border border-edge rounded-lg p-5">
+  <%= render layout: "shared/components/card" do %>
     <%= render "form", skill_repo: @skill_repo %>
-  </div>
+  <% end %>
 </div>

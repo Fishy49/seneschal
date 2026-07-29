@@ -1,10 +1,21 @@
 class User < ApplicationRecord
+  # Appearance is personal; brass and status colors are not, so only these
+  # three knobs exist. "system" theme resolves client-side.
+  THEMES = ["dark", "light", "system"].freeze
+  ACCENTS = ["verdigris", "cobalt", "heather", "claret", "moss"].freeze
+  DENSITIES = ["cozy", "compact"].freeze
+
   has_many :user_credentials, dependent: :destroy
 
   has_secure_password
 
+  store_accessor :settings, :theme, :accent, :density
+
   validates :email, presence: true, uniqueness: true,
                     format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates :theme, inclusion: { in: THEMES }, allow_blank: true
+  validates :accent, inclusion: { in: ACCENTS }, allow_blank: true
+  validates :density, inclusion: { in: DENSITIES }, allow_blank: true
 
   scope :ordered, -> { order(:email) }
 

@@ -9,7 +9,7 @@ CREATE INDEX "index_run_steps_on_run_id" ON "run_steps" ("run_id") /*application
 CREATE INDEX "index_run_steps_on_step_id" ON "run_steps" ("step_id") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" varchar NOT NULL PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS "ar_internal_metadata" ("key" varchar NOT NULL PRIMARY KEY, "value" varchar, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
-CREATE TABLE IF NOT EXISTS "users" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "email" varchar NOT NULL, "password_digest" varchar NOT NULL, "otp_secret" varchar, "otp_required_for_login" boolean DEFAULT FALSE NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, "admin" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, "invite_token" varchar /*application='Seneschal'*/, "invite_accepted_at" datetime(6) /*application='Seneschal'*/);
+CREATE TABLE IF NOT EXISTS "users" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "email" varchar NOT NULL, "password_digest" varchar NOT NULL, "otp_secret" varchar, "otp_required_for_login" boolean DEFAULT FALSE NOT NULL, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, "admin" boolean DEFAULT FALSE NOT NULL /*application='Seneschal'*/, "invite_token" varchar /*application='Seneschal'*/, "invite_accepted_at" datetime(6) /*application='Seneschal'*/, "settings" json DEFAULT '{}' NOT NULL /*application='Seneschal'*/);
 CREATE UNIQUE INDEX "index_users_on_email" ON "users" ("email") /*application='Seneschal'*/;
 CREATE TABLE IF NOT EXISTS "settings" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "key" varchar NOT NULL, "value" text, "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL);
 CREATE UNIQUE INDEX "index_settings_on_key" ON "settings" ("key") /*application='Seneschal'*/;
@@ -174,6 +174,7 @@ FOREIGN KEY ("created_by_id")
 CREATE INDEX "index_workflows_on_project_id" ON "workflows" ("project_id") /*application='Seneschal'*/;
 CREATE INDEX "index_workflows_on_created_by_id" ON "workflows" ("created_by_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260729091900'),
 ('20260727011843'),
 ('20260727011001'),
 ('20260724210000'),

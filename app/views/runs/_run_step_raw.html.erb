@@ -72,6 +72,6 @@
   <% stderr_is_error = run_step.status == "failed" %>
   <details class="mt-0.5" data-preserve-key="stderr">
     <summary class="text-[0.8125rem] cursor-pointer select-none <%= stderr_is_error ? "text-danger" : "text-content-muted hover:text-content" %>"><%= stderr_is_error ? "error" : "stderr" %></summary>
-    <div class="output-block mt-2" style="<%= "border-color:var(--danger)" if stderr_is_error %>"><%= run_step.error_output %></div>
+    <div class="output-block mt-2 <%= "border-danger" if stderr_is_error %>"><%= run_step.error_output %></div>
   </details>
 <% end %>

@@ -2,8 +2,8 @@
     Every workflow is rendered and tagged with its project; task_form_controller
     narrows the visible set. Locals: f:, task: %>
 <% workflows = Workflow.includes(:steps, :runs, project: []).order(:name) %>
-<span class="block text-sm font-medium text-content-muted mb-1.5">Workflow</span>
-<div class="grid grid-cols-2 gap-3" data-task-form-target="workflowCards">
+<span class="<%= label_classes %>">Workflow</span>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-task-form-target="workflowCards">
   <% workflows.each do |workflow| %>
     <label data-project-id="<%= workflow.project_id %>"
            data-task-form-target="workflowCard"

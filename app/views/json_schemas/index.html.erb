@@ -1,31 +1,32 @@
 <%= render "shared/library_nav" %>
 
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-semibold">JSON Schemas</h1>
-  <%= link_to "New Schema", new_json_schema_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-</div>
+<%= render layout: "shared/components/page_header", locals: { title: "JSON Schemas" } do %>
+  <%= link_to "New Schema", new_json_schema_path, class: btn_classes(:primary) %>
+<% end %>
 
 <% if @schemas.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <table class="w-full border-collapse">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @schemas.each do |schema| %>
+  <%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
           <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to schema.name, json_schema_path(schema) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(schema.description, length: 80) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= schema_usage_label(@usage_counts[schema.id].to_i, @skill_usage_counts[schema.id].to_i) %></td>
+            <th class="<%= th_classes %>">Name</th>
+            <th class="<%= th_classes %>">Description</th>
+            <th class="<%= th_classes %>">Used by</th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          <% @schemas.each do |schema| %>
+            <tr>
+              <td class="<%= td_classes %>"><%= link_to schema.name, json_schema_path(schema) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= truncate(schema.description, length: 80) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= schema_usage_label(@usage_counts[schema.id].to_i, @skill_usage_counts[schema.id].to_i) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
 <% else %>
   <%= render layout: "shared/components/card" do %>
     <%= render "shared/components/empty_state",

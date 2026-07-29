@@ -10,7 +10,7 @@
     </p>
     <%= button_to "Generate code map",
           generate_project_code_map_path(project),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          class: btn_classes(:ghost, size: :sm) %>
 
   <% elsif code_map.generating? %>
     <div class="flex items-center gap-2 text-sm text-content-muted">
@@ -27,10 +27,10 @@
       </span>
       <%= link_to "Explore",
             project_code_map_path(project),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            class: btn_classes(:ghost, size: :sm) %>
       <%= button_to "Regenerate",
             generate_project_code_map_path(project),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            class: btn_classes(:ghost, size: :sm) %>
     </div>
 
   <% elsif code_map.status == "error" %>
@@ -39,7 +39,7 @@
       <span class="text-xs text-content-muted"><%= code_map.error_message %></span>
       <%= button_to "Retry",
             generate_project_code_map_path(project),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            class: btn_classes(:ghost, size: :sm) %>
     </div>
   <% end %>
 </div>

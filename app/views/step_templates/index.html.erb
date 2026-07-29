@@ -6,9 +6,9 @@
     Whole workflows that ship with Seneschal. Pick a project and use one as the starting point.
   </p>
   <% if @projects.any? %>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <% Seneschal::StarterTemplates.list.each do |template| %>
-        <div class="border border-edge rounded-lg p-4">
+        <div class="bg-surface-card border border-edge rounded-lg p-5">
           <div class="flex items-start justify-between gap-2 mb-1">
             <h3 class="font-semibold"><%= template.name %></h3>
             <%= render "shared/components/chip", text: template.teaches, tone: :accent %>
@@ -25,13 +25,12 @@
             <%= hidden_field_tag :template, template.key %>
             <select data-action="change->template-target#projectChanged"
                     data-template-target-paths-value="<%= @projects.to_h { |p| [p.id, create_from_template_project_workflows_path(p)] }.to_json %>"
-                    class="flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+                    class="<%= input_classes("flex-1") %>">
               <% @projects.each do |project| %>
                 <option value="<%= project.id %>"><%= project.name %></option>
               <% end %>
             </select>
-            <button type="submit"
-                    class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">
+            <button type="submit" class="<%= btn_classes(:primary, size: :sm, extra: "shrink-0") %>">
               Use
             </button>
           <% end %>
@@ -54,21 +53,23 @@
     <div class="flex items-center gap-3 mb-4">
       <input type="text" placeholder="Search templates..." autocomplete="off"
              data-list-filter-target="search" data-action="input->list-filter#filter"
-             class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
-      <select data-list-filter-target="type" data-action="change->list-filter#filter"
-              class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        <option value="">All types</option>
-        <% StepsHelper::TYPE_OPTIONS.each do |label, value| %>
-          <option value="<%= value %>"><%= label %></option>
-        <% end %>
-      </select>
+             class="<%= input_classes("flex-1") %>" />
+      <div class="w-44 shrink-0">
+        <select data-list-filter-target="type" data-action="change->list-filter#filter"
+                class="<%= input_classes %>">
+          <option value="">All types</option>
+          <% StepsHelper::TYPE_OPTIONS.each do |label, value| %>
+            <option value="<%= value %>"><%= label %></option>
+          <% end %>
+        </select>
+      </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-4" data-list-filter-target="list">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" data-list-filter-target="list">
       <% @templates.each do |template| %>
         <% searchable = [template.name, template.description, template.step_type,
                          template.skill&.display_name, template.body].compact.join(" ").downcase %>
-        <div class="bg-surface-card border border-edge rounded-lg p-4"
+        <div class="bg-surface-card border border-edge rounded-lg p-5"
              data-type="<%= template.step_type %>" data-searchable="<%= searchable %>">
           <div class="flex items-start justify-between gap-3 mb-1">
             <h2 class="font-semibold">
@@ -83,13 +84,12 @@
             <% if template.skill %>
               Skill: <%= template.skill.display_name %> &middot;
             <% end %>
-            <%= template.timeout %>s timeout &middot; <%= pluralize(template.max_retries, "retry") %>
+            <span class="font-mono tabular-nums"><%= template.timeout %>s</span> timeout &middot; <%= pluralize(template.max_retries, "retry") %>
           </div>
           <div class="flex items-center gap-2 mt-3">
-            <%= link_to "Edit", edit_step_template_path(template),
-                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+            <%= link_to "Edit", edit_step_template_path(template), class: btn_classes(:ghost, size: :sm) %>
             <%= button_to "Delete", step_template_path(template), method: :delete,
-                  class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                  class: btn_classes(:danger, size: :sm),
                   data: { turbo_confirm: "Delete template '#{template.name}'?" } %>
           </div>
         </div>

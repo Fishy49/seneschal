@@ -51,7 +51,7 @@ module ApplicationHelper
   end
 
   def format_duration(seconds)
-    return "\u2014" unless seconds
+    return "-" unless seconds
 
     if seconds < 60
       "#{seconds.round(1)}s"
@@ -63,7 +63,7 @@ module ApplicationHelper
   end
 
   def time_ago_short(time)
-    return "\u2014" unless time
+    return "-" unless time
 
     "#{time_ago_in_words(time)} ago"
   end

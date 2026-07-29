@@ -1,6 +1,6 @@
 <%# One side of a diff row. Variables: run_step (RunStep|nil). %>
 <% if run_step.nil? %>
-  <div class="p-4 text-sm text-content-muted italic bg-surface-muted/10">
+  <div class="p-4 text-sm text-content-muted italic bg-surface-muted">
     (no step on this side)
   </div>
 <% else %>
@@ -13,7 +13,7 @@
         <%= run_step.step&.name || "(removed step)" %>
         <%= status_badge(run_step.status) %>
       </h4>
-      <span class="text-xs text-content-muted">
+      <span class="text-xs text-content-muted font-mono tabular-nums">
         <% if run_step.duration %><%= run_step.duration.round(1) %>s<% end %>
         <% if stats[:cost_usd] && stats[:cost_usd] > 0 %><span class="ml-2"><%= format_cost(stats[:cost_usd]) %></span><% end %>
       </span>

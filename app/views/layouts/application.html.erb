@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<html>
+<%# Appearance is server-rendered for signed-in users so the first paint is
+    already correct; the head script only resolves "system" and covers
+    signed-out visitors from localStorage. %>
+<% user_theme = current_user&.theme.presence %>
+<% user_accent = current_user&.accent.presence %>
+<% user_density = current_user&.density.presence %>
+<html<%= " data-theme=\"#{user_theme}\"".html_safe if user_theme %><%= " data-accent=\"#{user_accent}\"".html_safe if user_accent && user_accent != "verdigris" %><%= " data-density=\"#{user_density}\"".html_safe if user_density == "compact" %>>
   <head>
     <title><%= content_for(:title) || "Seneschal" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,8 +17,15 @@
     <script src="<%= asset_path("highlight.min.js") %>"></script>
     <script>
       (function() {
-        var t = localStorage.getItem("theme") || "dark";
-        document.documentElement.setAttribute("data-theme", t);
+        var el = document.documentElement;
+        var t = el.getAttribute("data-theme");
+        if (!t) {
+          t = localStorage.getItem("theme") || "dark";
+          el.setAttribute("data-theme", t);
+        } else if (t === "system") {
+          t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          el.setAttribute("data-theme", t);
+        }
         if (t === "light") {
           document.getElementById("hljs-theme").href = "<%= asset_path("highlight-github.css") %>";
         }
@@ -26,25 +39,32 @@
   <body data-controller="<%= "command-palette" if current_user %>"
         data-command-palette-options-url-value="<%= quick_launch_options_path %>"
         data-command-palette-launch-url-value="<%= quick_launch_path %>">
-    <div class="grid grid-cols-[220px_1fr] min-h-screen">
+    <div class="grid grid-cols-[224px_1fr] min-h-screen">
       <nav class="bg-surface-card border-r border-edge p-6 px-4 flex flex-col gap-2 sticky top-0 h-screen overflow-y-auto">
-        <div class="flex items-center gap-2 text-xl font-bold text-content px-2 mb-4">
-          <%= image_tag "logo.png", size: 28, class: "rounded-md" %>
-          Seneschal
+        <div class="flex items-center gap-2.5 px-2 mb-4 text-content">
+          <span class="text-brass"><%= seal_mark(size: 22) %></span>
+          <span class="font-display font-bold text-lg tracking-tight">Seneschal</span>
         </div>
-        <%= link_to "Home", root_path, class: nav_link_classes(:home) %>
-        <%= link_to runs_path,
-              class: "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors #{nav_section == :runs ? 'bg-surface-input text-content' : 'text-content-muted hover:bg-surface-input hover:text-content'}" do %>
-          <span>Runs</span>
+        <%= link_to root_path, class: nav_link_classes(:home) do %>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
+          <span>Home</span>
+        <% end %>
+        <%= link_to runs_path, class: "#{nav_link_classes(:runs)} justify-between" do %>
+          <span class="flex items-center gap-2.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <span>Runs</span>
+          </span>
           <% if (needs_you = awaiting_approval_count).positive? %>
-            <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-warning text-white text-[0.6875rem] font-semibold"
+            <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-brass text-on-brass text-[0.6875rem] font-semibold font-mono"
                   title="<%= pluralize(needs_you, "run") %> awaiting approval"><%= needs_you %></span>
           <% end %>
         <% end %>
         <div data-controller="sidebar-toggle">
           <div class="flex items-center justify-between">
-            <%= link_to "Projects", projects_path,
-                  class: "flex-1 #{nav_link_classes(:projects)}" %>
+            <%= link_to projects_path, class: "flex-1 #{nav_link_classes(:projects)}" do %>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 7v13h18V7"/><path d="M1 4h22v3H1z"/><path d="M10 11h4"/></svg>
+              <span>Projects</span>
+            <% end %>
             <% if Project.exists? %>
               <button type="button" class="bg-transparent border-none text-content-muted cursor-pointer px-2 py-1 text-xs rounded-lg hover:text-content hover:bg-surface-input" data-action="sidebar-toggle#toggle" data-sidebar-toggle-target="btn">
                 <span data-sidebar-toggle-target="icon">&#9656;</span>
@@ -99,8 +119,14 @@
             <% end %>
           </div>
         </div>
-        <%= link_to "Library", skills_path, class: nav_link_classes(:library) %>
-        <%= link_to "Activity", activity_path, class: nav_link_classes(:activity) %>
+        <%= link_to skills_path, class: nav_link_classes(:library) do %>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Library</span>
+        <% end %>
+        <%= link_to activity_path, class: nav_link_classes(:activity) do %>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 12h4l2 5 4-10 2 5h6"/></svg>
+          <span>Activity</span>
+        <% end %>
         <% if current_user&.admin? %>
           <div class="border-t border-edge pt-3 mt-2">
             <div class="px-3 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-muted">Admin</div>
@@ -114,9 +140,9 @@
         <% if current_user %>
           <div class="border-t border-edge pt-3 mt-2 space-y-1">
             <button type="button" data-action="command-palette#open"
-                    class="w-full flex items-center justify-between gap-2 px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium border-none cursor-pointer hover:bg-accent-hover transition-colors">
+                    class="w-full flex items-center justify-between gap-2 px-3 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium border-none cursor-pointer hover:bg-accent-hover transition-colors">
               <span>Launch</span>
-              <kbd class="px-1 py-0.5 rounded bg-white/20 font-mono text-[0.6875rem]">&#8984;K</kbd>
+              <kbd class="px-1 py-0.5 rounded bg-on-accent/20 font-mono text-[0.6875rem]">&#8984;K</kbd>
             </button>
             <%= link_to account_path,
                   class: "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-content-muted hover:bg-surface-input hover:text-content transition-colors" do %>
@@ -130,7 +156,8 @@
         <button type="button" class="theme-switch flex items-center justify-center bg-transparent border-none cursor-pointer py-2"
                 data-controller="theme-toggle" data-action="theme-toggle#toggle"
                 data-theme-toggle-dark-css-value="<%= asset_path("highlight-github-dark.css") %>"
-                data-theme-toggle-light-css-value="<%= asset_path("highlight-github.css") %>">
+                data-theme-toggle-light-css-value="<%= asset_path("highlight-github.css") %>"
+                <% if current_user %>data-theme-toggle-persist-url-value="<%= account_path %>"<% end %>>
           <span class="theme-switch-track">
             <span class="theme-switch-icon theme-switch-sun">&#9788;</span>
             <span class="theme-switch-thumb" data-theme-toggle-target="thumb"></span>

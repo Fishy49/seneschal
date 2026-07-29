@@ -2,17 +2,17 @@
   <p class="text-content-muted mb-4"><%= project.description %></p>
 <% end %>
 
-<div class="grid grid-cols-2 gap-4">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
   <div>
     <%= render layout: "shared/components/card", locals: { title: "Repository", class: "mb-4" } do %>
-      <p class="text-sm text-content-muted mb-3 break-all"><%= project.local_path %></p>
+      <p class="font-mono text-sm text-content-muted mb-3 break-all"><%= project.local_path %></p>
       <div class="flex items-center gap-2 flex-wrap">
         <%= render "projects/repo_status", project: project %>
         <% if project.repo_ready? %>
           <%= button_to "Refetch", refetch_project_path(project),
-                class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+                class: btn_classes(:ghost, size: :sm) %>
           <%= button_to "Import skills", import_skills_project_path(project),
-                class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+                class: btn_classes(:ghost, size: :sm) %>
         <% end %>
       </div>
     <% end %>

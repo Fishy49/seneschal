@@ -5,24 +5,22 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
   <div>
-    <%= f.label :max_retries, "Retries", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.number_field :max_retries, min: 0,
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <%= f.label :max_retries, "Retries", class: label_classes %>
+    <%= f.number_field :max_retries, min: 0, class: input_classes("font-mono tabular-nums") %>
   </div>
   <div>
-    <%= f.label :timeout, "Give up after (seconds)", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.number_field :timeout, min: 1,
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <%= f.label :timeout, "Give up after (seconds)", class: label_classes %>
+    <%= f.number_field :timeout, min: 1, class: input_classes("font-mono tabular-nums") %>
   </div>
 </div>
 
 <% if claude %>
   <div>
-    <label for="skill_validation_max_attempts" class="block text-sm font-medium text-content-muted mb-1.5">Tries to match the output shape</label>
+    <label for="skill_validation_max_attempts" class="<%= label_classes %>">Tries to match the output shape</label>
     <input type="number" name="skill_validation_max_attempts" id="skill_validation_max_attempts"
            value="<%= cfg["validation_max_attempts"] %>" min="1" placeholder="3"
-           class="w-full md:w-48 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-    <p class="text-xs text-content-muted mt-1.5">Only applies when an output shape is set. The step asks again when the answer does not match.</p>
+           class="<%= input_classes("md:w-48 font-mono tabular-nums") %>">
+    <p class="<%= hint_classes %>">Only applies when an output shape is set. The step asks again when the answer does not match.</p>
   </div>
 <% end %>
 
@@ -37,10 +35,10 @@
 <div class="pt-2 border-t border-edge space-y-4" data-step-form-target="onFailFields">
   <div class="grid grid-cols-[1fr_auto] gap-4">
     <div>
-      <label for="on_fail_type" class="block text-sm font-medium text-content-muted mb-1.5">On failure</label>
+      <label for="on_fail_type" class="<%= label_classes %>">On failure</label>
       <select name="on_fail_type" id="on_fail_type"
               data-step-form-target="onFailType" data-action="step-form#onFailChanged"
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+              class="<%= input_classes %>">
         <option value="">Stop the run</option>
         <option value="reopen_previous" <%= "selected" if on_fail["type"] == "reopen_previous" %>>Reopen the previous AI step and let it fix this</option>
         <option value="skill" <%= "selected" if on_fail["type"] == "skill" %>>Run a diagnostic skill</option>
@@ -49,39 +47,39 @@
       </select>
     </div>
     <div data-step-form-target="onFailMaxRounds" style="<%= "display:none" if on_fail["type"].blank? %>">
-      <label for="on_fail_max_rounds" class="block text-sm font-medium text-content-muted mb-1.5">Attempts</label>
+      <label for="on_fail_max_rounds" class="<%= label_classes %>">Attempts</label>
       <input type="number" name="on_fail_max_rounds" id="on_fail_max_rounds"
              value="<%= on_fail["max_rounds"] || 3 %>" min="1"
-             class="w-24 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+             class="<%= input_classes("w-24 font-mono tabular-nums") %>">
     </div>
   </div>
 
   <div data-step-form-target="onFailSkillFields" style="<%= "display:none" unless on_fail["type"] == "skill" %>" class="space-y-2">
-    <label for="on_fail_skill_id" class="block text-sm font-medium text-content-muted mb-1.5">Which skill</label>
+    <label for="on_fail_skill_id" class="<%= label_classes %>">Which skill</label>
     <select name="on_fail_skill_id" id="on_fail_skill_id"
-            class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+            class="<%= input_classes %>">
       <option value="">Choose a skill</option>
       <% Skill.for_project(@project).includes(:project).order(:name).each do |skill| %>
         <option value="<%= skill.id %>" <%= "selected" if on_fail["skill_id"].to_s == skill.id.to_s %>><%= skill.display_name %></option>
       <% end %>
     </select>
-    <p class="text-xs text-content-muted">It is given the failure output and the name of the step that failed.</p>
+    <p class="<%= hint_classes %>">It is given the failure output and the name of the step that failed.</p>
   </div>
 
   <div data-step-form-target="onFailReopenFields" style="<%= "display:none" unless on_fail["type"] == "reopen_previous" %>" class="space-y-2">
-    <label for="on_fail_instructions" class="block text-sm font-medium text-content-muted mb-1.5">What to tell it</label>
+    <label for="on_fail_instructions" class="<%= label_classes %>">What to tell it</label>
     <textarea name="on_fail_instructions" id="on_fail_instructions" rows="3"
               placeholder="e.g. The import in the test suite is wrong. Check package.json."
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["instructions"] %></textarea>
-    <p class="text-xs text-content-muted">Picks up the earlier step's conversation and adds the failure plus this note.</p>
+              class="<%= input_classes("font-mono resize-y") %>"><%= on_fail["instructions"] %></textarea>
+    <p class="<%= hint_classes %>">Picks up the earlier step's conversation and adds the failure plus this note.</p>
   </div>
 
   <div data-step-form-target="onFailBodyFields" style="<%= "display:none" unless on_fail["type"].in?(["script", "command"]) %>" class="space-y-2">
-    <label for="on_fail_body" class="block text-sm font-medium text-content-muted mb-1.5">What to run</label>
+    <label for="on_fail_body" class="<%= label_classes %>">What to run</label>
     <textarea name="on_fail_body" id="on_fail_body" rows="4"
               placeholder="e.g. git checkout main -- package-lock.json &amp;&amp; npm install"
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["body"] %></textarea>
-    <p class="text-xs text-content-muted">
+              class="<%= input_classes("font-mono resize-y") %>"><%= on_fail["body"] %></textarea>
+    <p class="<%= hint_classes %>">
       Reads <code class="bg-surface-input px-1 rounded">$PREVIOUS_FAILURE</code> and
       <code class="bg-surface-input px-1 rounded">$PREVIOUS_FAILURE_STEP</code>.
     </p>

@@ -50,7 +50,7 @@ module NavigationHelper
             else
               "text-content-muted hover:bg-surface-input hover:text-content"
             end
-    "block px-3 py-2 rounded-lg text-sm transition-colors #{state}"
+    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors #{state}"
   end
 
   def nav_sublink_classes(controller)

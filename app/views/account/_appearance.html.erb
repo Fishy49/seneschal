@@ -1,0 +1,48 @@
+<%# Personal appearance settings. Stored server-side so every device and
+    every future surface renders them on first paint. Brass and the status
+    colors are deliberately not customizable: decisions and states must read
+    the same on every teammate's screen. %>
+<%= render layout: "shared/components/card", locals: { title: "Appearance", class: "mt-6" } do %>
+  <%= form_with model: current_user, url: account_path, method: :patch, class: "space-y-5" do |f| %>
+    <div>
+      <span class="<%= label_classes %>">Theme</span>
+      <div class="inline-flex bg-surface-input border border-edge rounded-full p-0.5">
+        <% [["dark", "Nightwatch"], ["light", "Daybook"], ["system", "System"]].each do |value, label| %>
+          <label class="cursor-pointer px-3.5 py-1.5 rounded-full text-sm text-content-muted transition-colors has-[:checked]:bg-surface-card has-[:checked]:text-content has-[:checked]:shadow-sm">
+            <%= f.radio_button :theme, value, checked: (current_user.theme.presence || "dark") == value, class: "sr-only" %>
+            <%= label %>
+          </label>
+        <% end %>
+      </div>
+      <p class="<%= hint_classes %>">System follows your device's light or dark preference.</p>
+    </div>
+
+    <div>
+      <span class="<%= label_classes %>">Accent</span>
+      <div class="flex items-center gap-2.5">
+        <% { "verdigris" => "#41BFAB", "cobalt" => "#7BA3EE", "heather" => "#A697E8",
+             "claret" => "#E2879C", "moss" => "#93BF6A" }.each do |value, swatch| %>
+          <label class="relative w-7 h-7 rounded-full cursor-pointer border-2 border-transparent has-[:checked]:border-content transition-colors" title="<%= value.capitalize %>">
+            <%= f.radio_button :accent, value, checked: (current_user.accent.presence || "verdigris") == value, class: "sr-only" %>
+            <span class="absolute inset-[3px] rounded-full" style="background: <%= swatch %>"></span>
+          </label>
+        <% end %>
+      </div>
+      <p class="<%= hint_classes %>">Yours alone. Brass stays brass: it marks human decisions for everyone.</p>
+    </div>
+
+    <div>
+      <span class="<%= label_classes %>">Density</span>
+      <div class="inline-flex bg-surface-input border border-edge rounded-full p-0.5">
+        <% [["cozy", "Cozy"], ["compact", "Compact"]].each do |value, label| %>
+          <label class="cursor-pointer px-3.5 py-1.5 rounded-full text-sm text-content-muted transition-colors has-[:checked]:bg-surface-card has-[:checked]:text-content has-[:checked]:shadow-sm">
+            <%= f.radio_button :density, value, checked: (current_user.density.presence || "cozy") == value, class: "sr-only" %>
+            <%= label %>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <button type="submit" class="<%= btn_classes(:primary) %>">Save appearance</button>
+  <% end %>
+<% end %>

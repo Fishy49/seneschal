@@ -13,19 +13,16 @@
   <% end %>
 
   <div>
-    <%= f.label :password, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.password_field :password, autofocus: true, required: true,
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <%= f.label :password, class: label_classes %>
+    <%= f.password_field :password, autofocus: true, required: true, class: input_classes %>
   </div>
 
   <div>
-    <%= f.label :password_confirmation, "Confirm Password", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-    <%= f.password_field :password_confirmation, required: true,
-          class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <%= f.label :password_confirmation, "Confirm Password", class: label_classes %>
+    <%= f.password_field :password_confirmation, required: true, class: input_classes %>
   </div>
 
-  <button type="submit"
-          class="w-full px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors">
-    Set Password & Sign In
+  <button type="submit" class="<%= btn_classes(:primary, extra: "w-full") %>">
+    Set Password &amp; Sign In
   </button>
 <% end %>

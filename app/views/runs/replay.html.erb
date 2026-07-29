@@ -11,24 +11,24 @@
     timeline entries (Stimulus only sees targets within the controller's
     own subtree). %>
 <div data-controller="replay-filter">
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
   <% if (stats = @run.usage_stats) %>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
       <div>
         <div class="text-xs text-content-muted uppercase tracking-wide">Cost</div>
-        <div class="text-content font-semibold"><%= format_cost(stats[:cost_usd]) %></div>
+        <div class="text-content font-semibold font-mono tabular-nums"><%= format_cost(stats[:cost_usd]) %></div>
       </div>
       <div>
         <div class="text-xs text-content-muted uppercase tracking-wide">Tokens</div>
-        <div class="text-content font-semibold"><%= format_tokens(stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens]) %></div>
+        <div class="text-content font-semibold font-mono tabular-nums"><%= format_tokens(stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens]) %></div>
       </div>
       <div>
         <div class="text-xs text-content-muted uppercase tracking-wide">Turns</div>
-        <div class="text-content font-semibold"><%= stats[:num_turns] %></div>
+        <div class="text-content font-semibold font-mono tabular-nums"><%= stats[:num_turns] %></div>
       </div>
       <div>
         <div class="text-xs text-content-muted uppercase tracking-wide">Duration</div>
-        <div class="text-content font-semibold"><%= number_with_delimiter((@run.duration || 0).round) %>s</div>
+        <div class="text-content font-semibold font-mono tabular-nums"><%= number_with_delimiter((@run.duration || 0).round) %>s</div>
       </div>
     </div>
   <% end %>
@@ -43,8 +43,8 @@
       ["result", "Result events", true],
       ["system", "System", false]
     ].each do |kind, label, default_on| %>
-      <label class="inline-flex items-center gap-1 cursor-pointer select-none">
-        <input type="checkbox" data-action="change->replay-filter#toggle"
+      <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-input cursor-pointer select-none hover:bg-edge transition-colors">
+        <input type="checkbox" class="accent-accent" data-action="change->replay-filter#toggle"
                data-replay-filter-target="checkbox"
                data-kind="<%= kind %>"
                <%= "checked" if default_on %>>
@@ -52,7 +52,7 @@
       </label>
     <% end %>
   </div>
-</div>
+<% end %>
 
 <%# Per-step trajectory. Parent run_steps only; child steps from the
     on-fail recovery path nest under their parents inside the partial. %>

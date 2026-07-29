@@ -6,7 +6,7 @@
   <% templates = step.new_record? ? StepTemplate.includes(skill: :project).ordered : StepTemplate.none %>
   <div data-controller="template-panel skill-panel file-panel"
        data-template-panel-new-step-url-value="<%= new_project_workflow_step_path(project, workflow) %>">
-    <div class="bg-surface-card border border-edge rounded-lg p-5 step-form-wrapper">
+    <%= render layout: "shared/components/card", locals: { class: "step-form-wrapper" } do %>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold"><%= step.new_record? ? "Add step" : "Edit step" %></h2>
         <%= link_to "Close", project_workflow_path(project, workflow),
@@ -14,7 +14,7 @@
               class: "text-[0.8125rem] text-content-muted hover:text-content transition-colors" %>
       </div>
       <%= render "steps/form", step: step %>
-    </div>
+    <% end %>
 
     <%= render "steps/template_panel", templates: templates if templates.any? %>
     <%= render "steps/skill_panel", skills: skills %>

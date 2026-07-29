@@ -4,7 +4,8 @@ module ComponentsHelper
     accent: "bg-accent/15 text-accent",
     ok: "bg-success/15 text-success",
     warn: "bg-warning/15 text-warning",
-    danger: "bg-danger/15 text-danger"
+    danger: "bg-danger/15 text-danger",
+    brass: "bg-brass/15 text-brass"
   }.freeze
 
   AVATAR_SIZES = {
@@ -14,14 +15,15 @@ module ComponentsHelper
   }.freeze
 
   # "passed" is the run-step flavour of "completed"; both read as success.
+  # Brass marks the states that wait on a person.
   STATUS_DOT_CLASSES = {
     "running" => "bg-info",
     "streaming" => "bg-info",
     "completed" => "bg-success",
     "passed" => "bg-success",
     "failed" => "bg-danger",
-    "awaiting_approval" => "bg-warning",
-    "waiting_for_tokens" => "bg-warning"
+    "awaiting_approval" => "bg-brass",
+    "waiting_for_tokens" => "bg-brass"
   }.freeze
 
   # Timeline node tints for the run steps list. The node carries the step's
@@ -32,8 +34,8 @@ module ComponentsHelper
     "failed" => "node-tint-danger text-danger",
     "running" => "node-tint-info text-info animate-pulse",
     "retrying" => "node-tint-info text-info animate-pulse",
-    "awaiting_approval" => "node-tint-warning text-warning",
-    "waiting_for_tokens" => "node-tint-warning text-warning"
+    "awaiting_approval" => "node-tint-brass text-brass border",
+    "waiting_for_tokens" => "node-tint-brass text-brass border"
   }.freeze
 
   def step_node_classes(status)

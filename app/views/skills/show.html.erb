@@ -1,19 +1,10 @@
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <% if @skill.shared? %>
-      <p class="text-sm text-content-muted">Shared</p>
-    <% else %>
-      <p class="text-sm text-content-muted"><%= @skill.project.name %></p>
-    <% end %>
-    <h1 class="text-2xl font-semibold"><%= @skill.name %></h1>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= link_to "Edit", edit_skill_path(@skill), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= button_to "Delete", skill_path(@skill), method: :delete,
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
-          data: { turbo_confirm: "Delete skill '#{@skill.name}'?" } %>
-  </div>
-</div>
+<%= render layout: "shared/components/page_header",
+      locals: { title: @skill.name, subtitle: @skill.shared? ? "Shared" : @skill.project.name } do %>
+  <%= link_to "Edit", edit_skill_path(@skill), class: btn_classes(:ghost, size: :sm) %>
+  <%= button_to "Delete", skill_path(@skill), method: :delete,
+        class: btn_classes(:danger, size: :sm),
+        data: { turbo_confirm: "Delete skill '#{@skill.name}'?" } %>
+<% end %>
 
 <% if @skill.filesystem_backed? && @skill.absolute_path %>
   <div class="mb-4 p-4 border border-edge rounded-lg bg-surface-muted/40">
@@ -40,76 +31,79 @@
 <% end %>
 
 <% if @skill.filesystem_backed? && @skill.frontmatter.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">Frontmatter</h2>
-    <table class="w-full border-collapse">
-      <tbody>
-        <% @skill.frontmatter.each do |key, value| %>
-          <tr>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-mono text-content-muted align-top w-40"><%= key %></th>
-            <td class="px-3 py-2 border-b border-edge text-sm">
-              <% if value.is_a?(Array) %>
-                <code class="text-xs font-mono"><%= value.join(", ") %></code>
-              <% else %>
-                <code class="text-xs font-mono whitespace-pre-wrap"><%= value %></code>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
+  <%= render layout: "shared/components/card", locals: { title: "Frontmatter", class: "mb-4" } do %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <tbody>
+          <% @skill.frontmatter.each do |key, value| %>
+            <tr>
+              <th class="<%= td_classes("text-left font-normal align-top w-40") %>"><code class="text-xs font-mono text-content-muted"><%= key %></code></th>
+              <td class="<%= td_classes %>">
+                <% if value.is_a?(Array) %>
+                  <code class="text-xs font-mono"><%= value.join(", ") %></code>
+                <% else %>
+                  <code class="text-xs font-mono whitespace-pre-wrap"><%= value %></code>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
 <% end %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="markdown">
-  <h2 class="text-lg font-semibold mb-3">Prompt body</h2>
-  <div class="code-preview" data-markdown-target="output"></div>
-  <template data-markdown-target="source"><%= @skill.body %></template>
-</div>
+<%= render layout: "shared/components/card", locals: { title: "Prompt body", class: "mb-4" } do %>
+  <div data-controller="markdown">
+    <div class="code-preview" data-markdown-target="output"></div>
+    <template data-markdown-target="source"><%= @skill.body %></template>
+  </div>
+<% end %>
 
 <% scripts = @skill.scripts_files %>
 <% references = @skill.references_files %>
 
 <% if scripts.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">
-      <code class="text-base font-mono">scripts/</code>
-      <span class="text-xs font-normal text-content-muted ml-2">deterministic helpers — run without consuming context</span>
-    </h2>
+  <% scripts_title = capture do %>
+    <code class="text-base font-mono">scripts/</code>
+    <span class="text-xs font-normal text-content-muted ml-2">deterministic helpers - run without consuming context</span>
+  <% end %>
+  <%= render layout: "shared/components/card", locals: { title: scripts_title, class: "mb-4" } do %>
     <%= render "aux_files", kind: "scripts", files: scripts, base: @skill.scripts_dir %>
-  </div>
+  <% end %>
 <% end %>
 
 <% if references.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">
-      <code class="text-base font-mono">references/</code>
-      <span class="text-xs font-normal text-content-muted ml-2">lazy-loaded docs the agent can read on demand</span>
-    </h2>
+  <% references_title = capture do %>
+    <code class="text-base font-mono">references/</code>
+    <span class="text-xs font-normal text-content-muted ml-2">lazy-loaded docs the agent can read on demand</span>
+  <% end %>
+  <%= render layout: "shared/components/card", locals: { title: references_title, class: "mb-4" } do %>
     <%= render "aux_files", kind: "references", files: references, base: @skill.references_dir %>
-  </div>
+  <% end %>
 <% end %>
 
 <% if @skill.steps.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">Used in Steps</h2>
-    <table class="w-full border-collapse">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Step</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @skill.steps.includes(workflow: :project).each do |step| %>
+  <%= render layout: "shared/components/card", locals: { title: "Used in Steps", class: "mb-4" } do %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
           <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= step.name %></td>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to step.workflow.name, project_workflow_path(step.workflow.project, step.workflow) %></td>
-            <td class="px-3 py-2 border-b border-edge text-content-muted"><%= step.workflow.project.name %></td>
+            <th class="<%= th_classes %>">Step</th>
+            <th class="<%= th_classes %>">Workflow</th>
+            <th class="<%= th_classes %>">Project</th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          <% @skill.steps.includes(workflow: :project).each do |step| %>
+            <tr>
+              <td class="<%= td_classes %>"><%= step.name %></td>
+              <td class="<%= td_classes %>"><%= link_to step.workflow.name, project_workflow_path(step.workflow.project, step.workflow) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= step.workflow.project.name %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
 <% end %>

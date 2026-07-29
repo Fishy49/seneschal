@@ -6,9 +6,9 @@
 <%= render "workflows/starter_gallery", project: @project %>
 
 <h2 class="text-lg font-semibold mt-8 mb-3">Start blank</h2>
-<div class="bg-surface-card border border-edge rounded-lg p-5 max-w-2xl">
+<%= render layout: "shared/components/card", locals: { class: "max-w-2xl" } do %>
   <%= render "form", workflow: @workflow %>
-</div>
+<% end %>
 
 <p class="text-sm text-content-muted mt-4">
   Got a workflow from somewhere else?

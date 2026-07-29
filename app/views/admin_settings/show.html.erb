@@ -1,6 +1,6 @@
-<% field = "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent" %>
-<% label = "block text-sm font-medium text-content-muted mb-1.5" %>
-<% hint = "text-xs text-content-muted mt-1.5" %>
+<% field = input_classes("font-mono") %>
+<% label = label_classes %>
+<% hint = hint_classes %>
 
 <%= render "shared/admin_nav" %>
 <%= render "shared/components/page_header", title: "Server settings",
@@ -158,8 +158,7 @@
       </div>
     <% end %>
 
-    <button type="submit"
-            class="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">
+    <button type="submit" class="<%= btn_classes(:primary) %>">
       Save settings
     </button>
   <% end %>

@@ -1,6 +1,6 @@
 <%= render "shared/project_bar", project: @project %>
 
-<h1 class="text-2xl font-semibold mb-4">Import Workflow</h1>
+<%= render "shared/components/page_header", title: "Import Workflow" %>
 <p class="text-content-muted mb-6">
   Upload a workflow export JSON (from any project's <em>Export</em> button).
   Referenced JSON schemas are reused if present, created if missing.
@@ -13,19 +13,19 @@
               data: { controller: "workflow-import" },
               class: "space-y-5 max-w-2xl" do %>
   <div>
-    <label class="block text-sm font-medium text-content-muted mb-1.5">Workflow export (.json)</label>
+    <label class="<%= label_classes %>">Workflow export (.json)</label>
     <input type="file" name="file" accept=".json" required
-           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-accent/15 file:text-accent file:text-xs file:px-3 file:py-1 file:cursor-pointer" />
+           class="<%= input_classes("file:mr-3 file:rounded-lg file:border-0 file:bg-accent/15 file:text-accent file:text-xs file:px-3 file:py-1 file:cursor-pointer") %>" />
   </div>
 
   <fieldset class="space-y-3">
-    <legend class="block text-sm font-medium text-content-muted mb-1.5">Mode</legend>
+    <legend class="<%= label_classes %>">Mode</legend>
 
     <label class="flex items-start gap-2 cursor-pointer">
       <input type="radio" name="mode" value="new" checked
              data-action="change->workflow-import#modeChanged"
              data-workflow-import-target="modeNew"
-             class="mt-1" />
+             class="mt-1 accent-accent" />
       <div>
         <div class="font-medium">Create a new workflow</div>
         <div class="text-xs text-content-muted">A workflow with this name will get a "(import N)" suffix if it conflicts.</div>
@@ -33,9 +33,9 @@
     </label>
 
     <div data-workflow-import-target="newOptions" class="ml-6">
-      <label class="block text-xs font-medium text-content-muted mb-1">Name override (optional)</label>
+      <label class="<%= label_classes %>">Name override (optional)</label>
       <input type="text" name="name_override" placeholder="Leave blank to use the export's name"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+             class="<%= input_classes %>" />
     </div>
 
     <label class="flex items-start gap-2 cursor-pointer">
@@ -43,7 +43,7 @@
              data-action="change->workflow-import#modeChanged"
              data-workflow-import-target="modeReplace"
              <%= "disabled" if @existing_workflows.empty? %>
-             class="mt-1" />
+             class="mt-1 accent-accent" />
       <div>
         <div class="font-medium">Replace an existing workflow</div>
         <div class="text-xs text-content-muted">Keeps the workflow's id, runs, and tasks; rebuilds its steps + trigger/config from the import.</div>
@@ -51,9 +51,9 @@
     </label>
 
     <div data-workflow-import-target="replaceOptions" class="ml-6 hidden">
-      <label class="block text-xs font-medium text-content-muted mb-1">Workflow to replace</label>
+      <label class="<%= label_classes %>">Workflow to replace</label>
       <select name="replace_workflow_id"
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+              class="<%= input_classes %>">
         <% @existing_workflows.each do |wf| %>
           <option value="<%= wf.id %>"><%= wf.name %></option>
         <% end %>
@@ -64,10 +64,10 @@
   <div class="flex gap-2">
     <button type="submit"
             data-turbo-confirm="Replace mode will permanently delete the chosen workflow's existing steps. Continue?"
-            class="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">
+            class="<%= btn_classes(:primary) %>">
       Import workflow
     </button>
     <%= link_to "Cancel", project_path(@project),
-          class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+          class: btn_classes(:ghost) %>
   </div>
 <% end %>

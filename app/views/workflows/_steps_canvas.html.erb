@@ -5,19 +5,19 @@
     <div class="flex items-center justify-end mb-3">
       <%= link_to "+ Add step", new_project_workflow_step_path(project, workflow),
             data: { turbo_frame: "step_inspector" },
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+            class: btn_classes(:ghost, size: :sm) %>
     </div>
 
     <% if steps.any? %>
       <ul class="list-none" data-controller="sortable-steps"
           data-sortable-steps-url-value="<%= reorder_project_workflow_steps_path(project, workflow) %>">
         <% steps.each do |step| %>
-          <li class="flex items-start gap-3 py-3 border-b border-edge last:border-b-0"
+          <li class="flex items-start gap-3 py-[var(--row-y)] border-b border-edge last:border-b-0"
               draggable="true" data-step-id="<%= step.id %>"
               data-sortable-steps-target="item"
               data-action="dragstart->sortable-steps#dragstart dragend->sortable-steps#dragend dragover->sortable-steps#dragover dragleave->sortable-steps#dragleave drop->sortable-steps#drop">
             <span class="text-content-muted select-none pt-1.5 cursor-grab" title="Drag to reorder">&#8942;&#8942;</span>
-            <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
+            <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold font-mono flex items-center justify-center shrink-0"><%= step.position %></span>
             <div class="flex-1 min-w-0">
               <% if step.consumes.any? %>
                 <div class="flex flex-wrap gap-1 mb-1">
@@ -34,9 +34,9 @@
               <div class="text-[0.8125rem] text-content-muted">
                 <%= type_badge(step.step_type) %>
                 <% if step.max_retries > 0 %>
-                  &middot; <%= step.max_retries %> retries
+                  &middot; <span class="font-mono"><%= step.max_retries %></span> retries
                 <% end %>
-                &middot; <%= step.timeout %>s timeout
+                &middot; <span class="font-mono"><%= step.timeout %>s</span> timeout
               </div>
               <% ctx = Project.where(id: step.context_project_ids).order(:name) %>
               <% if ctx.any? %>
@@ -57,7 +57,7 @@
             </div>
             <%= button_to "Remove", project_workflow_step_path(project, workflow, step),
                   method: :delete,
-                  class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                  class: btn_classes(:ghost, size: :sm, extra: "shrink-0"),
                   data: { turbo_confirm: "Remove step '#{step.name}'?" } %>
           </li>
         <% end %>

@@ -1,44 +1,37 @@
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <p class="text-sm text-content-muted">Skill Repo</p>
-    <h1 class="text-2xl font-semibold"><%= @skill_repo.name %></h1>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= button_to "Sync now", sync_skill_repo_path(@skill_repo),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= link_to "Edit", edit_skill_repo_path(@skill_repo),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= button_to "Remove", skill_repo_path(@skill_repo), method: :delete,
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
-          data: { turbo_confirm: "Remove '#{@skill_repo.name}'? This deletes its cloned directory and its Skill records." } %>
-  </div>
-</div>
+<%= render layout: "shared/components/page_header",
+      locals: { title: @skill_repo.name, subtitle: "Skill Repo" } do %>
+  <%= button_to "Sync now", sync_skill_repo_path(@skill_repo), class: btn_classes(:ghost, size: :sm) %>
+  <%= link_to "Edit", edit_skill_repo_path(@skill_repo), class: btn_classes(:ghost, size: :sm) %>
+  <%= button_to "Remove", skill_repo_path(@skill_repo), method: :delete,
+        class: btn_classes(:danger, size: :sm),
+        data: { turbo_confirm: "Remove '#{@skill_repo.name}'? This deletes its cloned directory and its Skill records." } %>
+<% end %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-  <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
+  <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
     <div>
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Repo URL</dt>
-      <dd><code class="text-xs"><%= @skill_repo.repo_url %></code></dd>
+      <dd><code class="text-xs font-mono"><%= @skill_repo.repo_url %></code></dd>
     </div>
     <div>
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Branch</dt>
-      <dd><code class="text-xs"><%= @skill_repo.branch %></code></dd>
+      <dd><code class="text-xs font-mono"><%= @skill_repo.branch %></code></dd>
     </div>
     <div>
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Local path</dt>
-      <dd><code class="text-xs"><%= @skill_repo.local_path %></code></dd>
+      <dd><code class="text-xs font-mono"><%= @skill_repo.local_path %></code></dd>
     </div>
     <div>
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Priority</dt>
-      <dd class="tabular-nums"><%= @skill_repo.priority %> <span class="text-content-muted text-xs">(lower = earlier)</span></dd>
+      <dd class="font-mono tabular-nums"><%= @skill_repo.priority %> <span class="text-content-muted text-xs font-sans">(lower = earlier)</span></dd>
     </div>
     <div>
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Status</dt>
       <dd>
         <% if @skill_repo.enabled? %>
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-accent/15 text-accent rounded text-xs font-medium">enabled</span>
+          <%= render "shared/components/chip", text: "enabled", tone: :accent %>
         <% else %>
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-surface-input text-content-muted rounded text-xs font-medium">disabled</span>
+          <%= render "shared/components/chip", text: "disabled", tone: :neutral %>
         <% end %>
       </dd>
     </div>
@@ -46,7 +39,7 @@
       <dt class="text-content-muted text-xs uppercase tracking-wide mb-1">Last sync</dt>
       <dd>
         <% if @skill_repo.last_synced_at %>
-          <%= @skill_repo.last_synced_at.strftime("%Y-%m-%d %H:%M") %>
+          <span class="font-mono tabular-nums"><%= @skill_repo.last_synced_at.strftime("%Y-%m-%d %H:%M") %></span>
           <span class="text-content-muted">(<%= time_ago_in_words(@skill_repo.last_synced_at) %> ago)</span>
         <% else %>
           <span class="text-content-muted">never</span>
@@ -54,49 +47,50 @@
       </dd>
     </div>
   </dl>
-</div>
+<% end %>
 
 <% if @skill_repo.last_sync_error.present? %>
   <div class="bg-danger/10 border border-danger/30 rounded-lg p-5 mb-4">
     <h2 class="text-sm font-semibold text-danger mb-2">Last sync error</h2>
-    <pre class="text-xs whitespace-pre-wrap"><%= @skill_repo.last_sync_error %></pre>
+    <pre class="text-xs font-mono whitespace-pre-wrap"><%= @skill_repo.last_sync_error %></pre>
   </div>
 <% end %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-  <h2 class="text-lg font-semibold mb-3">Skills (<%= @active_skills.size %>)</h2>
+<%= render layout: "shared/components/card",
+      locals: { title: "Skills (#{@active_skills.size})", class: "mb-4" } do %>
   <% if @active_skills.any? %>
-    <table class="w-full border-collapse">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Install notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @active_skills.each do |skill| %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
           <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 100) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm">
-              <% if @skill_repo.install_notes_for(skill.name).present? %>
-                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-warning/15 text-warning rounded text-xs font-medium">setup required</span>
-              <% end %>
-            </td>
+            <th class="<%= th_classes %>">Name</th>
+            <th class="<%= th_classes %>">Description</th>
+            <th class="<%= th_classes %>">Install notes</th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% @active_skills.each do |skill| %>
+            <tr>
+              <td class="<%= td_classes %>"><%= link_to skill.name, skill_path(skill) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= truncate(skill.description, length: 100) %></td>
+              <td class="<%= td_classes %>">
+                <% if @skill_repo.install_notes_for(skill.name).present? %>
+                  <%= render "shared/components/chip", text: "setup required", tone: :warn %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
   <% else %>
     <p class="text-content-muted text-sm">No skills yet - try running a sync.</p>
   <% end %>
-</div>
+<% end %>
 
 <% notes_hash = @skill_repo.install_notes.is_a?(Hash) ? @skill_repo.install_notes : {} %>
 <% if notes_hash.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">Install notes</h2>
+  <%= render layout: "shared/components/card", locals: { title: "Install notes", class: "mb-4" } do %>
     <p class="text-sm text-content-muted mb-3">
       Captured from each skill's <code>.install-notes</code> file. These are setup steps
       (env vars, MCP servers, dependencies) that need to be in place before the skill
@@ -104,18 +98,18 @@
     </p>
     <% notes_hash.each do |skill_name, body| %>
       <details class="border border-edge rounded-lg mb-2">
-        <summary class="px-3 py-2 cursor-pointer text-sm font-medium hover:bg-surface-input">
+        <summary class="px-3 py-[var(--row-y)] cursor-pointer text-sm font-medium hover:bg-surface-input">
           <%= skill_name %>
         </summary>
-        <pre class="px-3 py-2 text-xs whitespace-pre-wrap border-t border-edge bg-surface-input/30"><%= body %></pre>
+        <pre class="px-3 py-2 text-xs font-mono whitespace-pre-wrap border-t border-edge bg-surface-input/30"><%= body %></pre>
       </details>
     <% end %>
-  </div>
+  <% end %>
 <% end %>
 
 <% if @archived_skills.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-1">Archived skills (<%= @archived_skills.size %>)</h2>
+  <%= render layout: "shared/components/card",
+        locals: { title: "Archived skills (#{@archived_skills.size})", class: "mb-4" } do %>
     <p class="text-sm text-content-muted mb-3">
       Removed from the repo upstream. Step references are preserved so workflows
       can show "this skill is no longer available" rather than silently breaking.
@@ -123,11 +117,11 @@
     </p>
     <ul class="text-sm">
       <% @archived_skills.each do |skill| %>
-        <li class="py-1 text-content-muted">
+        <li class="py-[var(--row-y)] text-content-muted">
           <%= link_to skill.name, skill_path(skill) %>
-          <span class="text-xs">— archived <%= time_ago_in_words(skill.archived_at) %> ago</span>
+          <span class="text-xs">· archived <%= time_ago_in_words(skill.archived_at) %> ago</span>
         </li>
       <% end %>
     </ul>
-  </div>
+  <% end %>
 <% end %>

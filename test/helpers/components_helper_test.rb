@@ -47,9 +47,9 @@ class ComponentsHelperTest < ActionView::TestCase
     assert_includes status_dot("failed"), "bg-danger"
   end
 
-  test "status_dot maps approval and token waits to warning" do
-    assert_includes status_dot("awaiting_approval"), "bg-warning"
-    assert_includes status_dot("waiting_for_tokens"), "bg-warning"
+  test "status_dot maps approval and token waits to brass" do
+    assert_includes status_dot("awaiting_approval"), "bg-brass"
+    assert_includes status_dot("waiting_for_tokens"), "bg-brass"
   end
 
   test "status_dot falls back to muted" do

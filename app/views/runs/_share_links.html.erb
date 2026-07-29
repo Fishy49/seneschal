@@ -10,7 +10,7 @@
     <% if links.any? %>
       <ul class="list-none mb-3">
         <% links.each do |link| %>
-          <li class="flex items-center justify-between gap-2 py-2 border-b border-edge/60 last:border-b-0">
+          <li class="flex items-center justify-between gap-2 py-[var(--row-y)] border-b border-edge/60 last:border-b-0">
             <div class="min-w-0">
               <div class="text-xs font-mono truncate"><%= shared_run_url(link.token) %></div>
               <div class="text-xs text-content-muted">
@@ -23,7 +23,7 @@
               </div>
             </div>
             <%= button_to "Revoke", share_link_path(link), method: :delete,
-                  class: "shrink-0 text-xs text-content-muted bg-transparent border border-edge rounded px-2 py-0.5 cursor-pointer hover:text-danger",
+                  class: btn_classes(:danger, size: :xs, extra: "shrink-0"),
                   data: { turbo_confirm: "Revoke this share link?" } %>
           </li>
         <% end %>
@@ -32,6 +32,6 @@
       <p class="text-sm text-content-muted mb-3">A link gives read-only access to a redacted summary: task, project, workflow, step names and statuses, timings and total cost. No logs, no output, no paths.</p>
     <% end %>
     <%= button_to "Create link", share_links_path(run_id: run.id),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          class: btn_classes(:ghost, size: :sm) %>
   </div>
 </details>

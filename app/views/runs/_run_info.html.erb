@@ -3,7 +3,7 @@
     there is one - it is the reason anyone is reading this card. %>
 <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" id="run_info">
   <div class="flex items-center justify-between gap-2 mb-3">
-    <h2 class="text-lg font-semibold">Run <span class="text-content-muted font-normal">#<%= run.id %></span></h2>
+    <h2 class="text-lg font-semibold">Run <span class="text-content-muted font-normal font-mono">#<%= run.id %></span></h2>
     <%= status_badge(run.status) %>
   </div>
 
@@ -29,18 +29,18 @@
       <dd><%= run.waiting_until.strftime("%H:%M:%S") %> (<%= time_ago_in_words(run.waiting_until) %> from now)</dd>
     <% end %>
     <dt class="text-content-muted">Started</dt>
-    <dd class="tabular-nums"><%= run.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
+    <dd class="font-mono tabular-nums"><%= run.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
     <dt class="text-content-muted">Finished</dt>
-    <dd class="tabular-nums"><%= run.finished_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
+    <dd class="font-mono tabular-nums"><%= run.finished_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
     <dt class="text-content-muted">Duration</dt>
-    <dd class="tabular-nums"><%= format_duration(run.duration) %></dd>
+    <dd class="font-mono tabular-nums"><%= format_duration(run.duration) %></dd>
     <% if stats && stats[:cost_usd].to_f.positive? %>
       <dt class="text-content-muted">Cost</dt>
-      <dd class="tabular-nums"><%= format_cost(stats[:cost_usd]) %></dd>
+      <dd class="font-mono tabular-nums"><%= format_cost(stats[:cost_usd]) %></dd>
     <% end %>
     <% if tokens&.positive? %>
       <dt class="text-content-muted">Tokens</dt>
-      <dd class="tabular-nums"><%= format_tokens(tokens) %></dd>
+      <dd class="font-mono tabular-nums"><%= format_tokens(tokens) %></dd>
     <% end %>
   </dl>
 </div>

@@ -2,32 +2,32 @@
 <% cfg = step.config || {} %>
 <div class="space-y-4">
   <div>
-    <label for="pr_title" class="block text-sm font-medium text-content-muted mb-1.5">Title</label>
+    <label for="pr_title" class="<%= label_classes %>">Title</label>
     <input type="text" name="pr_title" id="pr_title"
            value="<%= cfg["title"] %>" placeholder="e.g. feat: ${task_title}"
-           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-    <p class="text-xs text-content-muted mt-1.5">Variables like <code class="bg-surface-input px-1 rounded">${task_title}</code> are substituted first.</p>
+           class="<%= input_classes %>">
+    <p class="<%= hint_classes %>">Variables like <code class="bg-surface-input px-1 rounded">${task_title}</code> are substituted first.</p>
   </div>
 
   <div>
-    <label for="pr_body" class="block text-sm font-medium text-content-muted mb-1.5">Description</label>
+    <label for="pr_body" class="<%= label_classes %>">Description</label>
     <textarea name="pr_body" id="pr_body" rows="5"
               placeholder="## What changed&#10;&#10;${task_body}"
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= cfg["body"] %></textarea>
+              class="<%= input_classes("font-mono resize-y") %>"><%= cfg["body"] %></textarea>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
-      <label for="pr_base" class="block text-sm font-medium text-content-muted mb-1.5">Merge into</label>
+      <label for="pr_base" class="<%= label_classes %>">Merge into</label>
       <input type="text" name="pr_base" id="pr_base"
              value="<%= cfg["base"] || "main" %>" placeholder="main"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+             class="<%= input_classes("font-mono") %>">
     </div>
     <div>
-      <label for="pr_branch" class="block text-sm font-medium text-content-muted mb-1.5">From branch</label>
+      <label for="pr_branch" class="<%= label_classes %>">From branch</label>
       <input type="text" name="pr_branch" id="pr_branch"
              value="<%= cfg["branch"] %>" placeholder="The run's own branch"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+             class="<%= input_classes("font-mono") %>">
     </div>
   </div>
 
@@ -37,25 +37,25 @@
   </label>
 
   <div>
-    <label for="pr_reviewers" class="block text-sm font-medium text-content-muted mb-1.5">Reviewers</label>
+    <label for="pr_reviewers" class="<%= label_classes %>">Reviewers</label>
     <input type="text" name="pr_reviewers" id="pr_reviewers"
            value="<%= Array(cfg["reviewers"]).join(", ") %>" placeholder="e.g. octocat, my-org/devs"
-           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-    <p class="text-xs text-content-muted mt-1.5">Comma separated.</p>
+           class="<%= input_classes %>">
+    <p class="<%= hint_classes %>">Comma separated.</p>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
-      <label for="pr_labels" class="block text-sm font-medium text-content-muted mb-1.5">Labels</label>
+      <label for="pr_labels" class="<%= label_classes %>">Labels</label>
       <input type="text" name="pr_labels" id="pr_labels"
              value="<%= Array(cfg["labels"]).join(", ") %>" placeholder="e.g. enhancement, bug"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+             class="<%= input_classes %>">
     </div>
     <div>
-      <label for="pr_assignees" class="block text-sm font-medium text-content-muted mb-1.5">Assignees</label>
+      <label for="pr_assignees" class="<%= label_classes %>">Assignees</label>
       <input type="text" name="pr_assignees" id="pr_assignees"
              value="<%= Array(cfg["assignees"]).join(", ") %>" placeholder="e.g. developer-one"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+             class="<%= input_classes %>">
     </div>
   </div>
 

@@ -96,11 +96,11 @@
     <%# Center card %>
     <div class="relative z-10 w-full max-w-sm mx-4">
       <div class="flex items-center justify-center gap-3 mb-8">
-        <%= image_tag "logo.png", size: 48, class: "rounded-lg" %>
-        <span class="text-3xl font-bold text-content tracking-tight">Seneschal</span>
+        <span class="text-brass"><%= seal_mark(size: 40) %></span>
+        <span class="text-3xl font-display font-bold text-content tracking-tight">Seneschal</span>
       </div>
 
-      <div class="bg-surface-card/90 backdrop-blur-sm border border-edge rounded-xl p-8 shadow-2xl">
+      <div class="bg-surface-card/90 backdrop-blur-sm border border-edge rounded-lg p-8 shadow-2xl">
         <% flash.each do |type, message| %>
           <div class="<%= type == 'notice' ? 'bg-success/15 text-success border border-success/25' : 'bg-danger/15 text-danger border border-danger/25' %> px-4 py-3 rounded-lg mb-4 text-sm">
             <%= message %>

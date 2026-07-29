@@ -19,7 +19,7 @@
 <div class="space-y-4">
   <% checks.each do |check| %>
     <% status = check[:status] %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5">
+    <%= render layout: "shared/components/card" do %>
       <div class="flex items-start justify-between gap-4">
         <div class="flex-1">
           <h2 class="text-lg font-semibold mb-1">
@@ -40,13 +40,13 @@
       </div>
 
       <% if status[:ok] %>
-        <pre class="mt-3 text-xs bg-surface-input rounded-lg px-3 py-2 text-content-muted overflow-x-auto"><%= status[:details] %></pre>
+        <pre class="mt-3 text-xs bg-surface-muted border border-edge rounded-lg px-3 py-2 text-content-muted font-mono overflow-x-auto"><%= status[:details] %></pre>
         <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_short(status[:checked_at]) %></p>
       <% else %>
-        <div class="mt-4 bg-surface-input rounded-lg px-4 py-3 text-sm space-y-2">
+        <div class="mt-4 bg-surface-muted border border-edge rounded-lg px-4 py-3 text-sm space-y-2">
           <p class="text-content-muted font-medium">Install and sign in:</p>
           <% check[:install].each do |line| %>
-            <pre class="text-xs text-content font-mono"><%= line %></pre>
+            <pre class="text-xs text-content font-mono overflow-x-auto"><%= line %></pre>
           <% end %>
           <% if check[:note] %>
             <p class="text-xs text-content-muted"><%= check[:note] %></p>
@@ -56,8 +56,8 @@
 
       <div class="mt-4">
         <%= button_to status[:ok] ? "Re-check" : "Check", check[:path],
-              class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{status[:ok] ? "bg-surface-input text-content-muted hover:text-content border border-edge" : "bg-accent text-white hover:bg-accent-hover"}" %>
+              class: btn_classes(status[:ok] ? :ghost : :primary) %>
       </div>
-    </div>
+    <% end %>
   <% end %>
 </div>

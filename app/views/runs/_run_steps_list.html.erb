@@ -12,7 +12,7 @@
   <%# Show remaining workflow steps not yet executed %>
   <% executed_step_ids = run.run_steps.pluck(:step_id) %>
   <% run.workflow.steps.reject { |s| executed_step_ids.include?(s.id) }.each do |step| %>
-    <li class="flex items-start gap-3 py-2.5" id="pending_step_<%= step.id %>">
+    <li class="flex items-start gap-3 py-[var(--row-y)]" id="pending_step_<%= step.id %>">
       <span class="relative w-7 h-7 rounded-full bg-surface border border-dashed border-edge text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0 mt-0.5" title="not started"><%= step.position %></span>
       <div class="flex-1 min-w-0 pt-1">
         <div class="flex items-center gap-2">

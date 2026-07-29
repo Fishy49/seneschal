@@ -6,7 +6,7 @@
   <% if @skills.any? %>
     <ul class="list-none">
       <% @skills.each do |skill| %>
-        <li class="flex items-start justify-between gap-3 py-3 border-b border-edge last:border-b-0">
+        <li class="flex items-start justify-between gap-3 py-[var(--row-y)] border-b border-edge last:border-b-0">
           <div class="min-w-0">
             <div class="font-medium">
               <%= link_to skill.name, skill_path(skill), class: "hover:text-accent transition-colors" %>

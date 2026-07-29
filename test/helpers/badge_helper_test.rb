@@ -4,7 +4,7 @@ class BadgeHelperTest < ActionView::TestCase
   test "status_badge renders span with status text" do
     html = status_badge("running")
     assert_includes html, "running"
-    assert_includes html, "bg-accent/15"
+    assert_includes html, "bg-info/15"
   end
 
   test "status_badge adds pulse dot for running" do

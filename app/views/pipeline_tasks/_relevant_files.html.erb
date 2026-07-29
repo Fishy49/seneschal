@@ -7,7 +7,7 @@
     <span class="block text-sm font-medium text-content-muted">Relevant files</span>
     <% if code_map&.ready? %>
       <button type="button" data-action="task-suggestions#suggest" data-task-suggestions-target="btn"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+              class="<%= btn_classes(:ghost, size: :sm) %>">
         Suggest with Claude
       </button>
     <% end %>
@@ -25,7 +25,7 @@
         <% Array(task.context_files).each do |entry| %>
           <% path = entry.is_a?(Hash) ? entry["path"] : entry.to_s %>
           <% reason = entry.is_a?(Hash) ? entry["reason"] : "" %>
-          <label class="flex items-start gap-2 py-1.5 cursor-pointer hover:bg-surface-input rounded px-2 -mx-2">
+          <label class="flex items-start gap-2 py-[var(--row-y)] cursor-pointer hover:bg-surface-input rounded px-2 -mx-2">
             <input type="checkbox" checked value="<%= path %>"
                    data-reason="<%= reason %>"
                    data-action="change->task-suggestions#updateSelected"
@@ -48,6 +48,6 @@
       given spec, so the agent starts in the right place.
     </p>
     <%= button_to "Generate code map", generate_project_code_map_path(project),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+          class: btn_classes(:ghost, size: :sm) %>
   <% end %>
 </div>

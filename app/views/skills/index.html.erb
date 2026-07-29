@@ -1,59 +1,60 @@
 <%= render "shared/library_nav" %>
 
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-semibold">Skills</h1>
-  <%= link_to "New Skill", new_skill_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-</div>
+<%= render layout: "shared/components/page_header", locals: { title: "Skills" } do %>
+  <%= link_to "New Skill", new_skill_path, class: btn_classes(:primary) %>
+<% end %>
 
 <% shared, project_specific = @skills.partition(&:shared?) %>
 
 <% if shared.any? %>
-  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-    <h2 class="text-lg font-semibold mb-3">Shared</h2>
-    <table class="w-full border-collapse">
-      <thead>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% shared.each do |skill| %>
-          <tr>
-            <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>
-            <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= pluralize(skill.steps.count, "step") %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-<% end %>
-
-<% if project_specific.any? %>
-  <% project_specific.group_by(&:project).each do |project, skills| %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <h2 class="text-lg font-semibold mb-3"><%= project.name %></h2>
+  <%= render layout: "shared/components/card", locals: { title: "Shared", class: "mb-4" } do %>
+    <div class="overflow-x-auto">
       <table class="w-full border-collapse">
         <thead>
           <tr>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Name</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Description</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Used by</th>
+            <th class="<%= th_classes %>">Name</th>
+            <th class="<%= th_classes %>">Description</th>
+            <th class="<%= th_classes %>">Used by</th>
           </tr>
         </thead>
         <tbody>
-          <% skills.each do |skill| %>
+          <% shared.each do |skill| %>
             <tr>
-              <td class="px-3 py-2 border-b border-edge"><%= link_to skill.name, skill_path(skill) %></td>
-              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= truncate(skill.description, length: 80) %></td>
-              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= pluralize(skill.steps.count, "step") %></td>
+              <td class="<%= td_classes %>"><%= link_to skill.name, skill_path(skill) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= truncate(skill.description, length: 80) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= pluralize(skill.steps.count, "step") %></td>
             </tr>
           <% end %>
         </tbody>
       </table>
     </div>
+  <% end %>
+<% end %>
+
+<% if project_specific.any? %>
+  <% project_specific.group_by(&:project).each do |project, skills| %>
+    <%= render layout: "shared/components/card", locals: { title: project.name, class: "mb-4" } do %>
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="<%= th_classes %>">Name</th>
+              <th class="<%= th_classes %>">Description</th>
+              <th class="<%= th_classes %>">Used by</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% skills.each do |skill| %>
+              <tr>
+                <td class="<%= td_classes %>"><%= link_to skill.name, skill_path(skill) %></td>
+                <td class="<%= td_classes("text-content-muted") %>"><%= truncate(skill.description, length: 80) %></td>
+                <td class="<%= td_classes("text-content-muted") %>"><%= pluralize(skill.steps.count, "step") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
   <% end %>
 <% end %>
 

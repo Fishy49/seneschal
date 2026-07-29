@@ -2,7 +2,7 @@
 <div class="inline-block" data-controller="step-context-modal" data-step-context-modal-title-value="Context for &quot;<%= run_step.step.name %>&quot;">
   <button type="button"
           data-action="step-context-modal#open"
-          class="inline-flex items-center gap-1 px-2 py-0.5 bg-transparent border border-edge text-content-muted rounded text-[0.75rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+          class="<%= btn_classes(:ghost, size: :xs) %>">
     View Context
   </button>
   <template data-step-context-modal-target="template">

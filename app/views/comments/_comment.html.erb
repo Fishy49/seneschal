@@ -1,7 +1,7 @@
 <%# One entry in a discussion feed. Broadcast with locals: { comment: } only,
     so everything shown here must be derivable from the comment itself. %>
 <% on_step = comment.commentable_type == "RunStep" ? comment.commentable : nil %>
-<li class="group/comment flex items-start gap-2.5 py-2.5 border-b border-edge/60 last:border-b-0" id="comment_<%= comment.id %>">
+<li class="group/comment flex items-start gap-2.5 py-[var(--row-y)] border-b border-edge/60 last:border-b-0" id="comment_<%= comment.id %>">
   <%= avatar_for(comment.user, size: :sm) %>
   <div class="flex-1 min-w-0">
     <div class="flex items-center gap-2 flex-wrap text-xs">

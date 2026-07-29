@@ -1,26 +1,26 @@
 <%= render "shared/components/page_header", title: "Runs" %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-4 mb-4">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
   <%= form_with url: runs_path, method: :get, class: "flex items-center gap-3 flex-wrap", data: { turbo_frame: "_top" } do |f| %>
     <select name="project_id" onchange="this.form.requestSubmit()"
-            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+            class="<%= input_classes("w-auto!") %>">
       <option value="">All Projects</option>
       <% @projects.each do |p| %>
         <option value="<%= p.id %>" <%= "selected" if params[:project_id].to_s == p.id.to_s %>><%= p.name %></option>
       <% end %>
     </select>
     <select name="status" onchange="this.form.requestSubmit()"
-            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+            class="<%= input_classes("w-auto!") %>">
       <option value="">All Statuses</option>
       <% Run::STATUSES.each do |s| %>
         <option value="<%= s %>" <%= "selected" if params[:status] == s %>><%= s.capitalize %></option>
       <% end %>
     </select>
     <% if params[:project_id].present? || params[:status].present? %>
-      <%= link_to "Clear", runs_path, class: "text-sm text-content-muted hover:text-content transition-colors" %>
+      <%= link_to "Clear", runs_path, class: btn_classes(:quiet, size: :sm) %>
     <% end %>
   <% end %>
-</div>
+<% end %>
 
 <%= render layout: "shared/components/card" do %>
   <% filtered = params[:project_id].present? || params[:status].present? %>

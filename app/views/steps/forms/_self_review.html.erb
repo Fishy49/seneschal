@@ -8,18 +8,18 @@
   </p>
 
   <div>
-    <label for="review_base_ref" class="block text-sm font-medium text-content-muted mb-1.5">Compare against</label>
+    <label for="review_base_ref" class="<%= label_classes %>">Compare against</label>
     <input type="text" name="review_base_ref" id="review_base_ref"
            value="<%= cfg["base_ref"] %>" placeholder="main"
-           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-    <p class="text-xs text-content-muted mt-1.5">The branch the diff is taken against. Blank works it out from the repository.</p>
+           class="<%= input_classes("font-mono") %>">
+    <p class="<%= hint_classes %>">The branch the diff is taken against. Blank works it out from the repository.</p>
   </div>
 
   <div>
-    <label for="review_focus" class="block text-sm font-medium text-content-muted mb-1.5">What to look for</label>
+    <label for="review_focus" class="<%= label_classes %>">What to look for</label>
     <textarea name="review_focus" id="review_focus" rows="5"
               placeholder="e.g. Check error handling on the new endpoints and that every branch has a test."
-              class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= cfg["focus"] %></textarea>
-    <p class="text-xs text-content-muted mt-1.5">Blank asks for a general review.</p>
+              class="<%= input_classes("font-mono resize-y") %>"><%= cfg["focus"] %></textarea>
+    <p class="<%= hint_classes %>">Blank asks for a general review.</p>
   </div>
 </div>

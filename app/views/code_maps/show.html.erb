@@ -1,22 +1,19 @@
 <%= turbo_stream_from @project %>
 <%= render "shared/project_bar", project: @project %>
 
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <h1 class="text-2xl font-semibold">Code Map</h1>
-    <p class="text-sm text-content-muted">
-      <%= pluralize(@code_map.file_count, "file") %> in <%= pluralize(@code_map.modules.size, "module") %>
-      <% if @code_map.commit_sha.present? %>
-        &middot; <code class="text-xs"><%= @code_map.commit_sha.first(8) %></code>
-      <% end %>
-      &middot; Generated <%= time_ago_short(@code_map.generated_at) %>
-    </p>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= button_to "Regenerate", generate_project_code_map_path(@project),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-  </div>
-</div>
+<% code_map_subtitle = capture do %>
+  <%= pluralize(@code_map.file_count, "file") %> in <%= pluralize(@code_map.modules.size, "module") %>
+  <% if @code_map.commit_sha.present? %>
+    &middot; <code class="font-mono text-xs"><%= @code_map.commit_sha.first(8) %></code>
+  <% end %>
+  &middot; Generated <%= time_ago_short(@code_map.generated_at) %>
+<% end %>
+
+<%= render layout: "shared/components/page_header",
+      locals: { title: "Code Map", subtitle: code_map_subtitle } do %>
+  <%= button_to "Regenerate", generate_project_code_map_path(@project),
+        class: btn_classes(:ghost, size: :sm) %>
+<% end %>
 
 <div data-controller="code-tree"
      data-code-tree-tree-value="<%= @code_map.tree.to_json %>"
@@ -29,18 +26,18 @@
            data-code-tree-target="search"
            data-action="input->code-tree#onSearch"
            placeholder="Search files..."
-           class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+           class="<%= input_classes("flex-1") %>" />
     <button type="button"
             data-action="code-tree#toggleGrouping"
             data-code-tree-target="groupToggle"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+            class="<%= btn_classes(:ghost, size: :sm) %>">
       Group by module
     </button>
   </div>
 
-  <div class="grid grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <%# File tree panel %>
-    <div class="col-span-2">
+    <div class="lg:col-span-2">
       <div class="bg-surface-card border border-edge rounded-lg">
         <div data-code-tree-target="tree" class="font-mono text-sm divide-y divide-edge"></div>
         <div data-code-tree-target="empty" class="p-8 text-center text-content-muted text-sm" style="display:none">
@@ -51,8 +48,7 @@
 
     <%# Modules panel %>
     <div>
-      <div class="bg-surface-card border border-edge rounded-lg p-4">
-        <h3 class="text-sm font-semibold mb-3">Modules</h3>
+      <%= render layout: "shared/components/card", locals: { title: "Modules" } do %>
         <% @code_map.modules.each do |mod| %>
           <button type="button"
                   data-action="code-tree#filterByModule"
@@ -64,7 +60,7 @@
             <div class="text-xs text-content-muted"><%= mod["files"]&.size || 0 %> files</div>
           </button>
         <% end %>
-      </div>
+      <% end %>
     </div>
   </div>
 </div>

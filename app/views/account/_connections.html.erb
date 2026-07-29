@@ -6,8 +6,7 @@
      "claude_oauth_token" => "The output of `claude setup-token`. Lasts one year. Used only when no API key is set."
    } %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-  <h2 class="text-lg font-semibold mb-1">Connections</h2>
+<%= render layout: "shared/components/card", locals: { title: "Connections", class: "mt-6 mb-4" } do %>
   <p class="text-sm text-content-muted mb-4">
     Runs you launch use these credentials instead of the server's shared CLI sessions.
     Leave them empty and your runs behave exactly as they do today, using the host's
@@ -18,7 +17,7 @@
 
   <% UserCredential::KINDS.each do |kind| %>
     <% credential = @credentials[kind] %>
-    <div class="py-3 border-b border-edge last:border-b-0">
+    <div class="py-[var(--row-y)] border-b border-edge last:border-b-0">
       <div class="flex items-center justify-between gap-3 mb-1.5">
         <div class="min-w-0">
           <span class="text-sm font-medium"><%= UserCredential::KIND_LABELS[kind] %></span>
@@ -32,7 +31,7 @@
         </div>
         <% if credential %>
           <%= button_to "Remove", user_credential_path(credential), method: :delete,
-                class: "shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:text-danger transition-colors",
+                class: btn_classes(:ghost, size: :sm, extra: "shrink-0 hover:text-danger"),
                 data: { turbo_confirm: "Remove your #{UserCredential::KIND_LABELS[kind]}?" } %>
         <% end %>
       </div>
@@ -43,10 +42,10 @@
         <%= hidden_field_tag :kind, kind %>
         <%= password_field_tag :value, nil, autocomplete: "off",
               placeholder: credential ? "Paste a new value to replace" : "Paste value",
-              class: "flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-[0.8125rem] font-mono focus:outline-none focus:border-accent" %>
+              class: input_classes("flex-1 font-mono") %>
         <%= f.submit credential ? "Replace" : "Save",
-              class: "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+              class: btn_classes(:ghost, extra: "shrink-0") %>
       <% end %>
     </div>
   <% end %>
-</div>
+<% end %>
