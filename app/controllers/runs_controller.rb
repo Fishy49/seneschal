@@ -69,6 +69,8 @@ class RunsController < ApplicationController
       "previous_failure_step" => resumable_step.name
     ).compact)
 
+    Event.record("run.resumed", subject: @run, user: current_user,
+                                metadata: { "step" => resumable_step.name })
     ExecuteRunJob.perform_later(@run, resumable_step.id, resume: true)
     redirect_to run_path(@run), notice: "Resuming from '#{resumable_step.name}'."
   end

@@ -41,6 +41,16 @@ class Run < ApplicationRecord
            .chronological.includes(:user, :commentable)
   end
 
+  # The run's whole story in one list: comments, run-level events, and seal
+  # decisions, oldest first. Approve/reject Events stay out (THREAD_HIDDEN);
+  # their ApprovalEvent rows tell it better, comment text included.
+  def thread_items
+    events = Event.run_thread(self).includes(:user)
+    seals = ApprovalEvent.where(run_step_id: run_step_ids).includes(:user, run_step: :step)
+    (discussion_comments.to_a + events.to_a + seals.to_a)
+      .sort_by { |item| [item.created_at, item.id] }
+  end
+
   # Most recent approve / reject decision anywhere in this run, used to tell a
   # second approver who got there first.
   def latest_approval_event

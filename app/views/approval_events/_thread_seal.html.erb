@@ -1,0 +1,22 @@
+<%# A human decision in the thread, stamped with the seal. Renders from
+    broadcast jobs too, so no controller state.
+    Locals: approval_event: %>
+<% step_name = approval_event.run_step&.step&.name %>
+<% tone = approval_event.approved? ? "text-brass" : "text-danger" %>
+<li id="<%= dom_id(approval_event) %>" class="py-1.5">
+  <div class="rounded-lg px-3 py-2 <%= approval_event.approved? ? "bg-brass/10" : "bg-danger/10" %>">
+    <div class="flex items-center gap-2 text-xs <%= tone %>">
+      <%= seal_mark(size: 14) %>
+      <span class="min-w-0 truncate">
+        <b class="font-semibold"><%= thread_actor(approval_event.user) %></b>
+        <%= approval_event.approved? ? "sealed" : "rejected" %><% if step_name %> "<%= step_name %>"<% end %>
+        &middot; <%= approval_event.approved? ? "approved" : "sent back" %>
+      </span>
+      <time class="ml-auto shrink-0 font-mono text-[0.6875rem] text-content-faint"
+            title="<%= approval_event.created_at %>"><%= time_ago_short(approval_event.created_at) %></time>
+    </div>
+    <% if approval_event.comment.present? %>
+      <p class="mt-1 pl-[1.375rem] text-xs text-content-muted"><%= approval_event.comment %></p>
+    <% end %>
+  </div>
+</li>

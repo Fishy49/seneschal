@@ -1,22 +1,21 @@
-<%# The one discussion surface for a run: comments on the run itself and on
-    any of its steps, in one chronological feed. Step rows link here instead
-    of hosting their own threads. New comments broadcast-append into
+<%# The run's whole story in one place: comments, run-level events, and seal
+    decisions interleaved chronologically. Step rows link here instead of
+    hosting their own threads. New items broadcast-append into
     #run_discussion, and the empty-state hint hides itself via :empty the
     moment the first one lands, so keep the ul free of whitespace text nodes.
 
     Locals: run: %>
-<% comments = run.discussion_comments %>
 <% step_options = run.run_steps.includes(:step).order(:id).map do |rs|
      label = rs.position.to_i.positive? ? "Step #{rs.position} · #{rs.step.name}" : rs.step.name
      [label, "RunStep:#{rs.id}"]
    end %>
 <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4 scroll-mt-4" id="discussion">
-  <h2 class="text-lg font-semibold mb-3">Discussion</h2>
+  <h2 class="text-lg font-semibold mb-3">Thread</h2>
 
-  <div class="max-h-96 overflow-y-auto" data-controller="autoscroll">
-    <ul class="list-none peer" id="run_discussion"><%= render partial: "comments/comment", collection: comments %></ul>
+  <div class="max-h-[55vh] overflow-y-auto" data-controller="autoscroll">
+    <ul class="list-none peer" id="run_discussion"><% run.thread_items.each do |item| %><%= render_thread_item(item) %><% end %></ul>
     <p class="hidden peer-empty:block text-sm text-content-muted py-1">
-      Nothing yet. Comments on the run and on individual steps all land here.
+      Nothing yet. The run's story - progress, decisions, comments - lands here.
     </p>
   </div>
 

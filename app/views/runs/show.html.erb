@@ -20,17 +20,11 @@
       </div>
       <%= render "run_steps_list", run: @run %>
     </div>
-  </div>
-
-  <div class="min-w-0">
-    <%= render "run_info", run: @run %>
-
-    <%= render "discussion", run: @run %>
 
     <%= render "share_links", run: @run %>
 
     <%# Context and input are reference material once a run is under way, so
-        they start closed rather than pushing the discussion off the screen. %>
+        they sit closed under the steps instead of crowding the rail. %>
     <details class="mb-4">
       <summary class="bg-surface-card border border-edge rounded-lg px-5 py-3 text-lg font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
         Context
@@ -59,5 +53,15 @@
         </div>
       </details>
     <% end %>
+  </div>
+
+  <%# The rail never leaves: info up top, then the thread, sticky so the
+      conversation stays beside the timeline as you scroll. %>
+  <div class="min-w-0">
+    <%= render "run_info", run: @run %>
+
+    <div class="lg:sticky lg:top-4">
+      <%= render "discussion", run: @run %>
+    </div>
   </div>
 </div>

@@ -3,10 +3,13 @@ module ActivityHelper
     "task.created" => "created task",
     "run.started" => "started run",
     "run.stopped" => "stopped run",
+    "run.resumed" => "resumed run",
     "run.completed" => "completed run",
     "run.failed" => "run failed",
     "run.approved" => "approved a step on run",
     "run.rejected" => "rejected a step on run",
+    "run.awaiting_approval" => "run paused for approval",
+    "run.waiting_for_tokens" => "run paused for tokens",
     "workflow.created" => "created workflow",
     "workflow.updated" => "updated workflow",
     "comment.created" => "commented on"

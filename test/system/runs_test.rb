@@ -135,6 +135,15 @@ class RunsTest < ApplicationSystemTestCase
     assert_text "Run ##{other.id}"
   end
 
+  test "approving a run stamps a seal into the thread" do
+    sign_in_as users(:admin)
+    visit run_path(runs(:awaiting_run))
+    click_button "Approve", match: :first
+
+    assert_selector "#run_discussion li", text: /sealed/
+    assert_selector "#run_discussion li", text: /approved/
+  end
+
   private
 
   def check_chip(label)

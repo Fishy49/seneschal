@@ -1,6 +1,10 @@
 require "test_helper"
+require "turbo/broadcastable/test_helper"
 
 class ApprovalEventTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+  include Turbo::Broadcastable::TestHelper
+
   setup do
     @run_step = run_steps(:awaiting_step_run_step)
   end
@@ -42,5 +46,25 @@ class ApprovalEventTest < ActiveSupport::TestCase
     assert_difference "ApprovalEvent.count", -1 do
       @run_step.destroy!
     end
+  end
+  test "a seal broadcasts into its run's thread" do
+    assert_enqueued_jobs 1, only: Turbo::Streams::ActionBroadcastJob do
+      @run_step.approval_events.create!(user: users(:admin), action: "approved")
+    end
+  end
+  test "the broadcast job renders the seal partial with its comment" do
+    seal = nil
+    streams = capture_turbo_stream_broadcasts(@run_step.run) do
+      perform_enqueued_jobs do
+        seal = @run_step.approval_events.create!(user: users(:admin), action: "approved",
+                                                 comment: "index handled")
+      end
+    end
+
+    stream = streams.find { |s| s["target"] == "run_discussion" }
+    assert stream, "expected an append targeting run_discussion"
+    assert_includes stream.to_html, "approval_event_#{seal.id}"
+    assert_includes stream.to_html, "sealed"
+    assert_includes stream.to_html, "index handled"
   end
 end

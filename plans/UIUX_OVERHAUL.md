@@ -160,6 +160,11 @@ Today Cmd+K is a launch-only form (no search, no results, no keyboard nav).
    feed, approval history absorbed, thread-rail layout, brass seal treatment.
    Preserve the broadcast contract (#run_header, #run_info, #run_context,
    #run_steps_list, #run_step_<id> ids + partial paths + locals).
+   **STATUS: shipped on this branch.** Notes: run.approved/run.rejected
+   Events stay recorded for the Activity page but are THREAD_HIDDEN in the
+   run feed; the ApprovalEvent row tells the decision with its comment.
+   Step-passed event coalescing deferred (it would need new emission points
+   inside ExecuteRunJob, which stays off-limits).
 3. **The inbox** - notifications table, mention fanout, read tracking, new
    home screen, honest badges, activity fold-in.
 4. **The board & the palette** - tasks kanban, command palette v2, branded

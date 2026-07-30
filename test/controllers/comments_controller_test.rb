@@ -181,4 +181,38 @@ class CommentsControllerTest < ActionDispatch::IntegrationTest
     }
     assert_redirected_to login_path
   end
+  test "the thread interleaves system events and seal decisions" do
+    run = runs(:awaiting_run)
+    event = Event.record("run.started", subject: run, user: users(:admin))
+    seal = run_steps(:awaiting_step_run_step).approval_events.create!(
+      user: users(:admin), action: "approved", comment: "index handled"
+    )
+
+    get run_path(run)
+    assert_response :success
+    assert_select "#run_discussion li#event_#{event.id}"
+    assert_select "#run_discussion li#approval_event_#{seal.id}", text: /sealed/
+    assert_select "#run_discussion li#approval_event_#{seal.id}", text: /index handled/
+  end
+
+  test "an awaiting run shows the brass callout with a review link" do
+    run = runs(:awaiting_run)
+    Event.record("run.awaiting_approval", subject: run)
+
+    get run_path(run)
+    assert_response :success
+    assert_select "#run_discussion", text: /waiting for a seal/
+    assert_select "#run_discussion a[href='#run_header']", text: "Review"
+  end
+
+  test "approve and reject events stay out of the thread but on the activity page" do
+    run = runs(:awaiting_run)
+    hidden = Event.record("run.approved", subject: run, user: users(:admin))
+
+    get run_path(run)
+    assert_select "#run_discussion li#event_#{hidden.id}", count: 0
+
+    get activity_path
+    assert_select "li", text: /approved a step on run/
+  end
 end
