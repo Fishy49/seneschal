@@ -1,0 +1,78 @@
+<%# PURPOSE-BUILT redacted view. Do not render any runs/ partial here.
+    ALLOWED: task title, project name, workflow name, run status, per-step
+    names / statuses / durations, total cost, started and finished times.
+    FORBIDDEN: stream logs, tool calls, file contents, error output, worktree
+    or repo paths, environment, context variables, comments, approval notes. %>
+<div class="max-w-3xl mx-auto p-8">
+  <div class="flex items-center gap-2 mb-6">
+    <span class="text-brass"><%= seal_mark(size: 20) %></span>
+    <span class="font-display text-lg font-bold tracking-tight">Seneschal</span>
+  </div>
+
+  <div class="mb-6">
+    <p class="text-xs uppercase tracking-wide text-content-muted mb-1">Shared run summary</p>
+    <h1 class="text-2xl font-semibold">
+      <%= @run.pipeline_task&.title || "Manual run" %>
+      <%= status_badge(@run.status) %>
+    </h1>
+    <p class="text-sm text-content-muted mt-1">
+      <%= @run.workflow.project.name %> &middot; <%= @run.workflow.name %>
+    </p>
+  </div>
+
+  <%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <tr>
+          <th class="<%= th_classes %>">Started</th>
+          <td class="<%= td_classes("font-mono tabular-nums") %>"><%= @run.started_at&.strftime("%Y-%m-%d %H:%M") || "not started" %></td>
+        </tr>
+        <tr>
+          <th class="<%= th_classes %>">Finished</th>
+          <td class="<%= td_classes("font-mono tabular-nums") %>"><%= @run.finished_at&.strftime("%Y-%m-%d %H:%M") || "still running" %></td>
+        </tr>
+        <tr>
+          <th class="<%= th_classes %>">Duration</th>
+          <td class="<%= td_classes("font-mono tabular-nums") %>"><%= format_duration(@run.duration) %></td>
+        </tr>
+        <% if (stats = @run.usage_stats) && stats[:cost_usd].to_f > 0 %>
+          <tr>
+            <th class="<%= th_classes %>">Total cost</th>
+            <td class="<%= td_classes("font-mono tabular-nums") %>"><%= format_cost(stats[:cost_usd]) %></td>
+          </tr>
+        <% end %>
+      </table>
+    </div>
+  <% end %>
+
+  <%= render layout: "shared/components/card", locals: { title: "Steps" } do %>
+    <% if @run_steps.any? %>
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="<%= th_classes %>">Step</th>
+              <th class="<%= th_classes %>">Status</th>
+              <th class="<%= th_classes %>">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @run_steps.each do |run_step| %>
+              <tr>
+                <td class="<%= td_classes %>"><%= run_step.step&.name || "(removed step)" %></td>
+                <td class="<%= td_classes %>"><%= status_badge(run_step.status) %></td>
+                <td class="<%= td_classes("text-content-muted font-mono tabular-nums") %>"><%= format_duration(run_step.duration) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <%= render "shared/components/empty_state", message: "No steps recorded." %>
+    <% end %>
+  <% end %>
+
+  <p class="text-xs text-content-muted mt-6 text-center">
+    Read-only summary shared from Seneschal. Link expires <span class="font-mono tabular-nums"><%= @share_link.expires_at.strftime("%Y-%m-%d") %></span>.
+  </p>
+</div>

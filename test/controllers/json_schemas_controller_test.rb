@@ -87,4 +87,42 @@ class JsonSchemasControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to json_schemas_path
     assert_match "Cannot delete", flash[:alert]
   end
+
+  test "show lists the dotted paths the schema exposes" do
+    schema = json_schemas(:person_schema)
+    get json_schema_path(schema)
+
+    JsonPathResolver.paths_for_schema(schema.body).each do |path|
+      assert_select "span", text: path
+    end
+  end
+
+  test "used-by counts steps and skills separately" do
+    schema = json_schemas(:person_schema)
+    skills(:shared_skill).update!(default_json_schema: schema, default_output_variable: "person")
+
+    get json_schema_path(schema)
+    assert_select "p", text: /1 skill/
+
+    get json_schemas_path
+    assert_select "td", text: /1 skill/
+  end
+
+  test "an unreferenced schema says so" do
+    get json_schemas_path
+    assert_select "td", text: "unused"
+  end
+
+  test "the body field is a code editor with a starter shape" do
+    get new_json_schema_path
+    assert_select "div[data-controller=?]", "code-editor"
+    assert_select "input[name=?][type=hidden]", "json_schema[body]"
+  end
+
+  test "invalid JSON still reports the model error beside the editor" do
+    post json_schemas_path, params: { json_schema: { name: "Broken", body: "{not json" } }
+    assert_response :unprocessable_content
+    assert_select "div[data-controller=?]", "code-editor"
+    assert_select "p", text: /valid JSON/i
+  end
 end

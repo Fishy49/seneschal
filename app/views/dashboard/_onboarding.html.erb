@@ -1,0 +1,39 @@
+<%# Shown until this person has launched something of their own. Locals:
+    connected:, has_project: %>
+<% items = [
+     { done: connected, label: "Connect your accounts",
+       blurb: "Runs you launch then use your own GitHub and Claude access instead of the server's.",
+       cta: "Go to Account", path: account_path },
+     { done: has_project, label: "Find your project",
+       blurb: "Projects are the repositories Seneschal can work in.",
+       cta: has_project ? "Browse projects" : "Add a project",
+       path: has_project ? projects_path : new_project_path },
+     { done: false, label: "Launch your first run",
+       blurb: "Describe what you want done, pick a workflow, and watch it work.",
+       cta: "Launch", action: "command-palette#open" }
+   ] %>
+
+<%= render layout: "shared/components/card", locals: { title: "Getting started", class: "mb-4" } do %>
+  <ul class="list-none">
+    <% items.each do |item| %>
+      <li class="flex items-start gap-3 py-3 border-b border-edge last:border-b-0">
+        <span class="mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs <%= item[:done] ? "bg-success/15 text-success" : "bg-surface-input text-content-muted" %>">
+          <%= item[:done] ? "&check;".html_safe : "&middot;".html_safe %>
+        </span>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium <%= "text-content-muted line-through" if item[:done] %>"><%= item[:label] %></div>
+          <p class="text-xs text-content-muted mt-0.5"><%= item[:blurb] %></p>
+        </div>
+        <% if item[:action] %>
+          <button type="button" data-action="<%= item[:action] %>"
+                  class="<%= btn_classes(:primary, size: :sm, extra: "shrink-0") %>">
+            <%= item[:cta] %>
+          </button>
+        <% else %>
+          <%= link_to item[:cta], item[:path],
+                class: btn_classes(:ghost, size: :sm, extra: "shrink-0") %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

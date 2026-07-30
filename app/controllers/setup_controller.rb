@@ -4,18 +4,12 @@ class SetupController < ApplicationController
   skip_before_action :require_setup
 
   def index
-    @claude = integration_status("claude_cli")
-    @gh = integration_status("gh_cli")
-    @sdk_runner = integration_status("sdk_runner")
-    @allowed_tools = Setting["default_allowed_tools"].presence || StepExecutor::DEFAULT_ALLOWED_TOOLS
-    # SDK runner stays optional — skills can still execute via the CLI runner,
+    @claude = IntegrationStatus.for("claude_cli")
+    @gh = IntegrationStatus.for("gh_cli")
+    @sdk_runner = IntegrationStatus.for("sdk_runner")
+    # SDK runner stays optional - skills can still execute via the CLI runner,
     # which is the default. Only the two core CLIs gate the rest of the app.
     @all_ok = @claude[:ok] && @gh[:ok]
-  end
-
-  def update_allowed_tools
-    Setting["default_allowed_tools"] = params.expect(:default_allowed_tools).strip
-    redirect_to setup_path, notice: "Allowed tools updated."
   end
 
   def check_claude
@@ -47,7 +41,7 @@ class SetupController < ApplicationController
   # Verifies the Claude Agent SDK Python sidecar is installed by importing
   # claude_agent_sdk in the bundled venv (or whichever python_bin resolves
   # to) and reporting back its version. A failure here means
-  # `Runners::ClaudeSDK` can't dispatch a step — operators run
+  # `Runners::ClaudeSDK` can't dispatch a step - operators run
   # `bin/setup_sdk_runner` to fix it.
   def check_sdk_runner
     python = Runners::ClaudeSDK.new.python_bin
@@ -68,16 +62,6 @@ class SetupController < ApplicationController
   end
 
   private
-
-  def integration_status(key)
-    value = Setting[key]
-    checked_at = Setting["#{key}_checked_at"]
-    if value.present? && checked_at.present?
-      { ok: true, details: value, checked_at: Time.iso8601(checked_at) }
-    else
-      { ok: false }
-    end
-  end
 
   def run_check(cmd)
     Timeout.timeout(15) do

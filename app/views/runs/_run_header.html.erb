@@ -1,89 +1,82 @@
+<%# Identity and actions for a run, said once: breadcrumb, title, status,
+    live stats and actions share a single row. ExecuteRunJob broadcasts a
+    replace of #run_header with this partial, so the element id, the partial
+    path and the `run:` local are a contract - anything live must live in
+    here, and anything with a Stimulus subscription must not (it would be
+    torn down on every step update). %>
 <div id="run_header">
-  <div class="flex items-center justify-between mb-4">
-    <div>
-      <h1 class="text-2xl font-semibold">
-        Run #<%= run.id %> <%= status_badge(run.status) %>
-        <% if run.workflow.project.skip_permissions? %>
-          <span class="bg-danger/15 text-danger border border-danger/25 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide" title="Run executed with --dangerously-skip-permissions">&#9888; Danger Mode</span>
-        <% end %>
-      </h1>
-    </div>
-    <div class="flex items-center gap-2">
-      <%= link_to "Replay", replay_run_path(run),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
-      <%= link_to "Compare", diff_run_path(run),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
+  <div class="flex items-center gap-x-2.5 gap-y-2 flex-wrap min-w-0">
+    <nav class="flex items-center gap-2.5 text-[0.8125rem] text-content-muted min-w-0" aria-label="Breadcrumb">
+      <%= link_to run.workflow.project.name, project_path(run.workflow.project), class: "hover:text-accent transition-colors shrink-0" %>
+      <span class="text-content-faint">/</span>
+      <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-accent transition-colors truncate" %>
+      <span class="text-content-faint">/</span>
+    </nav>
+    <h1 class="text-lg font-semibold leading-tight flex items-baseline gap-1.5 min-w-0">
+      <% if run.pipeline_task %>
+        <%= link_to run.pipeline_task.title, pipeline_task_path(run.pipeline_task), class: "text-content hover:text-accent transition-colors truncate" %>
+        <span class="shrink-0 text-content-muted font-normal">&middot; run <%= run.ordinal %></span>
+      <% else %>
+        <span class="truncate">Manual run <span class="font-mono">#<%= run.id %></span></span>
+      <% end %>
+    </h1>
+    <%= status_badge(run.status) %>
+    <% if run.workflow.project.skip_permissions? %>
+      <span class="bg-danger/15 text-danger border border-danger/25 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide"
+            title="This run executed without permission prompts.">&#9888; Danger mode</span>
+    <% end %>
+
+    <span class="ml-auto"></span>
+    <%
+      stats = run.usage_stats
+      tokens = stats && (stats[:input_tokens] + stats[:output_tokens] +
+                         stats[:cache_read_tokens] + stats[:cache_creation_tokens])
+      strip = []
+      if run.active? && (current = run.run_steps.where(status: ["running", "streaming", "retrying", "awaiting_approval", "waiting_for_tokens"]).order(:position).first)
+        total = run.workflow.steps.count
+        strip << "step #{current.position} of #{total}" if current.position.to_i.positive? && total.positive?
+      end
+      strip << format_cost(stats[:cost_usd]) if stats && stats[:cost_usd].to_f.positive?
+      strip << "#{format_tokens(tokens)} tok" if tokens&.positive?
+      if run.active? && run.started_at
+        strip << format_duration(Time.current - run.started_at)
+      elsif run.duration
+        strip << format_duration(run.duration)
+      end
+    %>
+    <% if strip.any? %>
+      <span class="font-mono tabular-nums text-xs text-content-muted whitespace-nowrap"><%= strip.join(" · ") %></span>
+    <% end %>
+    <span class="flex items-center gap-2 shrink-0">
       <% if run.active? %>
         <%= button_to "Stop", stop_run_path(run),
-              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
+              class: btn_classes(:danger, size: :sm),
               data: { turbo_confirm: "Stop this run?" } %>
       <% end %>
-      <% if run.status.in?(%w[failed stopped]) && run.run_steps.exists?(status: "failed") %>
+      <% if run.status.in?(["completed", "failed", "stopped"]) && run.pipeline_task&.executable? %>
+        <%= button_to "Re-run", execute_pipeline_task_path(run.pipeline_task),
+              class: btn_classes(:primary, size: :sm) %>
+      <% end %>
+      <% if run.status.in?(["failed", "stopped"]) && run.run_steps.exists?(status: "failed") %>
         <%= button_to "Resume", resume_run_path(run),
-              class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
-              data: { turbo_confirm: "Resume this run from the failed step?" } %>
+              class: btn_classes(:primary, size: :sm) %>
       <% end %>
-    </div>
+      <%= link_to "Share", run_path(run, anchor: "share"),
+            class: btn_classes(:ghost, size: :sm) %>
+    </span>
   </div>
+  <p class="text-xs text-content-muted mt-1">
+    Started by <%= run.started_by_label %> &middot; <%= time_ago_short(run.started_at || run.created_at) %><% if run.stopped_by %> &middot; stopped by <%= run.stopped_by.email %><% end %>
+    &middot; <span class="font-mono">Run #<%= run.id %></span>
+  </p>
+
   <% if run.awaiting_approval? %>
-    <%= render "runs/approval_actions", run: run, run_step: run.awaiting_run_step %>
-  <% end %>
-  <% if run.status.in?(%w[completed failed stopped]) %>
-    <% project_skills = Skill.for_project(run.workflow.project).includes(:project).order(:name) %>
-    <details class="mb-4" data-controller="follow-up-form">
-      <summary class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors list-none [&::-webkit-details-marker]:hidden">
-        Follow Up
-      </summary>
-      <div class="bg-surface-card border border-edge rounded-lg p-5 mt-3">
-        <p class="text-sm text-content-muted mb-3">Describe what to fix or change. The instructions will run as a new Prompt step appended to this run, with access to the same context (branch, PR, etc). Optionally add skills to run afterward.</p>
-        <%= form_with url: follow_up_run_path(run), method: :post, class: "space-y-4" do |f| %>
-          <div>
-            <label for="follow_up_instructions" class="block text-sm font-medium text-content-muted mb-1.5">Instructions</label>
-            <%= f.text_area :instructions, id: "follow_up_instructions", rows: 5,
-                  placeholder: "e.g. The service layer is using direct DB calls instead of the repository pattern. Update RunService and StepService to use the repository, keeping the existing public method signatures.",
-                  class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-content-muted mb-1.5">Run these skills after (optional, in order)</label>
-            <div data-follow-up-form-target="skillList" class="space-y-2"></div>
-            <template data-follow-up-form-target="template">
-              <div class="flex items-center gap-2">
-                <select name="skill_ids[]"
-                        class="flex-1 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-                  <option value="">Select a skill...</option>
-                  <% project_skills.each do |skill| %>
-                    <option value="<%= skill.id %>"><%= skill.display_name %></option>
-                  <% end %>
-                </select>
-                <button type="button" data-action="follow-up-form#removeSkill"
-                        class="px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] cursor-pointer hover:bg-surface-input hover:text-content transition-colors">Remove</button>
-              </div>
-            </template>
-            <button type="button" data-action="follow-up-form#addSkill"
-                    class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
-              + Add Skill
-            </button>
-          </div>
-
-          <%= f.submit "Start Follow Up",
-                class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-        <% end %>
-      </div>
-    </details>
-  <% end %>
-  <% if (stats = run.usage_stats) && stats[:cost_usd] > 0 %>
-    <div class="text-sm text-content-muted mb-4 flex flex-wrap gap-x-4 gap-y-1">
-      <span>Cost: <span class="text-content font-medium"><%= format_cost(stats[:cost_usd]) %></span></span>
-      <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>
-      <% if total > 0 %>
-        <span>Tokens: <span class="text-content font-medium"><%= format_tokens(total) %></span>
-          <span class="text-xs">(in: <%= format_tokens(stats[:input_tokens]) %>, out: <%= format_tokens(stats[:output_tokens]) %>, cache read: <%= format_tokens(stats[:cache_read_tokens]) %>, cache write: <%= format_tokens(stats[:cache_creation_tokens]) %>)</span>
-        </span>
-      <% end %>
-      <% if stats[:num_turns] > 0 %>
-        <span>Turns: <span class="text-content font-medium"><%= stats[:num_turns] %></span></span>
-      <% end %>
+    <div class="mt-4">
+      <%= render "runs/approval_actions", run: run, run_step: run.awaiting_run_step %>
     </div>
+  <% end %>
+
+  <% if run.status.in?(["completed", "failed", "stopped"]) %>
+    <%= render "runs/follow_up", run: run %>
   <% end %>
 </div>

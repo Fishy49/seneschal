@@ -1,0 +1,8 @@
+<%# Small inline label.
+    Locals:
+      text:  chip text
+      tone:  :neutral (default), :accent, :ok, :warn, :danger
+      title: optional tooltip %>
+<%= tag.span text, title: local_assigns[:title],
+      class: "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium " \
+             "#{chip_tone_classes(local_assigns.fetch(:tone, :neutral))}" %>

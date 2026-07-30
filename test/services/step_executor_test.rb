@@ -218,7 +218,7 @@ class StepExecutorTest < ActiveSupport::TestCase
     projects(:seneschal).update!(skip_permissions: true)
     other = projects(:other_project)
     other.update!(skip_permissions: false)
-    workflow = other.workflows.create!(name: "Other Wf", trigger_type: "manual")
+    workflow = other.workflows.create!(name: "Other Wf")
     other_step = workflow.steps.create!(
       name: "Other Step",
       step_type: "skill",

@@ -1,6 +1,12 @@
 class ProjectsController < ApplicationController
   before_action :set_project, only: [:show, :edit, :update, :destroy, :clone, :refetch]
 
+  SECTIONS = ["overview", "workflows", "tasks", "runs", "skills", "settings"].freeze
+  RUNS_LIMIT = 50
+  WORKFLOW_SORTS = ["name", "most_run", "recent"].freeze
+
+  def self.workflow_sort(value) = WORKFLOW_SORTS.include?(value) ? value : "name"
+
   def index
     @project_groups = ProjectGroup.ordered
     @projects = Project.includes(:project_group).order(:name)
@@ -10,31 +16,45 @@ class ProjectsController < ApplicationController
 
   def show
     @project.refresh_repo_status!
-    @workflows = @project.workflows.order(:name)
-    @tasks = @project.pipeline_tasks.active.recent.limit(10)
-    @recent_runs = @project.runs.includes(:pipeline_task, workflow: :project).recent.limit(10)
+    load_section
   end
 
   def new
     @project = Project.new
+    @onboarding = params[:onboarding].present?
   end
 
-  def edit; end
+  # The project form lives on the hub's Settings tab; this route stays valid
+  # for old links and for the Edit Path affordance on a failed clone.
+  def edit
+    redirect_to project_path(@project, section: "settings")
+  end
 
   def create
-    @project = Project.new(project_params)
-    if @project.save
-      redirect_to @project, notice: "Project created."
-    else
+    @onboarding = params[:onboarding].present?
+    attributes = project_params
+    attributes[:local_path] = default_local_path(attributes) if @onboarding && attributes[:local_path].blank?
+    @project = Project.new(attributes)
+
+    unless @project.save
       render :new, status: :unprocessable_content
+      return
     end
+
+    return redirect_to(@project, notice: "Project created.") unless @onboarding
+
+    # On first boot there is nothing to decide about the clone, so just start it.
+    @project.update!(repo_status: "cloning")
+    CloneRepoJob.perform_later(@project)
+    redirect_to project_path(@project, onboarding: 1)
   end
 
   def update
     if @project.update(project_params)
-      redirect_to @project, notice: "Project updated."
+      redirect_to project_path(@project, section: "settings"), notice: "Project updated."
     else
-      render :edit, status: :unprocessable_content
+      @section = "settings"
+      render :show, status: :unprocessable_content
     end
   end
 
@@ -80,6 +100,59 @@ class ProjectsController < ApplicationController
 
   def set_project
     @project = Project.find(params.expect(:id))
+  end
+
+  # Only the requested tab's data is loaded; the sidebar links straight at the
+  # default tab, so it has to stay cheap.
+  def load_section
+    @section = SECTIONS.include?(params[:section]) ? params[:section] : "overview"
+
+    case @section
+    when "overview"
+      @recent_runs = project_runs.limit(5)
+    when "workflows"
+      @workflows = sorted_workflows
+      @last_runs = @workflows.to_h { |workflow| [workflow.id, workflow.runs.max_by(&:created_at)] }
+      @stats = @workflows.to_h { |workflow| [workflow.id, workflow.stats] }
+      @access = @workflows.to_h { |workflow| [workflow.id, WorkflowAccessSummary.for(workflow)] }
+    when "tasks"
+      @tasks = @project.pipeline_tasks.includes(:workflow).recent
+      @tasks = @tasks.where(status: params[:status]) if PipelineTask::STATUSES.include?(params[:status])
+    when "runs"
+      @runs = project_runs.limit(RUNS_LIMIT)
+    when "skills"
+      @skills = @project.skills.order(:name)
+      @skill_usage = Step.where(skill_id: @skills.map(&:id)).group(:skill_id).count
+    end
+  end
+
+  def project_runs
+    @project.runs.includes(:pipeline_task, workflow: :project).recent
+  end
+
+  # Ordering by run activity uses a left join and a count; at self-hosted
+  # scale that is cheaper than maintaining a counter column.
+  def sorted_workflows
+    scope = @project.workflows.includes(:steps, :runs, :created_by)
+
+    case self.class.workflow_sort(params[:sort])
+    when "most_run"
+      scope.left_joins(:runs).group(:id).order(Arel.sql("COUNT(runs.id) DESC"), :name)
+    when "recent"
+      scope.left_joins(:runs).group(:id).order(Arel.sql("MAX(runs.created_at) DESC"), :name)
+    else
+      scope.order(:name)
+    end
+  end
+
+  # The onboarding form does not ask where to put the checkout; the JS fills it
+  # in and this is the backstop when it has not.
+  def default_local_path(attributes)
+    slug = attributes[:name].to_s.strip.downcase.gsub(/\s+/, "_")
+    slug = attributes[:repo_url].to_s[%r{/([^/]+?)(?:\.git)?\z}, 1].to_s if slug.blank?
+    return nil if slug.blank?
+
+    Rails.root.join("repos", slug).to_s
   end
 
   def project_params

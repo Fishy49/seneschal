@@ -1,0 +1,6 @@
+<%# Tabs for the reusable ingredients: skills, schemas, templates, repos. %>
+<div class="flex items-center gap-1 border-b border-edge mb-6">
+  <% nav_tabs_for(NavigationHelper::LIBRARY_TABS).each do |tab| %>
+    <%= link_to tab[:label], send(tab[:path]), class: nav_tab_classes(controller_name == tab[:controller]) %>
+  <% end %>
+</div>

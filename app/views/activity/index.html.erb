@@ -1,0 +1,20 @@
+<%= render "shared/components/page_header", title: "Activity" %>
+
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
+  <% if @events.any? %>
+    <ul class="list-none">
+      <%= render partial: "activity/event", collection: @events %>
+    </ul>
+  <% else %>
+    <%= render "shared/components/empty_state", message: "Nothing has happened yet." %>
+  <% end %>
+<% end %>
+
+<div class="flex items-center gap-2">
+  <% if @page > 1 %>
+    <%= link_to "Newer", activity_path(page: @page - 1), class: btn_classes(:ghost, size: :sm) %>
+  <% end %>
+  <% if @has_next_page %>
+    <%= link_to "Older", activity_path(page: @page + 1), class: btn_classes(:ghost, size: :sm) %>
+  <% end %>
+</div>

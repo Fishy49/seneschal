@@ -1,0 +1,63 @@
+<%# The three host-tool checks. Rendered by /setup (where they gate a fresh
+    install) and by Server settings (where they are a health panel).
+    Locals: claude:, gh:, sdk_runner: - each an IntegrationStatus hash. %>
+<% checks = [
+     { status: claude, title: "Claude CLI", blurb: "Runs the AI steps in your workflows.",
+       path: check_claude_setup_path,
+       install: ["npm install -g @anthropic-ai/claude-code", "claude login"] },
+     { status: gh, title: "GitHub CLI", blurb: "Creates branches and pull requests, and watches CI checks.",
+       path: check_gh_setup_path,
+       install: ["brew install gh", "gh auth login"] },
+     { status: sdk_runner, title: "Agent SDK sidecar", optional: true,
+       blurb: "Unlocks structured outputs, hooks, subagents and MCP servers on a step. " \
+              "Without it, steps run on the Claude CLI, which is the default.",
+       path: check_sdk_runner_setup_path,
+       install: ["bin/setup_sdk_runner"],
+       note: "Idempotent. Needs Python 3.10 or newer on PATH." }
+   ] %>
+
+<div class="space-y-4">
+  <% checks.each do |check| %>
+    <% status = check[:status] %>
+    <%= render layout: "shared/components/card" do %>
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <h2 class="text-lg font-semibold mb-1">
+            <%= check[:title] %>
+            <% if check[:optional] %>
+              <span class="ml-1 text-xs font-normal text-content-muted">optional</span>
+            <% end %>
+          </h2>
+          <p class="text-sm text-content-muted"><%= check[:blurb] %></p>
+        </div>
+        <% if status[:ok] %>
+          <%= render "shared/components/chip", text: "Verified", tone: :ok %>
+        <% elsif check[:optional] %>
+          <%= render "shared/components/chip", text: "Not installed", tone: :neutral %>
+        <% else %>
+          <%= render "shared/components/chip", text: "Not verified", tone: :warn %>
+        <% end %>
+      </div>
+
+      <% if status[:ok] %>
+        <pre class="mt-3 text-xs bg-surface-muted border border-edge rounded-lg px-3 py-2 text-content-muted font-mono overflow-x-auto"><%= status[:details] %></pre>
+        <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_short(status[:checked_at]) %></p>
+      <% else %>
+        <div class="mt-4 bg-surface-muted border border-edge rounded-lg px-4 py-3 text-sm space-y-2">
+          <p class="text-content-muted font-medium">Install and sign in:</p>
+          <% check[:install].each do |line| %>
+            <pre class="text-xs text-content font-mono overflow-x-auto"><%= line %></pre>
+          <% end %>
+          <% if check[:note] %>
+            <p class="text-xs text-content-muted"><%= check[:note] %></p>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div class="mt-4">
+        <%= button_to status[:ok] ? "Re-check" : "Check", check[:path],
+              class: btn_classes(status[:ok] ? :ghost : :primary) %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

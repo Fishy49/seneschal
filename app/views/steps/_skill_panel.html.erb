@@ -1,11 +1,11 @@
 <%# Skill panel backdrop %>
 <div data-skill-panel-target="backdrop" data-action="click->skill-panel#close"
-     class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-200"
+     class="slideover-backdrop transition-opacity duration-200"
      style="display:none; opacity:0"></div>
 
 <%# Skill slide-out panel %>
 <div data-skill-panel-target="panel"
-     class="fixed top-0 right-0 h-full w-[560px] bg-surface-card border-l border-edge z-50 shadow-2xl flex flex-col transition-transform duration-200"
+     class="slideover-panel w-[560px]"
      style="transform:translateX(100%)">
 
   <%# Header %>
@@ -19,7 +19,7 @@
   <div class="px-5 py-3 border-b border-edge">
     <input type="text" placeholder="Search skills..." autocomplete="off"
            data-skill-panel-target="search" data-action="input->skill-panel#filter"
-           class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" />
+           class="<%= input_classes %>" />
   </div>
 
   <%# Skill cards %>

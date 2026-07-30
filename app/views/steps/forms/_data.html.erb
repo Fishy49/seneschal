@@ -1,0 +1,164 @@
+<%# What the step reads and what it publishes. Locals: f:, step:, claude: %>
+<% cfg = claude ? (step.config || {}) : {} %>
+<% skill_default_schema = step.skill&.default_json_schema %>
+<% skill_default_var = step.skill&.default_output_variable.to_s %>
+<% picker_selected_id = cfg["json_schema_id"].to_i %>
+<% using_skill_default = skill_default_schema && (cfg["json_schema_id"].blank? || picker_selected_id == skill_default_schema.id) %>
+<%# The single "Output variable" input is the canonical produces source whenever
+    a schema is set or inherited; both cases hide the multi-tag widget. %>
+<% schema_mode = claude && (cfg["json_schema_id"].present? || using_skill_default) %>
+<% schema_output_var = schema_mode ? (step.produces.first.presence || skill_default_var) : "" %>
+
+<% if claude %>
+  <div data-controller="step-schema-picker" data-step-schema-picker-overridden-value="<%= using_skill_default ? "false" : "true" %>">
+    <input type="hidden" name="schema_picker_mode"
+           value="<%= using_skill_default ? "inherit" : "override" %>"
+           data-step-schema-picker-target="modeInput">
+    <label class="<%= label_classes %>">Output shape</label>
+
+    <% if skill_default_schema %>
+      <div data-step-schema-picker-target="badge" style="<%= "display:none" unless using_skill_default %>"
+           class="flex items-center justify-between gap-3 px-3 py-2 bg-surface-muted border border-edge rounded-lg">
+        <span class="text-sm text-content truncate">
+          Using skill default:
+          <span class="font-mono"><%= skill_default_var.presence || "output" %></span>
+          <span class="text-content-muted">(<%= skill_default_schema.name %>)</span>
+        </span>
+        <button type="button" data-action="step-schema-picker#override"
+                class="text-xs text-accent font-semibold hover:underline shrink-0 bg-transparent border-none cursor-pointer">Change</button>
+      </div>
+    <% end %>
+
+    <div data-step-schema-picker-target="picker" style="<%= "display:none" if using_skill_default && skill_default_schema %>" class="space-y-2">
+      <select name="json_schema_id" id="json_schema_id"
+              data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
+              class="<%= input_classes %>">
+        <option value="">Free text</option>
+        <% JsonSchema.order(:name).each do |schema| %>
+          <option value="<%= schema.id %>" <%= "selected" if picker_selected_id == schema.id %>><%= schema.name %></option>
+        <% end %>
+      </select>
+      <% if skill_default_schema %>
+        <button type="button" data-action="step-schema-picker#restoreDefault"
+                class="text-xs text-content-muted hover:text-accent font-medium bg-transparent border-none cursor-pointer p-0">
+          Back to the skill default (<%= skill_default_schema.name %>)
+        </button>
+      <% end %>
+      <p class="<%= hint_classes %>">Picking a schema makes the model answer in that exact shape, so later steps can read individual fields.</p>
+    </div>
+  </div>
+<% end %>
+
+<div data-step-form-target="producesMultiFields" style="<%= "display:none" if schema_mode %>">
+  <label class="<%= label_classes %>">Publishes</label>
+  <div data-controller="produces-input"
+       data-step-form-target="producesInputWrapper"
+       data-produces-input-suggestions-url-value="<%= produces_suggestions_project_workflow_steps_path(@project, @workflow) %>"
+       data-produces-input-initial-value="<%= schema_mode ? "" : step.produces.join(",") %>">
+    <ul data-produces-input-target="tagList" class="flex flex-wrap gap-1 mb-2 min-h-[1.5rem]"></ul>
+    <div class="flex gap-1.5">
+      <input type="text" data-produces-input-target="newInput"
+             list="produces_input_suggestions"
+             data-action="keydown->produces-input#keydown input->produces-input#input"
+             placeholder="e.g. pr_number, build_status"
+             class="<%= input_classes("flex-1 font-mono") %>">
+      <button type="button" data-action="produces-input#add"
+              class="<%= btn_classes(:ghost, size: :sm) %>">Add</button>
+    </div>
+    <datalist id="produces_input_suggestions" data-produces-input-target="datalist"></datalist>
+    <input type="hidden" name="produces" data-produces-input-target="hiddenInput" value="<%= schema_mode ? "" : step.produces.join(",") %>">
+  </div>
+  <p class="<%= hint_classes %>">Names later steps can read.</p>
+  <details class="mt-2">
+    <summary class="text-xs text-content-muted cursor-pointer hover:text-content">How outputs work</summary>
+    <p class="text-xs text-content-muted mt-1.5 leading-relaxed">
+      AI steps write these in <code class="bg-surface-input px-1 rounded">```output</code> blocks; shell steps write them
+      with <code class="bg-surface-input px-1 rounded">::set-output</code>.
+    </p>
+  </details>
+</div>
+
+<div data-step-form-target="schemaOutputFields" style="<%= "display:none" unless schema_mode %>">
+  <label for="schema_output_variable" class="<%= label_classes %>">Publishes as</label>
+  <input type="text" name="schema_output_variable" id="schema_output_variable"
+         value="<%= schema_output_var %>" data-step-form-target="schemaOutputInput"
+         placeholder="e.g. parse_result"
+         class="<%= input_classes("font-mono") %>">
+  <p class="<%= hint_classes %>">The whole structured answer is stored under this one name.</p>
+</div>
+
+<% available_vars = Step.available_variables_for(@workflow, step.position.to_i) %>
+<div>
+  <label class="<%= label_classes %>">Reads</label>
+  <% if available_vars.any? %>
+    <div class="max-h-56 overflow-auto bg-surface-muted border border-edge rounded-lg">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr>
+            <th class="<%= th_classes("text-center w-32") %>">Include value in prompt</th>
+            <th class="<%= th_classes("text-center w-32") %>"
+                title="The step's shell can extract subpaths with the seneschal-context CLI.">Queryable in workspace <span class="font-normal normal-case">(advanced)</span></th>
+            <th class="<%= th_classes %>">Variable</th>
+            <th class="<%= th_classes("text-right") %>">From</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% available_vars.each do |var| %>
+            <tr class="hover:bg-surface-input/30 transition-colors">
+              <td class="<%= td_classes("text-center") %>">
+                <input type="checkbox" name="consumes[]" value="<%= var["name"] %>"
+                       <%= "checked" if step.consumes.include?(var["name"]) %>
+                       class="accent-accent h-4 w-4 rounded cursor-pointer">
+              </td>
+              <td class="<%= td_classes("text-center") %>">
+                <% if var["queryable"] %>
+                  <input type="checkbox" name="queries[]" value="<%= var["name"] %>"
+                         <%= "checked" if step.queries.include?(var["name"]) %>
+                         class="accent-accent h-4 w-4 rounded cursor-pointer">
+                <% else %>
+                  <span class="text-content-faint">-</span>
+                <% end %>
+              </td>
+              <td class="<%= td_classes("font-mono text-content font-medium") %>"><%= var["name"] %></td>
+              <td class="<%= td_classes("text-right text-content-muted font-mono text-xs") %>"><%= var["source"] %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <p class="text-sm text-content-muted">Nothing to read yet. Earlier steps in this workflow publish variables here.</p>
+  <% end %>
+</div>
+
+<% if claude %>
+  <% other_projects = Project.where.not(id: @project.id).order(:name) %>
+  <% selected_ids = (cfg["context_projects"] || []).map(&:to_i) %>
+  <div>
+    <label for="skill_context_projects" class="<%= label_classes %>">Other projects to read</label>
+    <% if other_projects.any? %>
+      <select name="skill_context_projects[]" id="skill_context_projects" multiple size="<%= [other_projects.size, 5].min %>"
+              class="<%= input_classes %>">
+        <% other_projects.each do |other| %>
+          <option value="<%= other.id %>" <%= "selected" if selected_ids.include?(other.id) %>>
+            <%= other.name %><%= " (not cloned)" unless other.repo_ready? %>
+          </option>
+        <% end %>
+      </select>
+      <p class="<%= hint_classes %>">Read-only. Hold Cmd or Ctrl to pick more than one. Projects that are not cloned are skipped.</p>
+    <% else %>
+      <p class="text-sm text-content-muted">No other projects to share.</p>
+    <% end %>
+  </div>
+<% end %>
+
+<div>
+  <%= f.label :input_context, "Extra instructions", class: label_classes %>
+  <%= f.text_area :input_context, rows: 4,
+        placeholder: "Optional. Anything this step should know that is not in the skill or prompt.",
+        class: input_classes("font-mono resize-y") %>
+  <p class="<%= hint_classes %>">
+    Appended to an AI step's prompt, or available to a shell step as
+    <code class="bg-surface-input px-1 rounded">$INPUT_CONTEXT</code>.
+  </p>
+</div>

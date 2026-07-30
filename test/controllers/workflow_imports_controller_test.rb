@@ -35,7 +35,7 @@ class WorkflowImportsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "POST create with mode=replace replaces the chosen workflow" do
-    target_wf = @target_project.workflows.create!(name: "To Replace", trigger_type: "manual")
+    target_wf = @target_project.workflows.create!(name: "To Replace")
     target_wf.steps.create!(
       name: "Old step", step_type: "command", body: "echo old",
       position: 1, max_retries: 0, timeout: 60, config: {}

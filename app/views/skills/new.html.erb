@@ -1,4 +1,4 @@
-<h1 class="text-2xl font-semibold mb-4">New Skill</h1>
-<div class="bg-surface-card border border-edge rounded-lg p-5">
+<%= render "shared/components/page_header", title: "New Skill" %>
+<%= render layout: "shared/components/card" do %>
   <%= render "form", skill: @skill %>
-</div>
+<% end %>

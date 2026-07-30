@@ -1,57 +1,38 @@
-<%= render "shared/project_bar",
-     project: @run.workflow.project,
-     workflow: @run.workflow,
-     task: @run.pipeline_task,
-     run: @run %>
-
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <h1 class="text-2xl font-semibold">
-      Run #<%= @run.id %> <%= status_badge(@run.status) %>
-      <span class="ml-2 text-base font-normal text-content-muted">/ Compare</span>
-    </h1>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= link_to "Live view", run_path(@run),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= link_to "Replay", replay_run_path(@run),
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium hover:bg-surface-input hover:text-content transition-colors" %>
-  </div>
-</div>
+<%= render "runs/run_chrome", run: @run, mode: :compare %>
 
 <%# Target picker. Defaults to the most-recent other run of the same
     PipelineTask (apples-to-apples) and falls back to any other run of
     the same Workflow. %>
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
   <%= form_with url: diff_run_path(@run), method: :get, data: { turbo: false } do |f| %>
     <div class="flex items-center gap-3">
       <label class="text-sm text-content-muted whitespace-nowrap">Compare against:</label>
       <%= f.select :against,
             options_from_collection_for_select(@available_targets, :id,
-              ->(r) { "##{r.id} · #{r.status} · #{r.created_at.strftime("%Y-%m-%d %H:%M")}" },
+              ->(r) { "#{r.ordinal ? "run #{r.ordinal}" : "##{r.id}"} · #{r.status} · #{time_ago_short(r.created_at)}" },
               @against&.id),
             { include_blank: @available_targets.any? ? false : "(no other runs of this task yet)" },
-            class: "flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
+            class: input_classes("flex-1"),
             onchange: "this.form.submit()",
             disabled: @available_targets.empty? %>
     </div>
   <% end %>
   <% if @against.nil? %>
-    <p class="text-xs text-content-muted mt-2">
+    <p class="<%= hint_classes %>">
       <% if @available_targets.empty? %>
-        No other runs of this task yet — run it again, then come back here to compare.
+        No other runs of this task yet - run it again, then come back here to compare.
       <% else %>
         Pick a run from the dropdown to see a side-by-side diff.
       <% end %>
     </p>
   <% end %>
-</div>
+<% end %>
 
 <% if @against %>
-  <%# Summary diff — top-line metrics side by side, with deltas. %>
+  <%# Summary diff - top-line metrics side by side, with deltas. %>
   <% left_stats = @run.usage_stats || {} %>
   <% right_stats = @against.usage_stats || {} %>
-  <div class="grid grid-cols-2 gap-4 mb-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
     <%= render "runs/diff_summary", run: @run, stats: left_stats, side: :left %>
     <%= render "runs/diff_summary", run: @against, stats: right_stats, side: :right %>
   </div>

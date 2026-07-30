@@ -1,87 +1,73 @@
 <%= render "shared/project_bar", project: @project, workflow: @workflow %>
 
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-semibold"><%= @workflow.name %></h1>
-  <div class="flex items-center gap-2">
-    <%= link_to "Edit", edit_project_workflow_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= link_to "Copy to project…", new_project_workflow_copy_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <%= link_to "Export…", export_project_workflow_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
+<%= render layout: "shared/components/page_header",
+      locals: { title: @workflow.name, subtitle: @workflow.description.presence } do %>
+  <% if @project.repo_ready? %>
+    <%= button_to "Run workflow", trigger_project_workflow_path(@project, @workflow),
+          class: btn_classes(:primary) %>
+  <% else %>
+    <%# Clone is what is actually missing, so offer it here rather than a
+        disabled button with an explanation in a tooltip. %>
+    <span class="text-xs text-content-muted">Clone the repository to run this</span>
+    <%= render "projects/repo_status", project: @project %>
+  <% end %>
+  <details class="relative">
+    <summary class="list-none <%= btn_classes(:ghost, size: :sm) %>">
+      &#8943;
+    </summary>
+    <div class="absolute right-0 mt-1 w-56 bg-surface-card border border-edge rounded-lg shadow-lg z-20 py-1">
+      <%= link_to "Edit name and description", edit_project_workflow_path(@project, @workflow),
+            class: "block px-3 py-2 text-sm text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
+      <%= link_to "Copy to project", new_project_workflow_copy_path(@project, @workflow),
+            class: "block px-3 py-2 text-sm text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
+      <%= link_to "Export", export_project_workflow_path(@project, @workflow),
+            class: "block px-3 py-2 text-sm text-content-muted hover:bg-surface-input hover:text-content transition-colors" %>
+      <%= button_to "Delete", project_workflow_path(@project, @workflow), method: :delete,
+            class: "block w-full text-left px-3 py-2 text-sm text-content-muted bg-transparent border-none cursor-pointer hover:bg-surface-input hover:text-danger transition-colors",
+            data: { turbo_confirm: "Delete \"#{@workflow.name}\"? Its #{pluralize(@workflow.steps.size, "step")} and #{pluralize(@workflow.runs.size, "run")} go with it. Skills and schemas it uses are not affected." } %>
+    </div>
+  </details>
+<% end %>
+
+<div class="-mt-2 mb-4">
+  <p class="text-xs text-content-muted flex items-center gap-1.5">
+    <% if @workflow.created_by %>
+      <%= avatar_for(@workflow.created_by, size: :xs) %>
+      <span>Added by <%= @workflow.created_by.email %></span>
+    <% end %>
+    <% if @workflow.copied_from %>
+      <span>Copied from <%= @workflow.copied_from %></span>
+    <% end %>
+  </p>
+  <div class="flex items-center gap-2 mt-2 flex-wrap">
+    <%= render "shared/components/chip", text: "Engine: #{workflow_engine_label(@workflow)}", tone: :neutral %>
+    <% @access.each do |chip| %>
+      <%= render "shared/components/chip", text: chip.label, tone: chip.tone, title: chip.title %>
+    <% end %>
+    <% if (line = workflow_stats_line(@stats)) %>
+      <span class="text-xs text-content-muted"><%= line %></span>
+    <% else %>
+      <span class="text-xs text-content-muted">Never run</span>
+    <% end %>
   </div>
 </div>
 
-<% if @workflow.description.present? %>
-  <p class="text-content-muted mb-4"><%= @workflow.description %></p>
-<% end %>
-
-<div class="grid grid-cols-2 gap-4">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4" data-controller="variable-highlight">
   <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold mb-0">Steps</h2>
-        <%= link_to "Add Step", new_project_workflow_step_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-      </div>
-      <% if @steps.any? %>
-        <ul class="list-none" data-controller="sortable-steps"
-            data-sortable-steps-url-value="<%= reorder_project_workflow_steps_path(@project, @workflow) %>">
-          <% @steps.each do |step| %>
-            <li class="flex items-center gap-3 py-3 border-b border-edge last:border-b-0"
-                draggable="true" data-step-id="<%= step.id %>"
-                data-sortable-steps-target="item"
-                data-action="dragstart->sortable-steps#dragstart dragend->sortable-steps#dragend dragover->sortable-steps#dragover dragleave->sortable-steps#dragleave drop->sortable-steps#drop"
-                style="cursor: grab;">
-              <span data-position-badge class="w-7 h-7 rounded-full bg-surface-input text-content-muted text-[0.8125rem] font-semibold flex items-center justify-center shrink-0"><%= step.position %></span>
-              <div class="flex-1">
-                <% if step.consumes.any? %>
-                  <div class="flex flex-wrap gap-1 mb-1">
-                    <% step.consumes.each do |var| %>
-                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-info/15 text-info font-mono">&larr; <%= var %></span>
-                    <% end %>
-                  </div>
-                <% end %>
-                <div class="font-medium"><%= step.name %></div>
-                <div class="text-[0.8125rem] text-content-muted">
-                  <%= type_badge(step.step_type) %>
-                  <% if step.max_retries > 0 %>
-                    &middot; <%= step.max_retries %> retries
-                  <% end %>
-                  &middot; <%= step.timeout %>s timeout
-                </div>
-                <% ctx = Project.where(id: step.context_project_ids).order(:name) %>
-                <% if ctx.any? %>
-                  <div class="flex flex-wrap gap-1 mt-1">
-                    <% ctx.each do |p| %>
-                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-accent/15 text-accent font-mono">+ <%= p.name %></span>
-                    <% end %>
-                  </div>
-                <% end %>
-                <% if step.produces.any? %>
-                  <div class="flex flex-wrap gap-1 mt-1">
-                    <% step.produces.each do |var| %>
-                      <span class="inline-block px-1.5 py-0 rounded text-[0.625rem] bg-success/15 text-success font-mono">&rarr; <%= var %></span>
-                    <% end %>
-                  </div>
-                <% end %>
-              </div>
-              <div class="flex items-center gap-2">
-                <%= link_to "Edit", edit_project_workflow_step_path(@project, @workflow, step), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-                <%= button_to "Remove", project_workflow_step_path(@project, @workflow, step),
-                      method: :delete,
-                      class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
-                      data: { turbo_confirm: "Remove step '#{step.name}'?" } %>
-              </div>
-            </li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p class="text-center py-8 text-content-muted"><%= link_to "Add the first step", new_project_workflow_step_path(@project, @workflow) %></p>
-      <% end %>
-    </div>
+    <%= render "workflows/steps_canvas", project: @project, workflow: @workflow, steps: @steps %>
+
+    <%= render layout: "shared/components/card", locals: { title: "Recent runs", class: "mb-4" } do %>
+      <%= render "shared/runs_list", runs: @recent_runs,
+            empty_message: "This workflow has not run yet." %>
+    <% end %>
   </div>
 
   <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <h2 class="text-lg font-semibold mb-3">Recent Runs</h2>
-      <%= render "shared/runs_list", runs: @recent_runs %>
-    </div>
+    <%= turbo_frame_tag "step_inspector" do %>
+      <%= render layout: "shared/components/card" do %>
+        <%= render "shared/components/empty_state", message: "Select a step to edit it.",
+              cta_label: "Add a step", cta_path: new_project_workflow_step_path(@project, @workflow) %>
+      <% end %>
+    <% end %>
   </div>
 </div>

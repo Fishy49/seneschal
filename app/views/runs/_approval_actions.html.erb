@@ -1,15 +1,23 @@
-<div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-4" data-controller="approval-form">
+<div class="bg-brass/10 border border-brass/30 rounded-lg p-4 mb-4" data-controller="approval-form">
   <div class="flex items-center justify-between gap-3 mb-2">
-    <div>
-      <p class="font-medium text-sm">Awaiting Approval</p>
-      <p class="text-xs text-content-muted">Step: <%= run_step&.step&.name %></p>
+    <div class="flex items-start gap-2">
+      <span class="text-brass mt-0.5"><%= seal_mark(size: 18) %></span>
+      <div>
+        <p class="font-medium text-sm">Awaiting Approval</p>
+        <p class="text-xs text-content-muted">Step: <%= run_step&.step&.name %></p>
+      </div>
     </div>
     <div class="flex items-center gap-2">
-      <%= button_to "Approve", approve_run_path(run),
-            class: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
-            data: { turbo_confirm: "Approve and continue?" } %>
+      <%= form_with url: approve_run_path(run), method: :post, class: "flex items-center gap-2" do |f| %>
+        <div class="w-56 shrink-0">
+          <%= f.text_field :comment, placeholder: "Optional note...", class: input_classes %>
+        </div>
+        <%= f.button type: "submit", class: btn_classes(:brass, size: :sm) do %>
+          <%= seal_mark(size: 14) %>Approve
+        <% end %>
+      <% end %>
       <button type="button" data-action="approval-form#toggleReject"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors">
+              class="<%= btn_classes(:ghost, size: :sm) %>">
         Reject
       </button>
     </div>
@@ -18,9 +26,11 @@
     <%= form_with url: reject_run_path(run), method: :post do |f| %>
       <%= f.text_area :rejection_context, rows: 4,
             placeholder: "Add context the step should use on the next run...",
-            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y mb-2" %>
-      <%= f.submit "Reject and Re-run",
-            class: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors" %>
+            class: input_classes("font-mono resize-y mb-2") %>
+      <%= f.submit "Reject and Re-run", class: btn_classes(:danger, size: :sm) %>
     <% end %>
   </div>
+  <% if run_step %>
+    <%= render "runs/approval_history", run_step: run_step %>
+  <% end %>
 </div>

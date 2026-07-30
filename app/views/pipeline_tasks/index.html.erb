@@ -1,76 +1,67 @@
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-semibold">Tasks</h1>
-  <%= link_to "New Task", new_pipeline_task_path, class: "inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-</div>
+<%= render layout: "shared/components/page_header", locals: { title: "Board" } do %>
+  <%= link_to "New Task", new_pipeline_task_path, class: btn_classes(:primary) %>
+<% end %>
 
-<div class="bg-surface-card border border-edge rounded-lg p-4 mb-4">
+<%= render layout: "shared/components/card", locals: { class: "mb-4" } do %>
   <%= form_with url: pipeline_tasks_path, method: :get, class: "flex items-center gap-3 flex-wrap", data: { turbo_frame: "_top" } do |f| %>
     <input type="text" name="q" value="<%= params[:q] %>" placeholder="Search tasks..."
-           class="flex-1 min-w-[200px] px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+           class="<%= input_classes("flex-1 min-w-[200px]") %>">
     <select name="project_id" onchange="this.form.requestSubmit()"
-            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+            class="<%= input_classes("w-auto!") %>">
       <option value="">All Projects</option>
       <% @projects.each do |p| %>
         <option value="<%= p.id %>" <%= "selected" if params[:project_id].to_s == p.id.to_s %>><%= p.name %></option>
       <% end %>
     </select>
-    <select name="status" onchange="this.form.requestSubmit()"
-            class="px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-      <option value="">All Statuses</option>
-      <% PipelineTask::STATUSES.each do |s| %>
-        <option value="<%= s %>" <%= "selected" if params[:status] == s %>><%= s.capitalize %></option>
-      <% end %>
-    </select>
-    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-accent-hover transition-colors">Search</button>
+    <button type="submit" class="<%= btn_classes(:ghost) %>">Search</button>
     <% if params[:q].present? || params[:project_id].present? || params[:status].present? || params[:kind].present? || params[:archived].present? %>
-      <%= link_to "Clear", pipeline_tasks_path, class: "text-sm text-content-muted hover:text-content transition-colors" %>
+      <%= link_to "Clear", pipeline_tasks_path, class: btn_classes(:quiet, size: :sm) %>
     <% end %>
     <% if @show_archived %>
-      <%= link_to "Show Active", pipeline_tasks_path(request.query_parameters.except("archived")), class: "text-sm text-content-muted hover:text-content transition-colors" %>
+      <%= link_to "Show Active", pipeline_tasks_path(request.query_parameters.except("archived")), class: btn_classes(:quiet, size: :sm) %>
     <% else %>
-      <%= link_to "Show Archived", pipeline_tasks_path(request.query_parameters.merge(archived: "1")), class: "text-sm text-content-muted hover:text-content transition-colors" %>
+      <%= link_to "Show Archived", pipeline_tasks_path(request.query_parameters.merge(archived: "1")), class: btn_classes(:quiet, size: :sm) %>
     <% end %>
   <% end %>
-</div>
+<% end %>
 
 <% if @tasks.any? %>
-  <% %w[draft ready running completed failed].each do |status| %>
-    <% tasks_in_status = @tasks.select { |t| t.status == status } %>
-    <% next if tasks_in_status.empty? %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <h2 class="text-lg font-semibold mb-3"><%= status.capitalize %></h2>
-      <table class="w-full border-collapse">
-        <thead>
-          <tr>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Title</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th>
-            <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% tasks_in_status.each do |task| %>
-            <tr>
-              <td class="px-3 py-2 border-b border-edge"><%= link_to task.title, pipeline_task_path(task) %></td>
-              <td class="px-3 py-2 border-b border-edge"><%= type_badge(task.kind) %></td>
-              <td class="px-3 py-2 border-b border-edge text-content-muted"><%= task.project.name %></td>
-              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= task.workflow&.name || "\u2014" %></td>
-              <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(task.updated_at) %></td>
-            </tr>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 items-start">
+    <% @columns.each do |name, tasks| %>
+      <div class="bg-surface-muted/60 border border-edge rounded-lg p-2.5 flex flex-col gap-2.5 min-h-24" data-column="<%= name.parameterize %>">
+        <div class="flex items-center gap-1.5 px-1 text-xs font-semibold text-content-muted">
+          <% if name == "Waiting on you" %>
+            <span class="text-brass"><%= seal_mark(size: 12) %></span>
+          <% elsif name == "Running" %>
+            <span class="w-1.5 h-1.5 rounded-full bg-info inline-block"></span>
           <% end %>
-        </tbody>
-      </table>
-    </div>
-  <% end %>
-<% else %>
-  <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-    <% if params[:q].present? || params[:project_id].present? || params[:status].present? %>
-      <p>No tasks match your filters.</p>
-      <p class="mt-2"><%= link_to "Clear filters", pipeline_tasks_path %></p>
-    <% else %>
-      <p>No tasks yet.</p>
-      <p class="mt-2"><%= link_to "Create your first task", new_pipeline_task_path %></p>
+          <%= name %>
+          <span class="font-mono font-normal text-content-faint"><%= tasks.size %></span>
+        </div>
+        <% tasks.each do |task| %>
+          <% run = @board_runs[task.id] %>
+          <% unread = @unread_contexts.include?(["PipelineTask", task.id]) ||
+                      @run_ids_by_task.fetch(task.id, []).any? { |rid| @unread_contexts.include?(["Run", rid]) } %>
+          <%= render "pipeline_tasks/board_card",
+                task: task, run: run,
+                comment_count: @comment_counts.fetch(task.id, 0),
+                unread: unread,
+                waiting: name == "Waiting on you" %>
+        <% end %>
+        <% if tasks.empty? %>
+          <p class="px-1 pb-1 text-xs text-content-faint">empty</p>
+        <% end %>
+      </div>
     <% end %>
   </div>
+<% else %>
+  <%= render layout: "shared/components/card" do %>
+    <% if params[:q].present? || params[:project_id].present? || params[:status].present? %>
+      <%= render "shared/components/empty_state", message: "No tasks match your filters.",
+            cta_label: "Clear filters", cta_path: pipeline_tasks_path %>
+    <% else %>
+      <%= render "shared/components/empty_state", message: "No tasks yet.",
+            cta_label: "Create your first task", cta_path: new_pipeline_task_path %>
+    <% end %>
+  <% end %>
 <% end %>

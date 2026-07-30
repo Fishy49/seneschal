@@ -2,6 +2,14 @@
 require "rubygems"
 require "bundler/setup"
 
-ARGV.unshift("--ensure-latest")
+# The Rails-generated binstub adds --ensure-latest here, which fails the scan
+# whenever a newer brakeman has been published, regardless of whether the code
+# has a single security problem. That turns a security gate into a version-drift
+# alarm, and a CI job that goes red because a gem shipped is a CI job people
+# learn to ignore. Dependabot already opens a PR for brakeman releases, so the
+# nudge to upgrade is covered.
+#
+# The gate itself is unaffected: brakeman exits non-zero when it finds warnings.
+# If you re-run `rails app:update` and this line comes back, that is why it went.
 
 load Gem.bin_path("brakeman", "brakeman")

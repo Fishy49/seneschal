@@ -1,53 +1,112 @@
-<h1 class="text-2xl font-semibold mb-4">Dashboard</h1>
+<% attention = @awaiting_runs.size + @failed_notifications.size + @mention_notifications.size %>
+<%= render layout: "shared/components/page_header", locals: { title: "Inbox" } do %>
+  <% if @failed_notifications.any? || @mention_notifications.any? %>
+    <%= button_to "Mark all read", read_all_notifications_path,
+          class: btn_classes(:quiet, size: :sm) %>
+  <% end %>
+  <button type="button" data-action="command-palette#open"
+          class="<%= btn_classes(:primary) %>">
+    Launch
+  </button>
+<% end %>
 
-<div class="grid grid-cols-2 gap-4">
-  <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold mb-0">Active Runs</h2>
-      </div>
-      <%= render "shared/runs_list", runs: @active_runs, empty_message: "No active runs" %>
-    </div>
+<p class="font-mono tabular-nums text-xs text-content-muted -mt-2 mb-4">
+  <%= attention %> need you &middot; <%= @active_runs.size %> running &middot; <%= @shipped_this_week %> shipped this week
+</p>
 
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold mb-0">Recent Runs</h2>
-        <%= link_to "View all", runs_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-      </div>
-      <%= render "shared/runs_list", runs: @recent_runs, empty_message: "No completed runs yet" %>
-    </div>
+<div data-controller="dashboard-refresh">
+  <div id="dashboard_awaiting" data-dashboard-refresh-target="region">
+    <%= render "dashboard/awaiting_runs", runs: @awaiting_runs, viewers: @awaiting_viewers %>
   </div>
 
-  <div>
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold mb-0">Projects</h2>
-      <%= link_to "New Project", new_project_path, class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    </div>
-    <% if @projects.any? %>
-      <% @projects.each do |project| %>
-        <div class="bg-surface-card border border-edge rounded-lg p-4 mb-3">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold"><%= link_to project.name, project_path(project), class: "hover:text-accent transition-colors" %></h3>
-            <span class="text-xs text-content-muted"><%= project.repo_status == "ready" ? "Repo cloned" : project.repo_status.titleize %></span>
-          </div>
-          <% if project.description.present? %>
-            <p class="text-sm text-content-muted mb-2"><%= project.description.truncate(100) %></p>
-          <% end %>
-          <div class="text-xs text-content-muted mb-3">
-            <%= pluralize(project.workflows.count, "workflow") %> &middot; <%= pluralize(project.pipeline_tasks.count, "task") %>
-          </div>
-          <div class="flex items-center gap-2">
-            <%= link_to "New Task", new_pipeline_task_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors" %>
-            <%= link_to "Tasks", pipeline_tasks_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-            <%= link_to "Runs", runs_path(project_id: project.id), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-          </div>
-        </div>
-      <% end %>
-    <% else %>
-      <div class="bg-surface-card border border-edge rounded-lg p-12 text-center text-content-muted">
-        <p>No projects yet.</p>
-        <p class="mt-2"><%= link_to "Create your first project", new_project_path %></p>
+  <div id="dashboard_inbox" data-dashboard-refresh-target="region">
+    <%= render "dashboard/inbox_notifications",
+          failed: @failed_notifications, mentions: @mention_notifications %>
+    <% if attention.zero? && !@show_onboarding %>
+      <div class="bg-surface-card border border-edge rounded-lg px-5 py-4 mb-4 flex items-center gap-2.5">
+        <span class="text-brass"><%= seal_mark(size: 16) %></span>
+        <p class="text-sm text-content-muted">Nothing needs you. The agents have the watch.</p>
       </div>
     <% end %>
+  </div>
+
+  <% if @show_onboarding %>
+    <%= render "dashboard/onboarding", connected: @has_credentials, has_project: @projects.any? %>
+  <% end %>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div>
+      <%= render layout: "shared/components/card",
+            locals: { title: "Runs", action: { label: "View all", path: runs_path }, class: "mb-4" } do %>
+        <div id="dashboard_active" data-dashboard-refresh-target="region">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Active</h3>
+          <% if @active_runs.any? %>
+            <ul class="list-none mb-4">
+              <%= render partial: "dashboard/run_row", collection: @active_runs, as: :run %>
+            </ul>
+          <% else %>
+            <p class="text-sm text-content-muted py-3 mb-2">Nothing running right now.</p>
+          <% end %>
+        </div>
+
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-content-muted mb-1">Recent</h3>
+        <% if @recent_runs.any? %>
+          <ul class="list-none">
+            <%= render partial: "dashboard/run_row", collection: @recent_runs, as: :run %>
+          </ul>
+        <% else %>
+          <%= render "shared/components/empty_state", message: "No runs yet.",
+                cta_label: "Launch your first run", cta_action: "command-palette#open" %>
+        <% end %>
+      <% end %>
+    </div>
+
+    <div>
+      <%= render layout: "shared/components/card",
+            locals: { title: "Projects", action: { label: "New project", path: new_project_path }, class: "mb-4" } do %>
+        <% if @projects.any? %>
+          <ul class="list-none">
+            <% @projects.each do |project| %>
+              <li class="flex items-center justify-between gap-3 py-[var(--row-y)] border-b border-edge last:border-b-0">
+                <div class="min-w-0">
+                  <div class="truncate">
+                    <%= link_to project.name, project_path(project), class: "font-medium hover:text-accent transition-colors" %>
+                    <% unless project.repo_ready? %>
+                      <span class="ml-1 text-xs text-content-muted"><%= project.repo_status.tr("_", " ") %></span>
+                    <% end %>
+                  </div>
+                  <div class="text-xs text-content-muted">
+                    <%= pluralize(project.workflows.count, "workflow") %> &middot;
+                    <%= pluralize(project.pipeline_tasks.count, "task") %>
+                  </div>
+                </div>
+                <button type="button"
+                        data-action="command-palette#openWithProject"
+                        data-command-palette-project-param="<%= project.id %>"
+                        class="<%= btn_classes(:ghost, size: :sm, extra: "shrink-0") %>">
+                  Launch
+                </button>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <%= render "shared/components/empty_state", message: "No projects yet.",
+                cta_label: "Create your first project", cta_path: new_project_path %>
+        <% end %>
+      <% end %>
+
+      <%= render layout: "shared/components/card",
+            locals: { title: "Recent activity", action: { label: "View all", path: activity_path }, class: "mb-4" } do %>
+        <div id="dashboard_activity" data-dashboard-refresh-target="region">
+          <% if @recent_events.any? %>
+            <ul class="list-none">
+              <%= render partial: "activity/event", collection: @recent_events %>
+            </ul>
+          <% else %>
+            <%= render "shared/components/empty_state", message: "Nothing has happened yet." %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
   </div>
 </div>

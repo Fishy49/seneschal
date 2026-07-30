@@ -1,40 +1,114 @@
 @import "tailwindcss";
 
-/* Theme tokens — swap via data-theme attribute */
+/* Self-hosted faces (app/assets/fonts). Propshaft rewrites the url()s to
+   digested paths when it serves the compiled sheet. */
+@font-face { font-family: "Cabinet Grotesk"; font-weight: 700; font-style: normal; font-display: swap; src: url("cabinet-grotesk-700.woff2") format("woff2"); }
+@font-face { font-family: "Cabinet Grotesk"; font-weight: 800; font-style: normal; font-display: swap; src: url("cabinet-grotesk-800.woff2") format("woff2"); }
+@font-face { font-family: "Switzer"; font-weight: 400; font-style: normal; font-display: swap; src: url("switzer-400.woff2") format("woff2"); }
+@font-face { font-family: "Switzer"; font-weight: 500; font-style: normal; font-display: swap; src: url("switzer-500.woff2") format("woff2"); }
+@font-face { font-family: "Switzer"; font-weight: 600; font-style: normal; font-display: swap; src: url("switzer-600.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-style: normal; font-display: swap; src: url("jetbrains-mono-400.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-style: normal; font-display: swap; src: url("jetbrains-mono-500.woff2") format("woff2"); }
+
+/* Theme tokens.
+   Two hues carry the interface: the accent (a per-user preference, verdigris
+   by default) for everything interactive, and brass for human decisions only.
+   Status colors stay semantic. Brass and status values never vary by accent,
+   so a decision reads identically on every teammate's screen. */
 @layer base {
+  /* Accent presets: each defines a light-ground and dark-ground pair. The
+     theme blocks below select the right side, so a preset only has to be
+     declared once. */
   :root {
-    --bg: #0f1117;
-    --bg-card: #1a1d27;
-    --bg-input: #252836;
-    --border: #2d3140;
-    --text: #e4e6ed;
-    --text-muted: #8b8fa3;
-    --accent: #6366f1;
-    --accent-hover: #818cf8;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #3b82f6;
+    --pick-accent-light: #0E8A7A;
+    --pick-accent-hover-light: #11A18E;
+    --pick-on-accent-light: #FFFFFF;
+    --pick-accent-dark: #41BFAB;
+    --pick-accent-hover-dark: #63D2BF;
+    --pick-on-accent-dark: #0A1411;
+  }
+  [data-accent="cobalt"] {
+    --pick-accent-light: #2B62CF; --pick-accent-hover-light: #3E77DE; --pick-on-accent-light: #FFFFFF;
+    --pick-accent-dark: #7BA3EE; --pick-accent-hover-dark: #96B7F3; --pick-on-accent-dark: #0C1220;
+  }
+  [data-accent="heather"] {
+    --pick-accent-light: #6A51C4; --pick-accent-hover-light: #7D66D4; --pick-on-accent-light: #FFFFFF;
+    --pick-accent-dark: #A697E8; --pick-accent-hover-dark: #BAAEF0; --pick-on-accent-dark: #120E20;
+  }
+  [data-accent="claret"] {
+    --pick-accent-light: #B4405E; --pick-accent-hover-light: #C65674; --pick-on-accent-light: #FFFFFF;
+    --pick-accent-dark: #E2879C; --pick-accent-hover-dark: #EBA2B3; --pick-on-accent-dark: #1F0D12;
+  }
+  [data-accent="moss"] {
+    --pick-accent-light: #4E7F2E; --pick-accent-hover-light: #5E943B; --pick-on-accent-light: #FFFFFF;
+    --pick-accent-dark: #93BF6A; --pick-accent-hover-dark: #A8CE84; --pick-on-accent-dark: #101705;
   }
 
-  [data-theme="light"] {
-    --bg: #f4f5f7;
-    --bg-card: #ffffff;
-    --bg-input: #eef0f4;
-    --border: #d1d5de;
-    --text: #1a1d27;
-    --text-muted: #5f6578;
-    --accent: #4f46e5;
-    --accent-hover: #6366f1;
-    --success: #16a34a;
-    --warning: #d97706;
-    --danger: #dc2626;
-    --info: #2563eb;
+  /* Nightwatch (default) */
+  :root {
+    --bg: #0E1113;
+    --bg-card: #15191C;
+    --bg-input: #1C2124;
+    --bg-muted: #0B0E10;
+    --border: #262D31;
+    --border-strong: #374147;
+    --text: #E8ECED;
+    --text-muted: #9FAAB0;
+    --text-faint: #68757C;
+    --accent: var(--pick-accent-dark);
+    --accent-hover: var(--pick-accent-hover-dark);
+    --on-accent: var(--pick-on-accent-dark);
+    --brass: #C6A268;
+    --brass-hover: #D9BA82;
+    --on-brass: #141008;
+    --success: #53C287;
+    --warning: #DCA83F;
+    --danger: #E36A5E;
+    --info: #6AA5E8;
+    --scrim: rgba(4, 6, 8, 0.62);
+    --radius: 0.625rem;
+    color-scheme: dark;
   }
+
+  /* Daybook */
+  [data-theme="light"] {
+    --bg: #F1F2F1;
+    --bg-card: #FBFBFA;
+    --bg-input: #E8EAE9;
+    --bg-muted: #E4E7E5;
+    --border: #D6DAD8;
+    --border-strong: #C2C8C5;
+    --text: #171C1E;
+    --text-muted: #525E63;
+    --text-faint: #8A959B;
+    --accent: var(--pick-accent-light);
+    --accent-hover: var(--pick-accent-hover-light);
+    --on-accent: var(--pick-on-accent-light);
+    --brass: #96783D;
+    --brass-hover: #AA8A4C;
+    --on-brass: #FFFFFF;
+    --success: #1E9459;
+    --warning: #AD7712;
+    --danger: #C74538;
+    --info: #2A6FC4;
+    --scrim: rgba(23, 28, 30, 0.45);
+    color-scheme: light;
+  }
+
+  /* Density: helper-built rows and cells pad with these so Compact tightens
+     the whole app at once. */
+  :root { --row-y: 0.5rem; --cell-y: 0.5rem; }
+  [data-density="compact"] { --row-y: 0.3125rem; --cell-y: 0.3125rem; }
 
   body {
     background: var(--bg);
     color: var(--text);
+    font-family: var(--font-sans);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   a {
@@ -44,21 +118,89 @@
   a:hover {
     color: var(--accent-hover);
   }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Deep links from the Replay view land on a step or a trajectory entry;
+     the outline makes it obvious which one the URL pointed at. */
+  :target {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+    scroll-margin-top: 1.5rem;
+  }
 }
 
 @theme inline {
   --color-surface: var(--bg);
   --color-surface-card: var(--bg-card);
   --color-surface-input: var(--bg-input);
+  --color-surface-muted: var(--bg-muted);
   --color-edge: var(--border);
+  --color-edge-strong: var(--border-strong);
   --color-content: var(--text);
   --color-content-muted: var(--text-muted);
+  --color-content-faint: var(--text-faint);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-brass: var(--brass);
+  --color-brass-hover: var(--brass-hover);
+  --color-on-brass: var(--on-brass);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
+  --color-scrim: var(--scrim);
+  --font-sans: "Switzer", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cabinet Grotesk", "Switzer", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer components {
+  /* Run timeline nodes sit on the connector line, so their fills must be
+     opaque: these are the /15 tints flattened onto the card colour. */
+  .node-tint-success { background-color: color-mix(in oklab, var(--success) 15%, var(--bg-card)); }
+  .node-tint-danger  { background-color: color-mix(in oklab, var(--danger) 15%, var(--bg-card)); }
+  .node-tint-info    { background-color: color-mix(in oklab, var(--info) 15%, var(--bg-card)); }
+  .node-tint-warning { background-color: color-mix(in oklab, var(--warning) 15%, var(--bg-card)); }
+  .node-tint-brass   { background-color: color-mix(in oklab, var(--brass) 18%, var(--bg-card)); border-color: color-mix(in oklab, var(--brass) 45%, transparent); }
+  .node-tint-muted   { background-color: color-mix(in oklab, var(--bg-input) 92%, var(--bg-card)); }
+
+  /* Slide-over panel chrome, shared by the step editor's template, skill and
+     file pickers. The panel translates in from the right; controllers only
+     toggle visibility and transform. */
+  .slideover-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: var(--scrim);
+  }
+
+  .slideover-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    box-shadow: -24px 0 48px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slideover-panel { transition: none; }
+  }
 }
 
 /* CodeJar editor */
@@ -73,7 +215,7 @@
     display: block;
     min-height: 400px;
     padding: 1rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
     line-height: 1.7;
     tab-size: 2;
@@ -94,12 +236,12 @@
   }
 
   .code-preview code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
     line-height: 1.7;
   }
 
-  /* Background watermark — set via inline style in layout for propshaft asset paths */
+  /* Background watermark - set via inline style in layout for propshaft asset paths */
   .main-watermark {
     position: fixed;
     top: 0;
@@ -179,7 +321,7 @@
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     padding: 1rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
     line-height: 1.6;
     white-space: pre-wrap;
@@ -189,7 +331,7 @@
     color: var(--text-muted);
   }
 
-  /* Auth splash — circuit conduit animation */
+  /* Auth splash - circuit conduit animation */
   .circuit-bg {
     position: fixed;
     inset: 0;

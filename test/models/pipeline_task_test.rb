@@ -53,8 +53,42 @@ class PipelineTaskTest < ActiveSupport::TestCase
     assert pipeline_tasks(:ready_task).executable?
   end
 
-  test "not executable? when draft" do
+  test "executable? when draft with a workflow" do
+    task = pipeline_tasks(:draft_task)
+    task.update!(workflow: workflows(:deploy))
+    assert task.executable?
+  end
+
+  test "executable? when completed with a workflow" do
+    assert pipeline_tasks(:completed_task).executable?
+  end
+
+  test "not executable? without a workflow" do
     assert_not pipeline_tasks(:draft_task).executable?
+  end
+
+  test "not executable? while running" do
+    assert_not pipeline_tasks(:running_task).executable?
+  end
+
+  test "not executable? when archived" do
+    task = pipeline_tasks(:ready_task)
+    task.update!(archived_at: Time.current)
+    assert_not task.executable?
+  end
+
+  test "accepts a workflow from its own project" do
+    t = pipeline_tasks(:ready_task)
+    t.workflow = workflows(:cron_workflow)
+    assert t.valid?
+  end
+
+  test "rejects a workflow from another project" do
+    other = projects(:other_project).workflows.create!(name: "Foreign")
+    t = pipeline_tasks(:ready_task)
+    t.workflow = other
+    assert_not t.valid?
+    assert_includes t.errors[:workflow], "does not belong to the selected project"
   end
 
   test "latest_run returns most recent run" do

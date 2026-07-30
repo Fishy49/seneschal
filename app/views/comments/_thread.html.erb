@@ -1,0 +1,23 @@
+<%# A comment thread for a single commentable (task pages). Run pages use
+    runs/_discussion instead, which aggregates the run and its steps into one
+    feed. The ul stays free of whitespace text nodes so the empty-state hint
+    can key off :empty. Locals: commentable: %>
+<div data-controller="discussion">
+  <ul class="list-none peer" id="<%= "comments_#{commentable.class.name.underscore}_#{commentable.id}" %>"><%= render partial: "comments/comment", collection: commentable.comments.chronological.includes(:user) %></ul>
+  <p class="hidden peer-empty:block text-sm text-content-muted py-1">No comments yet.</p>
+
+  <%= form_with url: comments_path, method: :post, class: "mt-3 pt-3 border-t border-edge/60",
+        data: { action: "turbo:submit-end->discussion#submitEnd" } do |f| %>
+    <%= hidden_field_tag :commentable_type, commentable.class.name %>
+    <%= hidden_field_tag :commentable_id, commentable.id %>
+    <div class="flex items-start gap-2.5">
+      <%= avatar_for(current_user, size: :sm) %>
+      <%= text_area_tag "comment[body]", nil, rows: 2, required: true,
+            placeholder: "Add a comment. Use @name to notify someone.",
+            data: { discussion_target: "body" },
+            class: input_classes("flex-1 resize-y") %>
+      <%= f.submit "Comment",
+            class: btn_classes(:primary, size: :sm, extra: "shrink-0") %>
+    </div>
+  <% end %>
+</div>

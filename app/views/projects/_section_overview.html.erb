@@ -1,0 +1,36 @@
+<% if project.description.present? %>
+  <p class="text-content-muted mb-4"><%= project.description %></p>
+<% end %>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div>
+    <%= render layout: "shared/components/card", locals: { title: "Repository", class: "mb-4" } do %>
+      <p class="font-mono text-sm text-content-muted mb-3 break-all"><%= project.local_path %></p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <%= render "projects/repo_status", project: project %>
+        <% if project.repo_ready? %>
+          <%= button_to "Refetch", refetch_project_path(project),
+                class: btn_classes(:ghost, size: :sm) %>
+          <%= button_to "Import skills", import_skills_project_path(project),
+                class: btn_classes(:ghost, size: :sm) %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if project.repo_ready? %>
+      <%= render layout: "shared/components/card", locals: { title: "Code map", class: "mb-4" } do %>
+        <%= render "code_maps/status", code_map: project.code_map, project: project %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div>
+    <%= render layout: "shared/components/card",
+          locals: { title: "Recent runs",
+                    action: { label: "View all", path: project_path(project, section: "runs") }, class: "mb-4" } do %>
+      <%= render "shared/runs_list", runs: @recent_runs,
+            empty_message: "Nothing has run in this project yet.",
+            empty_cta_label: "Launch a run", empty_cta_action: "command-palette#open" %>
+    <% end %>
+  </div>
+</div>

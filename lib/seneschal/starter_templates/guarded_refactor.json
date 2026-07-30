@@ -1,0 +1,105 @@
+{
+  "seneschal_workflow_export": {
+    "version": 1,
+    "exported_at": "2026-07-27T00:00:00Z",
+    "source_project_name": "Seneschal starter templates",
+    "workflow": {
+      "name": "Refactor with a checkpoint",
+      "description": "Plans the refactor, waits for a person to approve the plan, then carries it out. Good for anything touching code you cannot afford to break.",
+      "config": {},
+      "steps": [
+        {
+          "name": "Plan the refactor",
+          "position": 1,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "produces": [
+              "plan"
+            ],
+            "consumes": [
+              "task_title",
+              "task_body"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "plan-the-refactor"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 1800,
+          "input_context": null,
+          "manual_approval": true
+        },
+        {
+          "name": "Refactor",
+          "position": 2,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "consumes": [
+              "plan"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "carry-out-the-refactor"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Open PR",
+          "position": 3,
+          "step_type": "pr",
+          "body": null,
+          "config": {
+            "title": "refactor: ${task_title}",
+            "body": "${task_body}",
+            "base": "main",
+            "draft": true,
+            "produces": [
+              "pr_number",
+              "branch_name"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 600,
+          "input_context": null,
+          "manual_approval": false
+        }
+      ]
+    },
+    "skills": [
+      {
+        "name": "plan-the-refactor",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "plan-the-refactor",
+        "description": "Plans a behaviour-preserving refactor for a person to approve.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: plan-the-refactor\ndescription: Plans a behaviour-preserving refactor for a person to approve.\n---\n\nPlan this refactor. Do not change any code yet.\n\nGoal: ${task_title}\n\n${task_body}\n\nRefactors go wrong when they quietly change behaviour, so be specific: which\nfiles move, what stays identical, and what could break. List anything you are\nunsure about. A person is going to read this and decide whether to let it run.\n\nWrite the plan into an output block named `plan`.\n"
+      },
+      {
+        "name": "carry-out-the-refactor",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "carry-out-the-refactor",
+        "description": "Executes an approved refactor without changing behaviour.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: carry-out-the-refactor\ndescription: Executes an approved refactor without changing behaviour.\n---\n\nCarry out this approved refactor:\n\n${plan}\n\nBehaviour must not change. Run the tests before you start so you know what\nalready passes, and again at the end. If something has to change behaviour to\nwork, stop and say so instead of doing it.\n"
+      }
+    ],
+    "json_schemas": []
+  }
+}

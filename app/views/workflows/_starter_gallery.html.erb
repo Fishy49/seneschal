@@ -1,0 +1,21 @@
+<%# The starter pack. Locals: project: %>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <% Seneschal::StarterTemplates.list.each do |template| %>
+    <%= render layout: "shared/components/card", locals: { class: "flex flex-col" } do %>
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <h3 class="font-semibold"><%= template.name %></h3>
+        <%= render "shared/components/chip", text: template.teaches, tone: :accent %>
+      </div>
+      <p class="text-sm text-content-muted mb-3 flex-1"><%= template.description %></p>
+      <div class="flex flex-wrap items-center gap-1 mb-3">
+        <% template.step_types.each_with_index do |step_type, index| %>
+          <% if index.positive? %><span class="text-content-muted text-xs">&rarr;</span><% end %>
+          <%= type_badge(step_type) %>
+        <% end %>
+      </div>
+      <%= button_to "Use template", create_from_template_project_workflows_path(project),
+            params: { template: template.key },
+            class: btn_classes(:primary, extra: "w-full") %>
+    <% end %>
+  <% end %>
+</div>

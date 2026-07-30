@@ -1,0 +1,143 @@
+{
+  "seneschal_workflow_export": {
+    "version": 1,
+    "exported_at": "2026-07-27T00:00:00Z",
+    "source_project_name": "Seneschal starter templates",
+    "workflow": {
+      "name": "Diagnose, then fix",
+      "description": "Reproduce and understand the bug first, fix it second. Ends with a pull request and CI.",
+      "config": {},
+      "steps": [
+        {
+          "name": "Reproduce and diagnose",
+          "position": 1,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "produces": [
+              "diagnosis"
+            ],
+            "consumes": [
+              "task_title",
+              "task_body"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "diagnose-the-bug"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 1800,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Fix",
+          "position": 2,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "high",
+            "consumes": [
+              "diagnosis",
+              "task_title"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "fix-the-bug"
+          },
+          "json_schema_ref": null,
+          "max_retries": 1,
+          "timeout": 1800,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Self review",
+          "position": 3,
+          "step_type": "self_review",
+          "body": null,
+          "config": {
+            "focus": "Confirm the test fails without the fix, and that nothing else changed."
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 900,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Open PR",
+          "position": 4,
+          "step_type": "pr",
+          "body": null,
+          "config": {
+            "title": "fix: ${task_title}",
+            "body": "${task_body}",
+            "base": "main",
+            "draft": true,
+            "produces": [
+              "pr_number",
+              "branch_name"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Wait for CI",
+          "position": 5,
+          "step_type": "ci_check",
+          "body": null,
+          "config": {
+            "mode": "pr",
+            "pr": "${pr_number}",
+            "poll_interval": 30,
+            "max_log_chars": 10000,
+            "log_from": "end",
+            "consumes": [
+              "pr_number"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        }
+      ]
+    },
+    "skills": [
+      {
+        "name": "diagnose-the-bug",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "diagnose-the-bug",
+        "description": "Reproduces a bug and explains its actual cause before anyone changes code.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: diagnose-the-bug\ndescription: Reproduces a bug and explains its actual cause before anyone changes code.\n---\n\nReproduce and diagnose this bug before changing anything.\n\nReport: ${task_title}\n\n${task_body}\n\nFirst reproduce it, ideally with a failing test. Then find the actual cause -\nnot the first line that throws. Explain the mechanism in a couple of\nsentences: what the code assumed, and why that assumption is wrong here.\n\nWrite your diagnosis into an output block named `diagnosis`. Do not fix it yet.\n"
+      },
+      {
+        "name": "fix-the-bug",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "fix-the-bug",
+        "description": "Fixes a diagnosed bug at its cause, with a test that proves it.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: fix-the-bug\ndescription: Fixes a diagnosed bug at its cause, with a test that proves it.\n---\n\nFix the bug described in this diagnosis:\n\n${diagnosis}\n\nReport: ${task_title}\n\nFix the cause, not the symptom. Keep the change as small as the cause allows.\nLeave behind a test that fails without your fix and passes with it.\n"
+      }
+    ],
+    "json_schemas": []
+  }
+}

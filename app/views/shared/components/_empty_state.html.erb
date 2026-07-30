@@ -1,0 +1,20 @@
+<%# Empty region that names the next action.
+    Locals:
+      message:    what is missing
+      cta_label:  optional call-to-action text
+      cta_path:   optional link target
+      cta_action: optional Stimulus action, for actions with no URL of their
+                  own (opening the launch palette, say) %>
+<div class="text-center py-8 text-content-muted">
+  <p><%= message %></p>
+  <% if local_assigns[:cta_label].present? %>
+    <p class="mt-2">
+      <% if local_assigns[:cta_action].present? %>
+        <button type="button" data-action="<%= cta_action %>"
+                class="text-accent hover:underline bg-transparent border-none cursor-pointer p-0"><%= cta_label %></button>
+      <% elsif local_assigns[:cta_path].present? %>
+        <%= link_to cta_label, cta_path, class: "text-accent hover:underline" %>
+      <% end %>
+    </p>
+  <% end %>
+</div>

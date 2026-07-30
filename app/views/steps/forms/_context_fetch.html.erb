@@ -1,0 +1,64 @@
+<%# Fetch context: pull data in before later steps run. Locals: f:, step: %>
+<% cfg = step.config || {} %>
+<% method = cfg["method"].presence || "url" %>
+<% path = cfg["path"].to_s %>
+<div class="space-y-4">
+  <p class="text-sm text-content-muted">Reads something in and stores it under a name later steps can use.</p>
+
+  <div>
+    <label for="fetch_method" class="<%= label_classes %>">Read from</label>
+    <select name="fetch_method" id="fetch_method"
+            data-step-form-target="fetchMethod" data-action="step-form#fetchMethodChanged"
+            class="<%= input_classes %>">
+      <option value="url" <%= "selected" if method == "url" %>>A web address</option>
+      <option value="project_file" <%= "selected" if method == "project_file" %>>A file in this project</option>
+    </select>
+  </div>
+
+  <div data-step-form-target="fetchUrlFields" style="<%= "display:none" unless method == "url" %>">
+    <label for="fetch_url" class="<%= label_classes %>">Address</label>
+    <input type="text" name="fetch_url" id="fetch_url"
+           value="<%= cfg["url"] %>" placeholder="e.g. https://example.com/api or a GitHub repo URL"
+           class="<%= input_classes("font-mono") %>">
+    <p class="<%= hint_classes %>">
+      Variables like <code class="bg-surface-input px-1 rounded">${variable}</code> are substituted first.
+      GitHub repository links resolve to the raw file.
+    </p>
+  </div>
+
+  <div data-step-form-target="fetchProjectFileFields" style="<%= "display:none" unless method == "project_file" %>" class="space-y-3">
+    <div>
+      <label class="<%= label_classes %>">File</label>
+      <div class="flex items-center gap-3 p-3 bg-surface-muted border border-edge rounded-lg">
+        <button type="button" data-action="file-panel#open"
+                class="<%= btn_classes(:ghost, size: :xs, extra: "shrink-0") %>">
+          Choose file
+        </button>
+        <code data-step-form-target="fetchPathDisplay" class="text-xs text-content font-mono break-all flex-1">
+          <% if path.present? %><%= path %><% else %><span class="text-content-muted">No file selected</span><% end %>
+        </code>
+      </div>
+      <input type="hidden" name="fetch_path" data-step-form-target="fetchPath" value="<%= path %>">
+    </div>
+
+    <div data-step-form-target="fetchSchemaFields" style="<%= "display:none" unless path.downcase.end_with?(".json") %>">
+      <label for="fetch_json_schema_id" class="<%= label_classes %>">Read it as</label>
+      <select name="fetch_json_schema_id" id="fetch_json_schema_id"
+              class="<%= input_classes %>">
+        <option value="">Plain text</option>
+        <% JsonSchema.order(:name).each do |schema| %>
+          <option value="<%= schema.id %>" <%= "selected" if cfg["json_schema_id"].to_i == schema.id %>><%= schema.name %></option>
+        <% end %>
+      </select>
+      <p class="<%= hint_classes %>">Matching a schema lets later steps read individual fields.</p>
+    </div>
+  </div>
+
+  <div>
+    <label for="fetch_context_key" class="<%= label_classes %>">Store it as</label>
+    <input type="text" name="fetch_context_key" id="fetch_context_key"
+           value="<%= cfg["context_key"] %>" placeholder="e.g. project_readme"
+           class="<%= input_classes %>">
+    <p class="<%= hint_classes %>">Later steps read it by this name.</p>
+  </div>
+</div>

@@ -1,7 +1,9 @@
 class PipelineTask < ApplicationRecord
   belongs_to :project
   belongs_to :workflow, optional: true
+  belongs_to :created_by, class_name: "User", optional: true
   has_many :runs, dependent: :nullify
+  has_many :comments, as: :commentable, dependent: :destroy
 
   KINDS = ["feature", "bugfix", "chore"].freeze
   STATUSES = ["draft", "ready", "running", "completed", "failed"].freeze
@@ -15,6 +17,10 @@ class PipelineTask < ApplicationRecord
     { label: "Weekly (Monday 9am)",  cron: "0 9 * * 1" }
   ].freeze
 
+  # Kind gates nothing but a template variable, so it is not a decision anyone
+  # should have to make before launching.
+  before_validation { self.kind = "feature" if kind.blank? }
+
   validates :title, presence: true
   validates :body, presence: true
   validates :kind, presence: true, inclusion: { in: KINDS }
@@ -22,6 +28,7 @@ class PipelineTask < ApplicationRecord
   validates :trigger_type, presence: true, inclusion: { in: TRIGGER_TYPES }
   validates :workflow, presence: true, if: -> { status != "draft" }
   validate :validate_trigger_config
+  validate :workflow_matches_project
 
   scope :recent, -> { order(updated_at: :desc) }
   scope :actionable, -> { where(status: ["draft", "ready"]) }
@@ -30,13 +37,20 @@ class PipelineTask < ApplicationRecord
   scope :scheduled_cron, -> { active.where(trigger_type: "cron") }
   scope :branch_watching, -> { active.where(trigger_type: "github_watch") }
 
+  # Whoever filed the task plus everyone who spoke in its thread.
+  def participants
+    ([created_by] + comments.includes(:user).map(&:user)).compact.uniq
+  end
+
   def archived? = archived_at.present?
   def manual? = trigger_type == "manual"
   def cron? = trigger_type == "cron"
   def github_watch? = trigger_type == "github_watch"
 
+  # Anything with a workflow can be launched, including drafts and finished
+  # tasks. Only an in-flight run or an archived task blocks a launch.
   def executable?
-    workflow.present? && status.in?(["ready", "failed"])
+    workflow.present? && !archived? && status != "running"
   end
 
   def latest_run
@@ -61,7 +75,7 @@ class PipelineTask < ApplicationRecord
 
   # Used by the manual Execute button, scheduled cron ticks, and branch-watch
   # polling. All three create a Run through this single code path.
-  def enqueue_run!(reason: "manual")
+  def enqueue_run!(reason: "manual", started_by: nil)
     raise "Task is not executable" if workflow.blank?
 
     context = {
@@ -81,6 +95,7 @@ class PipelineTask < ApplicationRecord
 
     run = runs.create!(
       workflow: workflow,
+      started_by: started_by,
       input: {
         "task_id" => id,
         "task_title" => title,
@@ -120,6 +135,12 @@ class PipelineTask < ApplicationRecord
   end
 
   private
+
+  def workflow_matches_project
+    return if workflow.blank? || workflow.project_id == project_id
+
+    errors.add(:workflow, "does not belong to the selected project")
+  end
 
   def validate_trigger_config
     case trigger_type

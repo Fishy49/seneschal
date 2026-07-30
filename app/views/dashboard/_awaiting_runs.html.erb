@@ -1,0 +1,40 @@
+<%# Runs parked on a manual approval gate. Renders nothing when the queue is
+    empty so the dashboard does not carry a permanently empty card.
+    Locals: runs:, viewers: (run id => list of emails currently watching) %>
+<% viewers = local_assigns.fetch(:viewers, {}) %>
+<% if runs.any? %>
+  <div class="bg-brass/10 border border-brass/30 rounded-lg p-5 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="flex items-center gap-1.5 text-lg font-semibold mb-0 text-brass">
+        <span class="text-brass"><%= seal_mark(size: 16) %></span>
+        Waiting on your seal
+        <span class="ml-1 inline-block px-2 py-0.5 rounded-full bg-brass/20 text-brass text-xs font-semibold align-middle"><%= runs.size %></span>
+      </h2>
+    </div>
+    <ul class="list-none">
+      <% runs.each do |run| %>
+        <li class="flex items-center justify-between gap-3 py-[var(--row-y)] border-b border-brass/20 last:border-b-0">
+          <div class="min-w-0">
+            <div class="truncate">
+              <%= link_to run_display_name(run), run_path(run), class: "font-medium" %>
+            </div>
+            <div class="text-xs text-content-muted truncate">
+              <%= run.workflow.project.name %> &middot; <%= run.workflow.name %>
+              &middot; launched by <%= run.started_by_label %>
+              &middot; parked <span class="font-mono"><%= time_ago_short(run.updated_at) %></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <% watching = viewers[run.id].to_a %>
+            <% if watching.any? %>
+              <span class="flex -space-x-1.5" title="Looking at this now">
+                <% watching.first(4).each do |email| %><%= avatar_for_email(email, size: :xs) %><% end %>
+              </span>
+            <% end %>
+            <%= link_to "Review", run_path(run), class: btn_classes(:brass, size: :sm) %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

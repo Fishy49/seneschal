@@ -1,38 +1,51 @@
 <%# Renders a consistent 3-column table of runs.
     Locals:
       runs:          collection of Run records
-      empty_message: text shown when the collection is empty (default: "No runs yet") %>
-<% empty_message = local_assigns.fetch(:empty_message, "No runs yet") %>
+      empty_message: text shown when the collection is empty (default: "No runs yet")
+      empty_cta_label / empty_cta_path / empty_cta_action: optional next step %>
+<% empty_message = local_assigns.fetch(:empty_message, "No runs yet.") %>
 <% if runs.any? %>
-  <table class="w-full border-collapse">
-    <thead>
-      <tr>
-        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Run</th>
-        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
-        <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% runs.each do |run| %>
+  <div class="overflow-x-auto">
+    <table class="w-full border-collapse">
+      <thead>
         <tr>
-          <td class="px-3 py-2 border-b border-edge">
-            <div>
-              <%= link_to "##{run.id} - #{run.pipeline_task&.title || 'Manual Run'}", run_path(run) %>
-              <% if run.workflow.project.skip_permissions? %>
-                <span class="ml-1 text-danger" title="Danger Mode">&#9888;</span>
-              <% end %>
-            </div>
-            <div class="text-xs text-content-muted">
-              Workflow:
-              <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-content transition-colors" %>
-            </div>
-          </td>
-          <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
-          <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.started_at || run.created_at) %></td>
+          <th class="<%= th_classes %>">Run</th>
+          <th class="<%= th_classes %>">Status</th>
+          <th class="<%= th_classes %>">When</th>
+          <th class="<%= th_classes %>"><span class="sr-only">Actions</span></th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% runs.each do |run| %>
+          <tr>
+            <td class="<%= td_classes %>">
+              <div>
+                <%= link_to run_display_name(run), run_path(run) %>
+                <% if run.workflow.project.skip_permissions? %>
+                  <span class="ml-1 text-danger" title="Danger mode">&#9888;</span>
+                <% end %>
+              </div>
+              <div class="text-xs text-content-muted">
+                Workflow:
+                <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-content transition-colors" %>
+              </div>
+            </td>
+            <td class="<%= td_classes %>"><%= status_badge(run.status) %></td>
+            <td class="<%= td_classes("text-content-muted font-mono") %>"><%= time_ago_short(run.finished_at || run.started_at || run.created_at) %></td>
+            <td class="<%= td_classes("text-right") %>">
+              <% if run.status.in?(%w[completed failed stopped]) && run.pipeline_task&.executable? %>
+                <%= button_to "Re-run", execute_pipeline_task_path(run.pipeline_task),
+                      class: btn_classes(:ghost, size: :xs, extra: "whitespace-nowrap") %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
 <% else %>
-  <p class="text-center py-8 text-content-muted"><%= empty_message %></p>
+  <%= render "shared/components/empty_state", message: empty_message,
+        cta_label: local_assigns[:empty_cta_label],
+        cta_path: local_assigns[:empty_cta_path],
+        cta_action: local_assigns[:empty_cta_action] %>
 <% end %>

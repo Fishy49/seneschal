@@ -1,141 +1,20 @@
 <div class="max-w-2xl mx-auto">
-  <h1 class="text-2xl font-bold mb-2">Setup</h1>
-  <p class="text-sm text-content-muted mb-6">Seneschal requires these CLI tools to be installed and authenticated on the host machine.</p>
+  <%= render "shared/admin_nav" %>
+  <%= render "shared/components/page_header", title: "Health checks",
+        subtitle: "Seneschal drives these tools on the host machine. Install and sign in to each one, then check it here." %>
 
-  <div class="space-y-4">
-    <%# ── Claude CLI ── %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5">
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1">
-          <h2 class="text-lg font-semibold mb-1">Claude CLI</h2>
-          <p class="text-sm text-content-muted">Executes AI skills in your pipelines.</p>
-        </div>
-        <% if @claude[:ok] %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success">Verified</span>
-        <% else %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-warning/15 text-warning">Not verified</span>
-        <% end %>
-      </div>
-
-      <% if @claude[:ok] %>
-        <pre class="mt-3 text-xs bg-surface-input rounded-lg px-3 py-2 text-content-muted overflow-x-auto"><%= @claude[:details] %></pre>
-        <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_in_words(@claude[:checked_at]) %> ago</p>
-      <% else %>
-        <div class="mt-4 bg-surface-input rounded-lg px-4 py-3 text-sm space-y-2">
-          <p class="text-content-muted font-medium">Install & authenticate:</p>
-          <pre class="text-xs text-content font-mono">npm install -g @anthropic-ai/claude-code</pre>
-          <pre class="text-xs text-content font-mono">claude login</pre>
-        </div>
-      <% end %>
-
-      <div class="mt-4">
-        <%= button_to @claude[:ok] ? "Re-check" : "Check", check_claude_setup_path,
-              class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{@claude[:ok] ? 'bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge' : 'bg-accent text-white hover:bg-accent-hover'}" %>
-      </div>
-    </div>
-
-    <%# ── GitHub CLI ── %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5">
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1">
-          <h2 class="text-lg font-semibold mb-1">GitHub CLI</h2>
-          <p class="text-sm text-content-muted">Creates branches, PRs, and monitors CI checks.</p>
-        </div>
-        <% if @gh[:ok] %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success">Verified</span>
-        <% else %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-warning/15 text-warning">Not verified</span>
-        <% end %>
-      </div>
-
-      <% if @gh[:ok] %>
-        <pre class="mt-3 text-xs bg-surface-input rounded-lg px-3 py-2 text-content-muted overflow-x-auto"><%= @gh[:details] %></pre>
-        <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_in_words(@gh[:checked_at]) %> ago</p>
-      <% else %>
-        <div class="mt-4 bg-surface-input rounded-lg px-4 py-3 text-sm space-y-2">
-          <p class="text-content-muted font-medium">Install & authenticate:</p>
-          <pre class="text-xs text-content font-mono">brew install gh</pre>
-          <pre class="text-xs text-content font-mono">gh auth login</pre>
-        </div>
-      <% end %>
-
-      <div class="mt-4">
-        <%= button_to @gh[:ok] ? "Re-check" : "Check", check_gh_setup_path,
-              class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{@gh[:ok] ? 'bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge' : 'bg-accent text-white hover:bg-accent-hover'}" %>
-      </div>
-    </div>
-
-    <%# ── Claude Agent SDK runner (optional) ── %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5">
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1">
-          <h2 class="text-lg font-semibold mb-1">
-            Claude Agent SDK runner
-            <span class="ml-1 text-xs font-normal text-content-muted">— optional</span>
-          </h2>
-          <p class="text-sm text-content-muted">
-            Python sidecar that wraps the Claude Agent SDK. Unlocks structured outputs,
-            programmatic hooks, subagents, and MCP servers on a per-step basis.
-            Steps opt in via <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Step.config["runner"] = "claude_sdk"</code>
-            or globally via <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Setting["default_runner"] = "claude_sdk"</code>.
-            The CLI runner stays the default if this isn't installed.
-          </p>
-        </div>
-        <% if @sdk_runner[:ok] %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success">Verified</span>
-        <% else %>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-input text-content-muted">Not installed</span>
-        <% end %>
-      </div>
-
-      <% if @sdk_runner[:ok] %>
-        <pre class="mt-3 text-xs bg-surface-input rounded-lg px-3 py-2 text-content-muted overflow-x-auto"><%= @sdk_runner[:details] %></pre>
-        <p class="text-xs text-content-muted mt-2">Checked <%= time_ago_in_words(@sdk_runner[:checked_at]) %> ago</p>
-      <% else %>
-        <div class="mt-4 bg-surface-input rounded-lg px-4 py-3 text-sm space-y-2">
-          <p class="text-content-muted font-medium">Install:</p>
-          <pre class="text-xs text-content font-mono">bin/setup_sdk_runner</pre>
-          <p class="text-xs text-content-muted">
-            Idempotent. Uses <code>uv</code> if available, falls back to <code>python3 -m venv</code>.
-            Requires Python ≥ 3.10 on PATH.
-          </p>
-        </div>
-      <% end %>
-
-      <div class="mt-4">
-        <%= button_to @sdk_runner[:ok] ? "Re-check" : "Check", check_sdk_runner_setup_path,
-              class: "px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors #{@sdk_runner[:ok] ? 'bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge' : 'bg-accent text-white hover:bg-accent-hover'}" %>
-      </div>
-    </div>
-  </div>
-
-    <%# ── Claude Permissions ── %>
-    <div class="bg-surface-card border border-edge rounded-lg p-5">
-      <h2 class="text-lg font-semibold mb-1">Claude Permissions</h2>
-      <p class="text-sm text-content-muted mb-4">Skills run with <code class="text-xs bg-surface-input px-1 py-0.5 rounded">--permission-mode dontAsk</code>, which auto-denies any tool not in the allowed list. This replaces the <code class="text-xs bg-surface-input px-1 py-0.5 rounded">--dangerously-skip-permissions</code> flag with scoped, auditable permissions.</p>
-
-      <%= form_with url: update_allowed_tools_setup_path, method: :patch, class: "space-y-3" do %>
-        <div>
-          <label for="default_allowed_tools" class="block text-sm font-medium text-content-muted mb-1.5">Default Allowed Tools</label>
-          <input type="text" name="default_allowed_tools" id="default_allowed_tools"
-                 value="<%= @allowed_tools %>"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-          <p class="text-sm text-content-muted mt-2">Comma-separated. Applies to all skill steps unless overridden. Supports patterns like <code class="text-xs bg-surface-input px-1 py-0.5 rounded">Bash(git *)</code>.</p>
-        </div>
-        <div>
-          <button type="submit"
-                  class="px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors bg-surface-input text-content-muted hover:text-content hover:bg-surface-input/80 border border-edge">
-            Save
-          </button>
-        </div>
-      <% end %>
-    </div>
-  </div>
+  <%= render "shared/health_checks", claude: @claude, gh: @gh, sdk_runner: @sdk_runner %>
 
   <% if @all_ok %>
     <div class="mt-6 text-center">
-      <%= link_to "Continue to Dashboard", root_path,
-            class: "inline-block px-6 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors" %>
+      <%# A fresh install has nothing to look at yet, so send the operator to
+          the one thing they need next. %>
+      <% if Project.none? %>
+        <%= link_to "Add your first project", new_project_path(onboarding: 1),
+              class: btn_classes(:primary) %>
+      <% else %>
+        <%= link_to "Continue to Home", root_path, class: btn_classes(:primary) %>
+      <% end %>
     </div>
   <% end %>
 </div>

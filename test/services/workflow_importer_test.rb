@@ -19,6 +19,18 @@ class WorkflowImporterTest < ActiveSupport::TestCase
     assert_equal :new, result.mode
   end
 
+  test "a legacy export carrying workflow trigger fields still imports" do
+    legacy = @payload.deep_dup
+    legacy[:seneschal_workflow_export][:workflow][:trigger_type] = "cron"
+    legacy[:seneschal_workflow_export][:workflow][:trigger_config] = { "cron" => "0 * * * *" }
+
+    result = WorkflowImporter.new(legacy, target_project: @target_project).call
+
+    assert_equal :new, result.mode
+    assert_equal @source_workflow.steps.count, result.workflow.steps.count
+    assert_not result.workflow.respond_to?(:trigger_type)
+  end
+
   test "creates shared skill on target when missing" do
     Skill.shared.where(name: "ingest_feature").destroy_all
 
@@ -42,7 +54,7 @@ class WorkflowImporterTest < ActiveSupport::TestCase
   end
 
   test "creates project-scoped skill in target when missing" do
-    wf = projects(:seneschal).workflows.create!(name: "Schemaless", trigger_type: "manual")
+    wf = projects(:seneschal).workflows.create!(name: "Schemaless")
     wf.steps.create!(
       name: "Check", step_type: "skill", skill: skills(:project_skill),
       position: 1, max_retries: 0, timeout: 300, config: {}
@@ -58,7 +70,7 @@ class WorkflowImporterTest < ActiveSupport::TestCase
   end
 
   test "name conflicts get '(import N)' suffix in :new mode" do
-    @target_project.workflows.create!(name: "Deploy Pipeline", trigger_type: "manual")
+    @target_project.workflows.create!(name: "Deploy Pipeline")
 
     result = WorkflowImporter.new(@payload, target_project: @target_project).call
 
@@ -73,7 +85,7 @@ class WorkflowImporterTest < ActiveSupport::TestCase
 
   test "replace mode keeps workflow id, swaps steps and config" do
     existing = @target_project.workflows.create!(
-      name: "Existing", trigger_type: "manual", description: "old", config: { "runner" => "claude_cli" }
+      name: "Existing", description: "old", config: { "runner" => "claude_cli" }
     )
     existing.steps.create!(
       name: "Old step", step_type: "command", body: "echo old",

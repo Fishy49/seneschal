@@ -1,0 +1,66 @@
+<%# The personal half of the Inbox: unread failure and conversation rows.
+    Rows disappear by being read - visiting the run or task marks them - or
+    by the broom. Renders nothing when both lists are empty.
+    Locals: failed:, mentions: %>
+<% if failed.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <div class="flex items-center gap-1.5 mb-2">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-danger shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+      <h2 class="text-lg font-semibold">Failed</h2>
+      <span class="text-xs text-content-muted ml-1"><%= failed.size %></span>
+    </div>
+    <ul class="list-none">
+      <% failed.each do |notification| %>
+        <li class="flex items-center justify-between gap-3 py-[var(--row-y)] border-b border-edge last:border-b-0">
+          <div class="min-w-0">
+            <div class="truncate">
+              <%= link_to notification_context_title(notification), notification_target_path(notification), class: "font-medium" %>
+            </div>
+            <% if notification.context.is_a?(Run) && notification.context.error_message.present? %>
+              <div class="text-xs text-content-muted font-mono truncate"><%= notification.context.error_message.lines.first&.strip %></div>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <time class="text-xs text-content-muted font-mono"><%= time_ago_short(notification.created_at) %></time>
+            <%= link_to "Open run", notification_target_path(notification), class: btn_classes(:ghost, size: :sm) %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<% if mentions.any? %>
+  <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
+    <div class="flex items-center gap-1.5 mb-2">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent shrink-0"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.3-.7L3 21l1.8-5.7a8.4 8.4 0 1 1 16.2-3.8z"/></svg>
+      <h2 class="text-lg font-semibold">Mentions &amp; replies</h2>
+      <span class="text-xs text-content-muted ml-1"><%= mentions.size %></span>
+    </div>
+    <ul class="list-none">
+      <% mentions.each do |notification| %>
+        <% comment = notification.event.subject %>
+        <li class="flex items-start gap-2.5 py-[var(--row-y)] border-b border-edge last:border-b-0">
+          <span class="mt-0.5"><%= avatar_for(notification.event.user, size: :sm) %></span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm truncate">
+              <span class="font-semibold"><%= notification.event.actor_label.split("@").first %></span>
+              <span class="text-content-muted">on</span>
+              <%= link_to notification_context_title(notification), notification_target_path(notification), class: "font-medium" %>
+              <% if notification.reason == "mention" %>
+                <span class="<%= chip_tone_classes(:accent) %> px-1.5 py-0.5 rounded text-[0.6875rem] font-semibold">mention</span>
+              <% end %>
+            </div>
+            <% if comment.respond_to?(:body) && comment&.body.present? %>
+              <p class="text-xs text-content-muted truncate">"<%= truncate(comment.body, length: 110) %>"</p>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <time class="text-xs text-content-muted font-mono"><%= time_ago_short(notification.created_at) %></time>
+            <%= link_to "Reply", notification_target_path(notification), class: btn_classes(:ghost, size: :sm) %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

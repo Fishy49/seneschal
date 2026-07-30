@@ -27,13 +27,13 @@
 <div id="ci_check_status_<%= run_step.id %>"
      class="mt-2 rounded-lg bg-surface border border-edge p-4 text-sm">
   <div class="flex items-start gap-3">
-    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-accent animate-pulse mt-1.5 shrink-0"></span>
+    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-info animate-pulse mt-1.5 shrink-0"></span>
     <div class="flex-1 min-w-0">
       <div class="font-medium text-content">
         <%= headline.presence || "Waiting for CI to report…" %>
       </div>
       <% if meta.present? %>
-        <div class="text-xs text-content-muted mt-0.5"><%= meta %></div>
+        <div class="text-xs text-content-muted mt-0.5 font-mono tabular-nums"><%= meta %></div>
       <% end %>
       <% if summary.present? %>
         <div class="text-xs text-content-muted mt-1"><%= summary %></div>

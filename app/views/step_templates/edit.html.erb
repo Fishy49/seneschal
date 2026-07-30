@@ -1,0 +1,37 @@
+<%= render "shared/library_nav" %>
+<%= render "shared/components/page_header", title: "Edit template" %>
+
+<div class="max-w-2xl">
+  <%= render layout: "shared/components/card" do %>
+    <%= form_with model: @template, url: step_template_path(@template) do |f| %>
+      <% if @template.errors.any? %>
+        <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
+          <% @template.errors.full_messages.each do |msg| %>
+            <p><%= msg %></p>
+          <% end %>
+        </div>
+      <% end %>
+
+      <p class="text-sm text-content-muted mb-4">
+        Only the name and description can change here. The configuration was captured from a step that
+        already worked; to change it, apply this template to a step, adjust it there, and save it again.
+      </p>
+
+      <div class="mb-4">
+        <%= f.label :name, class: label_classes %>
+        <%= f.text_field :name, class: input_classes %>
+      </div>
+
+      <div class="mb-4">
+        <%= f.label :description, class: label_classes %>
+        <%= f.text_area :description, rows: 3, placeholder: "When would somebody reach for this?",
+              class: input_classes("resize-y") %>
+      </div>
+
+      <div class="flex gap-2">
+        <%= f.submit "Save template", class: btn_classes(:primary) %>
+        <%= link_to "Cancel", step_template_path(@template), class: btn_classes(:ghost) %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

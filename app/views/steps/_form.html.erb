@@ -1,24 +1,14 @@
 <% skills = Skill.for_project(@project).includes(:project).order(:name) %>
-<% claude_cfg = step.step_type.in?(%w[skill prompt]) ? (step.config || {}) : {} %>
-<% ci = step.step_type == "ci_check" ? (step.config || {}) : {} %>
-<% ctx_fetch = step.step_type == "context_fetch" ? (step.config || {}) : {} %>
-<% pr_cfg = step.step_type == "pr" ? (step.config || {}) : {} %>
-<% templates = StepTemplate.ordered %>
-<% skill_default_schema = step.skill&.default_json_schema %>
-<% skill_default_var    = step.skill&.default_output_variable.to_s %>
-<% picker_selected_id   = claude_cfg["json_schema_id"].to_i %>
-<% using_skill_default  = skill_default_schema && (claude_cfg["json_schema_id"].blank? || picker_selected_id == skill_default_schema.id) %>
-<%# schema_mode = the form's single-input "Output Variable" is the canonical
-    produces source. True whenever a schema id is set OR we're inheriting one
-    from the skill — both cases hide the multi-tag widget. %>
-<% schema_mode = step.step_type.in?(%w[skill prompt]) && (claude_cfg["json_schema_id"].present? || using_skill_default) %>
-<% schema_output_var = schema_mode ? (step.produces.first.presence || skill_default_var) : "" %>
+<% claude = step.step_type.in?(["skill", "prompt"]) %>
+<%# script and command are the same behaviour under two names; the form offers
+    one, and an existing script step edits and saves as a shell step. %>
+<% partial = step.step_type.in?(["script", "command"]) ? "shell" : step.step_type %>
+<% type_url = step.new_record? ? new_project_workflow_step_path(@project, @workflow) : edit_project_workflow_step_path(@project, @workflow, step) %>
 
 <%= form_with model: [@project, @workflow, step],
       data: { controller: "step-form",
               action: "step-schema-picker:changed->step-form#schemaChanged",
-              step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json,
-              step_form_templates_value: templates.map { |t| [t.id, t.template_data] }.to_h.to_json } do |f| %>
+              step_form_skills_value: skills.map { |s| [s.id, s.body] }.to_h.to_json } do |f| %>
 
   <% if step.errors.any? %>
     <div class="bg-danger/15 text-danger border border-danger/25 px-4 py-3 rounded-lg mb-4 text-sm">
@@ -28,779 +18,87 @@
     </div>
   <% end %>
 
-  <% if step.new_record? && templates.any? %>
-    <div class="mb-6 pb-4 border-b border-edge flex items-center justify-between">
+  <% if step.new_record? && StepTemplate.exists? %>
+    <div class="mb-4 pb-4 border-b border-edge flex items-center justify-between">
       <button type="button" data-action="template-panel#open"
-              class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-input border border-edge rounded-lg text-sm text-content-muted hover:text-content hover:bg-edge transition-colors cursor-pointer font-medium">
-        <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-        Choose Template
-        <span class="text-xs opacity-60">(<%= templates.size %>)</span>
+              class="<%= btn_classes(:ghost) %>">
+        Start from a template
       </button>
-      <%= link_to "Manage Templates", step_templates_path,
+      <%= link_to "Manage templates", step_templates_path,
             class: "text-xs text-content-muted hover:text-accent transition-colors font-medium" %>
     </div>
   <% end %>
 
-  <!-- Premium Tabbed Interface -->
-  <div class="flex items-center gap-1 border-b border-edge mb-6 overflow-x-auto scrollbar-none" role="tablist">
-    <button type="button" role="tab" aria-selected="true"
-            data-step-form-target="tabBtn" data-tab="general" data-action="click->step-form#switchTab"
-            class="flex items-center gap-2 px-4 py-3 border-b-2 text-sm font-semibold transition-all duration-200 outline-none select-none cursor-pointer border-accent text-accent">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-      <span>Configuration</span>
-    </button>
-    
-    <button type="button" role="tab" aria-selected="false"
-            data-step-form-target="tabBtn" data-tab="ai" data-action="click->step-form#switchTab"
-            class="flex items-center gap-2 px-4 py-3 border-b-2 text-sm font-semibold transition-all duration-200 outline-none select-none cursor-pointer border-transparent text-content-muted hover:text-content hover:border-edge">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-      <span>AI Engine</span>
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/15 text-accent uppercase tracking-wide shrink-0">AI</span>
-    </button>
+  <div class="space-y-4">
+    <div>
+      <%= f.label :name, class: label_classes %>
+      <%= f.text_field :name, placeholder: "e.g. build-assets", class: input_classes %>
+    </div>
 
-    <button type="button" role="tab" aria-selected="false"
-            data-step-form-target="tabBtn" data-tab="pipeline" data-action="click->step-form#switchTab"
-            class="flex items-center gap-2 px-4 py-3 border-b-2 text-sm font-semibold transition-all duration-200 outline-none select-none cursor-pointer border-transparent text-content-muted hover:text-content hover:border-edge">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-      <span>Pipeline & Data</span>
-    </button>
-
-    <button type="button" role="tab" aria-selected="false"
-            data-step-form-target="tabBtn" data-tab="recovery" data-action="click->step-form#switchTab"
-            class="flex items-center gap-2 px-4 py-3 border-b-2 text-sm font-semibold transition-all duration-200 outline-none select-none cursor-pointer border-transparent text-content-muted hover:text-content hover:border-edge">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-      <span>Execution & Recovery</span>
-    </button>
-  </div>
-
-  <!-- Tab 1: General/Configuration -->
-  <div data-step-form-target="tabContent" data-tab="general">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <%= f.label :name, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-        <%= f.text_field :name, placeholder: "e.g. build-assets",
-              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
-      </div>
-
-      <div>
-        <%= f.label :position, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-        <%= f.number_field :position, min: 1,
-              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+    <%# Switching type re-fetches the form for the new type, so only that
+        type's fields are ever on the page. A saved step with settings warns
+        first, because its old config does not survive the switch. %>
+    <div data-controller="step-type-switch"
+         data-step-type-switch-url-value="<%= type_url %>"
+         data-step-type-switch-warn-value="<%= step.persisted? && step.config.present? %>"
+         data-step-type-switch-current-value="<%= step.step_type %>">
+      <%= f.label :step_type, "Type", class: label_classes %>
+      <%= f.select :step_type, StepsHelper::TYPE_OPTIONS, {},
+            class: input_classes,
+            data: { step_type_switch_target: "select", action: "step-type-switch#changed" } %>
+      <div data-step-type-switch-target="warning" hidden
+            class="mt-2 bg-warning/10 border border-warning/40 text-warning px-3 py-2 rounded-lg text-sm flex items-center justify-between gap-3">
+        <span data-step-type-switch-target="warningText"></span>
+        <button type="button" data-action="step-type-switch#confirm"
+                class="<%= btn_classes(:danger, size: :xs, extra: "shrink-0") %>">
+          Switch anyway
+        </button>
       </div>
     </div>
 
-    <div class="mb-4">
-      <%= f.label :step_type, "Step Type", class: "block text-sm font-medium text-content-muted mb-1.5" %>
-      <%= f.select :step_type,
-            [["Skill (AI Agent)", "skill"], ["Prompt (Direct LLM)", "prompt"], ["Script (File)", "script"], ["Command (Shell)", "command"], ["CI Check (GitHub)", "ci_check"], ["Context Fetch (Ingestion)", "context_fetch"], ["Open PR (Git Flow)", "pr"]],
-            {}, class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent",
-            data: { step_form_target: "typeSelect", action: "step-form#toggle" } %>
-    </div>
+    <%= render "steps/forms/#{partial}", f: f, step: step %>
 
-    <%# === Skill fields (skill picker only) === %>
-    <div data-step-form-target="skillFields" style="<%= 'display:none' unless step.step_type == 'skill' %>" class="mb-4">
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-content-muted mb-1.5">Selected Skill</label>
-        <%= f.hidden_field :skill_id, data: { step_form_target: "skillSelect" } %>
-        
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-surface-input/30 border border-edge rounded-xl relative overflow-hidden">
-          <div class="absolute inset-y-0 left-0 w-1 bg-accent/60"></div>
-          
-          <div class="flex-1 min-w-0 pl-1">
-            <div class="flex items-center gap-2 mb-1">
-              <svg class="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-              <span data-step-form-target="skillName" class="font-medium text-sm text-content">
-                <% if step.skill %>
-                  <%= step.skill.display_name %>
-                <% else %>
-                  <span class="text-content-muted">No skill selected</span>
-                <% end %>
-              </span>
-            </div>
-            <p class="text-xs text-content-muted">
-              Select an AI Capability/Agent from your active library.
-            </p>
-          </div>
-          
-          <button type="button" data-action="skill-panel#open"
-                  class="w-full sm:w-auto text-center px-3.5 py-1.5 bg-surface-input border border-edge rounded-lg text-xs font-semibold text-content hover:bg-edge hover:text-content transition-all shadow-sm cursor-pointer shrink-0">
-            Choose Skill
-          </button>
-        </div>
-      </div>
+    <% if claude %>
+      <%= render "steps/forms/group", title: "Model and tools", open: false do %>
+        <%= render "steps/forms/model_and_tools", step: step %>
+      <% end %>
+    <% end %>
 
-      <div data-step-form-target="skillPreview" style="<%= 'display:none' unless step.skill %>" class="mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-content-muted">Prompt Preview</label>
-          <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" data-action="step-form#togglePreview">
-            <span data-step-form-target="previewToggleText">Show</span>
-          </button>
-        </div>
-        <div data-step-form-target="previewBody" style="display:none" class="mt-2 rounded-lg overflow-hidden border border-edge">
-          <div class="code-preview max-h-96 overflow-y-auto" data-step-form-target="previewContent"></div>
-        </div>
-      </div>
-    </div>
+    <%= render "steps/forms/group", title: "Data", open: step.produces.any? || step.consumes.any? do %>
+      <%= render "steps/forms/data", f: f, step: step, claude: claude %>
+    <% end %>
 
-    <%# === Body field (script / command / prompt) === %>
-    <div data-step-form-target="bodyFields" style="<%= 'display:none' unless step.step_type.in?(%w[script command prompt]) %>" class="mb-4">
-      <div class="mb-4">
-        <% body_label = case step.step_type when "script" then "Script Body / Path" when "command" then "Command to Execute" when "prompt" then "Prompt Instructions" else "Body" end %>
-        <%= f.label :body, body_label, data: { step_form_target: "bodyLabel" }, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-        <%= f.text_area :body, rows: 8,
-              placeholder: "e.g. node ./scripts/build.js or git checkout -b feature",
-              class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
-      </div>
-    </div>
+    <%= render "steps/forms/group", title: "Guards and recovery", open: false do %>
+      <%= render "steps/forms/guards", f: f, step: step %>
+    <% end %>
 
-    <%# === CI Check fields === %>
-    <div data-step-form-target="ciCheckFields" style="<%= 'display:none' unless step.step_type == 'ci_check' %>" class="mb-4">
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl mb-4 space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">GitHub CI Watcher Settings</h3>
-            <p class="text-xs text-content-muted">Instruct Seneschal to wait and pull statuses from GitHub Actions.</p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="ci_mode" class="block text-xs font-semibold text-content-muted mb-1">Watch Mode</label>
-            <select name="ci_mode" id="ci_mode" data-step-form-target="ciMode" data-action="step-form#ciModeChanged"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="pr" <%= "selected" unless ci["mode"] == "workflow" %>>PR Checks (Entire Pull Request)</option>
-              <option value="workflow" <%= "selected" if ci["mode"] == "workflow" %>>Workflow Run (Specific File)</option>
-            </select>
-          </div>
-          <div>
-            <label for="ci_poll_interval" class="block text-xs font-semibold text-content-muted mb-1">Poll Interval (seconds)</label>
-            <input type="number" name="ci_poll_interval" id="ci_poll_interval"
-                   value="<%= ci["poll_interval"] || 30 %>" min="10"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-        </div>
-
-        <div data-step-form-target="ciLogFields" style="<%= 'display:none' if ci["mode"] == "workflow" %>" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          <div>
-            <label for="ci_max_log_chars" class="block text-xs font-semibold text-content-muted mb-1">Max Failure Log Size (chars)</label>
-            <input type="number" name="ci_max_log_chars" id="ci_max_log_chars"
-                   value="<%= ci["max_log_chars"] || 10_000 %>" min="1000" step="1000"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-          <div>
-            <label for="ci_log_from" class="block text-xs font-semibold text-content-muted mb-1">Read Failure Logs From</label>
-            <select name="ci_log_from" id="ci_log_from"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="end" <%= "selected" unless ci["log_from"] == "beginning" %>>End (error summary first)</option>
-              <option value="beginning" <%= "selected" if ci["log_from"] == "beginning" %>>Beginning</option>
-            </select>
-          </div>
-        </div>
-
-        <div data-step-form-target="ciPrFields" style="<%= 'display:none' if ci["mode"] == "workflow" %>" class="pt-2">
-          <div>
-            <label for="ci_pr" class="block text-xs font-semibold text-content-muted mb-1">PR Number (Variable/Value)</label>
-            <input type="text" name="ci_pr" id="ci_pr"
-                   value="<%= ci["pr"] || "${pr_number}" %>"
-                   placeholder="${pr_number}"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-          </div>
-        </div>
-
-        <div data-step-form-target="ciWorkflowFields" style="<%= 'display:none' unless ci["mode"] == "workflow" %>" class="space-y-4 pt-2">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label for="ci_workflow" class="block text-xs font-semibold text-content-muted mb-1">Workflow YML File</label>
-              <input type="text" name="ci_workflow" id="ci_workflow"
-                     value="<%= ci["workflow"] %>"
-                     placeholder="e.g. test.yml"
-                     class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-            </div>
-            <div>
-              <label for="ci_ref" class="block text-xs font-semibold text-content-muted mb-1">Branch/Ref (Variable/Value)</label>
-              <input type="text" name="ci_ref" id="ci_ref"
-                     value="<%= ci["ref"] || "${branch}" %>"
-                     placeholder="${branch}"
-                     class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-            </div>
-          </div>
-          
-          <div class="p-3 bg-surface-input/20 border border-edge rounded-lg">
-            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-content">
-              <input type="checkbox" name="ci_trigger" value="1" <%= "checked" if ci["trigger"] %> class="accent-accent h-4 w-4 rounded cursor-pointer">
-              Trigger workflow run on GitHub (otherwise just passive watch)
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <%# === Context Fetch fields === %>
-    <% fetch_method = ctx_fetch["method"].presence || "url" %>
-    <% fetch_path = ctx_fetch["path"].to_s %>
-    <% fetch_path_is_json = fetch_path.downcase.end_with?(".json") %>
-    <div data-step-form-target="contextFetchFields" style="<%= 'display:none' unless step.step_type == 'context_fetch' %>" class="mb-4">
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl mb-4 space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Data Fetching & Context Setup</h3>
-            <p class="text-xs text-content-muted">Ingest files or web content directly into the workflow context pipeline.</p>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label for="fetch_method" class="block text-xs font-semibold text-content-muted mb-1">Fetch Method</label>
-          <select name="fetch_method" id="fetch_method"
-                  data-step-form-target="fetchMethod" data-action="step-form#fetchMethodChanged"
-                  class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-            <option value="url" <%= "selected" if fetch_method == "url" %>>Web URL (HTTP / GitHub Auto-Resolve)</option>
-            <option value="project_file" <%= "selected" if fetch_method == "project_file" %>>Internal Project File</option>
-          </select>
-        </div>
-
-        <div data-step-form-target="fetchUrlFields" style="<%= 'display:none' unless fetch_method == 'url' %>" class="mb-4">
-          <label for="fetch_url" class="block text-xs font-semibold text-content-muted mb-1">Source URL</label>
-          <input type="text" name="fetch_url" id="fetch_url"
-                 value="<%= ctx_fetch["url"] %>"
-                 placeholder="e.g. https://github.com/owner/repo or https://example.com/api"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-          <p class="text-[11px] text-content-muted mt-1.5 leading-relaxed">Supports variable interpolation like <code class="bg-surface-input px-1 rounded">${variable}</code>. Standard URL fetch reads body; GitHub repo URLs auto-resolve to raw README/blobs.</p>
-        </div>
-
-        <div data-step-form-target="fetchProjectFileFields" style="<%= 'display:none' unless fetch_method == 'project_file' %>" class="mb-4 space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-content-muted mb-1">Select File</label>
-            <div class="flex items-center gap-3 p-3 bg-surface-input/30 border border-edge rounded-lg">
-              <button type="button" data-action="file-panel#open"
-                      class="px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-xs font-medium text-content hover:bg-edge transition-colors cursor-pointer shrink-0">
-                Choose File...
-              </button>
-              <code data-step-form-target="fetchPathDisplay" class="text-xs text-content font-mono break-all flex-1">
-                <% if fetch_path.present? %><%= fetch_path %><% else %><span class="text-content-muted">No file selected</span><% end %>
-              </code>
-            </div>
-            <input type="hidden" name="fetch_path" data-step-form-target="fetchPath" value="<%= fetch_path %>">
-          </div>
-
-          <div data-step-form-target="fetchSchemaFields" style="<%= 'display:none' unless fetch_path_is_json %>" class="pt-1">
-            <label for="fetch_json_schema_id" class="block text-xs font-semibold text-content-muted mb-1">JSON Schema Parser (Optional)</label>
-            <select name="fetch_json_schema_id" id="fetch_json_schema_id"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="">None (Plain Text)</option>
-              <% JsonSchema.order(:name).each do |s| %>
-                <option value="<%= s.id %>" <%= "selected" if ctx_fetch["json_schema_id"].to_i == s.id %>><%= s.name %></option>
-              <% end %>
-            </select>
-            <p class="text-[11px] text-content-muted mt-1">Converts the JSON into structured keys (e.g. <code class="bg-surface-input px-1 rounded">config.feature_flags</code>) downstream.</p>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <label for="fetch_context_key" class="block text-xs font-semibold text-content-muted mb-1">Context Pipeline Store Key</label>
-          <input type="text" name="fetch_context_key" id="fetch_context_key"
-                 value="<%= ctx_fetch["context_key"] %>"
-                 placeholder="e.g. project_readme_data"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          <p class="text-[11px] text-content-muted mt-1">References the fetched raw content in downstream steps using this unique key.</p>
-        </div>
-      </div>
-    </div>
-
-    <%# === PR step fields === %>
-    <div data-step-form-target="prFields" style="<%= 'display:none' unless step.step_type == 'pr' %>" class="mb-4">
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl mb-4 space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">GitHub Pull Request Automation</h3>
-            <p class="text-xs text-content-muted">Automatically draft, open, assign, and update code change reviews.</p>
-          </div>
-        </div>
-
+    <%= render "steps/forms/group", title: "Reuse", open: false do %>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="save_as_template" value="1" class="accent-accent h-4 w-4 rounded cursor-pointer mt-0.5"
+               data-step-form-target="saveTemplateCheck" data-action="step-form#toggleSaveTemplate">
+        <span>
+          <span class="block text-sm font-medium text-content">Save as a template</span>
+          <span class="block text-xs text-content-muted mt-0.5">Keeps this configuration in the Library so any workflow can start from it.</span>
+        </span>
+      </label>
+      <div data-step-form-target="saveTemplateFields" style="display:none" class="mt-3 pl-7 space-y-3">
         <div>
-          <label for="pr_title" class="block text-xs font-semibold text-content-muted mb-1">PR Title Template</label>
-          <input type="text" name="pr_title" id="pr_title"
-                 value="<%= pr_cfg["title"] %>"
-                 placeholder="e.g. feat: ${task_title}"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          <p class="text-[11px] text-content-muted mt-1">Allows interpolation (e.g. <code class="bg-surface-input px-1 rounded">${variable}</code>) from pipeline memory.</p>
-        </div>
-
-        <div>
-          <label for="pr_body" class="block text-xs font-semibold text-content-muted mb-1">PR Description / Body (Markdown)</label>
-          <textarea name="pr_body" id="pr_body" rows="5"
-                    placeholder="## Core Changes&#10;&#10;${task_summary}"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= pr_cfg["body"] %></textarea>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="pr_base" class="block text-xs font-semibold text-content-muted mb-1">Base Target Branch</label>
-            <input type="text" name="pr_base" id="pr_base"
-                   value="<%= pr_cfg["base"] || "main" %>"
-                   placeholder="main"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-          <div>
-            <label for="pr_branch" class="block text-xs font-semibold text-content-muted mb-1">Head Branch (Optional)</label>
-            <input type="text" name="pr_branch" id="pr_branch"
-                   value="<%= pr_cfg["branch"] %>"
-                   placeholder="Auto-detect current active branch"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="p-3 bg-surface-input/20 border border-edge rounded-lg">
-            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-content">
-              <input type="checkbox" name="pr_draft" value="1" <%= "checked" if pr_cfg.fetch("draft", true) %> class="accent-accent h-4 w-4 rounded cursor-pointer">
-              Open as Draft (Recommended)
-            </label>
-          </div>
-          
-          <div class="p-3 bg-danger/5 border border-danger/10 rounded-lg">
-            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-danger">
-              <input type="checkbox" name="pr_clean" value="1" <%= "checked" if pr_cfg["clean"] %> class="accent-danger h-4 w-4 rounded cursor-pointer">
-              Clean Re-Create (Destructive)
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label for="pr_reviewers" class="block text-xs font-semibold text-content-muted mb-1">Reviewers (Comma-separated)</label>
-          <input type="text" name="pr_reviewers" id="pr_reviewers"
-                 value="<%= Array(pr_cfg["reviewers"]).join(", ") %>"
-                 placeholder="e.g. octocat, my-org/devs"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="pr_labels" class="block text-xs font-semibold text-content-muted mb-1">Labels (Comma-separated)</label>
-            <input type="text" name="pr_labels" id="pr_labels"
-                   value="<%= Array(pr_cfg["labels"]).join(", ") %>"
-                   placeholder="e.g. enhancement, bug"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-          <div>
-            <label for="pr_assignees" class="block text-xs font-semibold text-content-muted mb-1">Assignees (Comma-separated)</label>
-            <input type="text" name="pr_assignees" id="pr_assignees"
-                   value="<%= Array(pr_cfg["assignees"]).join(", ") %>"
-                   placeholder="e.g. developer-one"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab 2: AI Engine -->
-  <div data-step-form-target="tabContent" data-tab="ai" style="display:none">
-    <div data-step-form-target="claudeConfigFields" style="<%= 'display:none' unless step.step_type.in?(%w[skill prompt]) %>" class="space-y-4">
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Anthropic Claude Model Settings</h3>
-            <p class="text-xs text-content-muted">Fine-tune the intelligence level, token usage, and depth of reasoning for this AI step.</p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label for="skill_model" class="block text-xs font-semibold text-content-muted mb-1">Model Selection</label>
-            <select name="skill_model" id="skill_model" class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="">Default Brand Choice</option>
-              <option value="claude-opus-4-7" <%= "selected" if claude_cfg["model"] == "claude-opus-4-7" %>>Opus 4.7 (Ultra-capable reasoning)</option>
-              <option value="claude-sonnet-4-6" <%= "selected" if claude_cfg["model"] == "claude-sonnet-4-6" %>>Sonnet 4.6 (Balanced & fast)</option>
-              <option value="claude-haiku-4-5-20251001" <%= "selected" if claude_cfg["model"] == "claude-haiku-4-5-20251001" %>>Haiku 4.5 (Lightning response)</option>
-            </select>
-          </div>
-          <div>
-            <label for="skill_effort" class="block text-xs font-semibold text-content-muted mb-1">Thinking Effort</label>
-            <select name="skill_effort" id="skill_effort" class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="low" <%= "selected" if claude_cfg["effort"] == "low" %>>Low (Quick scripts / checks)</option>
-              <option value="medium" <%= "selected" if claude_cfg["effort"].blank? || claude_cfg["effort"] == "medium" %>>Medium (Standard task-solving)</option>
-              <option value="high" <%= "selected" if claude_cfg["effort"] == "high" %>>High (Deep architecture/diffs)</option>
-              <option value="xhigh" <%= "selected" if claude_cfg["effort"] == "xhigh" %>>Extra High (Extreme accuracy)</option>
-              <option value="max" <%= "selected" if claude_cfg["effort"] == "max" %>>Max (Slower, highest quality)</option>
-            </select>
-          </div>
-          <div>
-            <label for="skill_max_turns" class="block text-xs font-semibold text-content-muted mb-1">Max Agentic Turns</label>
-            <input type="number" name="skill_max_turns" id="skill_max_turns"
-                   value="<%= claude_cfg["max_turns"] %>" min="1" placeholder="Auto"
-                   class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-        </div>
-
-        <div>
-          <label for="skill_allowed_tools" class="block text-xs font-semibold text-content-muted mb-1">Allowed Tools Rule-Matcher</label>
-          <input type="text" name="skill_allowed_tools" id="skill_allowed_tools"
-                 value="<%= claude_cfg["allowed_tools"] %>"
-                 placeholder="e.g. Bash(git *), FileRead(*), or leave blank for global default"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-          <p class="text-[11px] text-content-muted mt-1.5 leading-relaxed">Limits terminal and system commands the agent can run. Examples: <code class="bg-surface-input px-1 rounded">Bash(git *)</code> or <code class="bg-surface-input px-1 rounded">WriteFile(*)</code>. Leave empty to inherit full capability.</p>
-        </div>
-
-        <div class="p-4 bg-surface-input/20 border border-edge rounded-xl hover:bg-surface-input/30 transition-colors">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <div class="pt-0.5">
-              <input type="checkbox" name="skill_preview_assets" value="1" <%= "checked" if claude_cfg["preview_assets"] %> class="accent-accent h-4 w-4 rounded cursor-pointer">
-            </div>
-            <div class="flex-1 min-w-0">
-              <span class="block text-sm font-medium text-content">Enable Assets & Media Previews</span>
-              <span class="block text-xs text-content-muted mt-0.5">Instructs Claude to register generated visual files (charts, images, audio, video) for persistent, clickable previews in run reports.</span>
-            </div>
-          </label>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab 3: Pipeline & Data -->
-  <div data-step-form-target="tabContent" data-tab="pipeline" style="display:none">
-    <div class="space-y-4">
-      <%# --- Outputs Config (Dynamic Schema Picker / Variable Produces) --- %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Step Output Configuration</h3>
-            <p class="text-xs text-content-muted">Define the variables and data structures this step exports to downstream processes.</p>
-          </div>
-        </div>
-
-        <%# Conditional Schema Picker container %>
-        <div class="mb-4" data-step-form-target="claudeConfigFields" style="<%= 'display:none' unless step.step_type.in?(%w[skill prompt]) %>">
-          <div data-controller="step-schema-picker" data-step-schema-picker-overridden-value="<%= using_skill_default ? 'false' : 'true' %>">
-            <input type="hidden" name="schema_picker_mode"
-                   value="<%= using_skill_default ? 'inherit' : 'override' %>"
-                   data-step-schema-picker-target="modeInput">
-            <label class="block text-xs font-semibold text-content-muted mb-1.5">Output Data Schema</label>
-
-            <% if skill_default_schema %>
-              <div data-step-schema-picker-target="badge" style="<%= 'display:none' if !using_skill_default %>"
-                   class="flex items-center justify-between gap-3 px-3 py-2 bg-surface-input/60 border border-edge rounded-lg">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent uppercase tracking-wide shrink-0">Skill Default</span>
-                  <span class="text-sm font-mono text-content truncate"><%= skill_default_schema.name %></span>
-                  <% if skill_default_var.present? %>
-                    <span class="text-xs text-content-muted">→</span>
-                    <span class="text-xs font-mono text-content-muted truncate"><%= skill_default_var %></span>
-                  <% end %>
-                </div>
-                <button type="button" data-action="step-schema-picker#override"
-                        class="text-xs text-accent font-semibold hover:underline shrink-0">Override Settings</button>
-              </div>
-            <% end %>
-
-            <div data-step-schema-picker-target="picker" style="<%= 'display:none' if using_skill_default && skill_default_schema %>" class="space-y-2">
-              <select name="json_schema_id" id="json_schema_id"
-                      data-step-form-target="schemaSelect" data-action="step-form#schemaChanged"
-                      class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-                <option value="">Plain text or unstructured variables</option>
-                <% JsonSchema.order(:name).each do |s| %>
-                  <option value="<%= s.id %>" <%= "selected" if claude_cfg["json_schema_id"].to_i == s.id %>><%= s.name %></option>
-                <% end %>
-              </select>
-              <% if skill_default_schema %>
-                <button type="button" data-action="step-schema-picker#restoreDefault"
-                        class="text-xs text-content-muted hover:text-accent flex items-center gap-1 font-medium">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" /></svg>
-                  Reset to Skill default (<%= skill_default_schema.name %>)
-                </button>
-              <% end %>
-              <p class="text-[11px] text-content-muted leading-relaxed">Forces the AI to conform its entire output to a rigorous JSON Schema for robust API integration.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4">
-          <%# Standard list Produces input %>
-          <div data-step-form-target="producesMultiFields" style="<%= 'display:none' if schema_mode %>">
-            <label class="block text-xs font-semibold text-content-muted mb-1">Declared Output Variables</label>
-            <div data-controller="produces-input"
-                 data-step-form-target="producesInputWrapper"
-                 data-produces-input-suggestions-url-value="<%= produces_suggestions_project_workflow_steps_path(@project, @workflow) %>"
-                 data-produces-input-initial-value="<%= schema_mode ? "" : step.produces.join(",") %>">
-              <ul data-produces-input-target="tagList" class="flex flex-wrap gap-1 mb-2 min-h-[1.5rem]"></ul>
-              <div class="flex gap-1.5">
-                <input type="text" data-produces-input-target="newInput"
-                       list="produces_input_suggestions"
-                       data-action="keydown->produces-input#keydown input->produces-input#input"
-                       placeholder="e.g. pr_number, build_status"
-                       class="flex-1 px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-                <button type="button" data-action="produces-input#add"
-                        class="px-3.5 py-1.5 bg-surface-input border border-edge text-content-muted rounded-lg text-xs font-bold hover:bg-edge hover:text-content transition-all cursor-pointer">Add</button>
-              </div>
-              <datalist id="produces_input_suggestions" data-produces-input-target="datalist"></datalist>
-              <input type="hidden" name="produces" data-produces-input-target="hiddenInput" value="<%= schema_mode ? "" : step.produces.join(",") %>">
-            </div>
-            <p class="text-[11px] text-content-muted mt-1.5">Names of exports created by this step. AI writes these in <code class="bg-surface-input px-1 rounded">```output</code> blocks, script files use <code class="bg-surface-input px-1 rounded">::set-output</code>.</p>
-          </div>
-
-          <%# Single Variable Schema output input %>
-          <div data-step-form-target="schemaOutputFields" style="<%= 'display:none' unless schema_mode %>">
-            <label for="schema_output_variable" class="block text-xs font-semibold text-content-muted mb-1">Output Storage Variable</label>
-            <input type="text" name="schema_output_variable" id="schema_output_variable"
-                   value="<%= schema_output_var %>"
-                   data-step-form-target="schemaOutputInput"
-                   placeholder="e.g. parse_result"
-                   class="w-full px-3 py-1.5 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent">
-            <p class="text-[11px] text-content-muted mt-1.5">The pipeline stores the parsed JSON schema object inside this single namespace variable.</p>
-          </div>
-        </div>
-      </div>
-
-      <%# --- Inputs Config (Consumed Pipeline Variables) --- %>
-      <% available_vars = Step.available_variables_for(@workflow, step.position.to_i) %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Pipeline Variable Injection (Consumes)</h3>
-            <p class="text-xs text-content-muted">Import outputs of previous workflow steps directly into this step's environment.</p>
-          </div>
-        </div>
-
-        <div>
-          <% if available_vars.any? %>
-            <div class="max-h-56 overflow-y-auto bg-surface-input/50 border border-edge rounded-xl">
-              <table class="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr class="bg-surface-input/80 border-b border-edge text-content-muted font-bold text-[10px] uppercase tracking-wider">
-                    <th class="py-2.5 px-4 text-center w-16">Inject</th>
-                    <th class="py-2.5 px-4 text-center w-16">Query</th>
-                    <th class="py-2.5 px-4">Variable Name</th>
-                    <th class="py-2.5 px-4 text-right">Source Step</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-edge/50">
-                  <% available_vars.each do |var| %>
-                    <tr class="hover:bg-surface-input/30 transition-colors">
-                      <td class="py-2 px-4 text-center">
-                        <input type="checkbox" name="consumes[]" value="<%= var["name"] %>"
-                               <%= "checked" if step.consumes.include?(var["name"]) %>
-                               class="accent-accent h-4 w-4 rounded cursor-pointer">
-                      </td>
-                      <td class="py-2 px-4 text-center">
-                        <% if var["queryable"] %>
-                          <input type="checkbox" name="queries[]" value="<%= var["name"] %>"
-                                 <%= "checked" if step.queries.include?(var["name"]) %>
-                                 class="accent-accent h-4 w-4 rounded cursor-pointer">
-                        <% else %>
-                          <span class="text-content-muted/30">—</span>
-                        <% end %>
-                      </td>
-                      <td class="py-2 px-4 font-mono text-content font-medium">
-                        <%= var["name"] %>
-                      </td>
-                      <td class="py-2 px-4 text-right text-content-muted font-medium font-mono text-[11px]">
-                        <%= var["source"] %>
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-          <% else %>
-            <div class="p-4 bg-surface-input/20 border border-edge border-dashed rounded-xl text-center">
-              <p class="text-xs text-content-muted">No variable context is available at this position in the workflow.</p>
-            </div>
-          <% end %>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-[11px] text-content-muted leading-relaxed">
-            <p><strong>Inject</strong>: Pre-loads the variable value directly inside the LLM prompt. Best suited for smaller string parameters.</p>
-            <p><strong>Query</strong>: Exposes the variable inside the workspace shell. The script can call the CLI tool <code class="bg-surface-input px-1 rounded font-mono text-[10px]">seneschal-context</code> using jq to extract specific subpaths.</p>
-          </div>
-        </div>
-      </div>
-
-      <%# --- Connected Context Projects (Attachment) --- %>
-      <% other_projects  = Project.where.not(id: @project.id).order(:name) %>
-      <% selected_ids    = (claude_cfg["context_projects"] || []).map(&:to_i) %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4 mb-4" data-step-form-target="claudeConfigFields" style="<%= 'display:none' unless step.step_type.in?(%w[skill prompt]) %>">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Cross-Project Context Directories</h3>
-            <p class="text-xs text-content-muted">Share read-only directories of other Seneschal projects with Claude's environment.</p>
-          </div>
-        </div>
-
-        <div>
-          <% if other_projects.any? %>
-            <select name="skill_context_projects[]" id="skill_context_projects" multiple size="<%= [other_projects.size, 5].min %>"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <% other_projects.each do |p| %>
-                <option value="<%= p.id %>" <%= "selected" if selected_ids.include?(p.id) %>>
-                  <%= p.name %><%= " (Needs Clone)" unless p.repo_ready? %>
-                </option>
-              <% end %>
-            </select>
-            <p class="text-[11px] text-content-muted mt-2">Passed dynamically into Claude CLI's <code class="bg-surface-input px-1 rounded text-[10px]">--add-dir</code> command. Hold Cmd/Ctrl to toggle multiple. Non-cloned repos are automatically omitted.</p>
-          <% else %>
-            <div class="p-3 bg-surface-input/15 border border-edge rounded-lg text-center">
-              <p class="text-xs text-content-muted">No other project scopes available in this system.</p>
-            </div>
-          <% end %>
-        </div>
-      </div>
-
-      <%# --- Additional Input Context --- %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Dynamic Run-time Context Instructions</h3>
-            <p class="text-xs text-content-muted">Append dynamic instructions, variables, or retry-loop states to the step execution.</p>
-          </div>
-        </div>
-
-        <div>
-          <%= f.text_area :input_context, rows: 4,
-                placeholder: "Optional guidance. E.g., Use code map of module ${project_name} to search.\nFor automated self-healing retries, parse ${previous_failure} for logs.",
-                class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y" %>
-          <p class="text-[11px] text-content-muted mt-1.5 leading-relaxed">Appends instructions to AI skills or injects them as <code class="bg-surface-input px-1 rounded">$INPUT_CONTEXT</code> in script/shell operations.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tab 4: Execution & Recovery -->
-  <div data-step-form-target="tabContent" data-tab="recovery" style="display:none">
-    <div class="space-y-4">
-      <%# --- Timeout & Retries limits --- %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Execution Constraints</h3>
-            <p class="text-xs text-content-muted">Configure limits to prevent runaway tasks or long builds from locking the workflow runner.</p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <%= f.label :max_retries, "Maximum Auto-Retries", class: "block text-xs font-semibold text-content-muted mb-1" %>
-            <%= f.number_field :max_retries, min: 0,
-                  class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
-          </div>
-
-          <div>
-            <%= f.label :timeout, "Timeout (seconds)", class: "block text-xs font-semibold text-content-muted mb-1" %>
-            <%= f.number_field :timeout, min: 1,
-                  class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
-          </div>
-        </div>
-      </div>
-
-      <%# --- Manual Approval Card Checkbox --- %>
-      <div class="p-4 bg-surface-input/20 border border-edge rounded-xl hover:bg-surface-input/30 transition-colors">
-        <label class="flex items-start gap-3.5 cursor-pointer">
-          <div class="pt-0.5">
-            <%= f.check_box :manual_approval, class: "accent-accent h-4.5 w-4.5 rounded cursor-pointer" %>
-          </div>
-          <div class="flex-1 min-w-0">
-            <span class="block text-sm font-semibold text-content">Requires Manual Operator Approval</span>
-            <span class="block text-xs text-content-muted mt-0.5 leading-relaxed">Pauses the execution upon step completion. Downstream triggers stay blocked in <em>Awaiting Approval</em> until a team operator manually validates and resumes the run.</span>
-          </div>
-        </label>
-      </div>
-
-      <%# --- On Fail Self Healing Recovery Actions --- %>
-      <% on_fail = step.config&.dig("on_fail_action") || {} %>
-      <div class="p-4 bg-surface-input/30 border border-edge rounded-xl space-y-4" data-step-form-target="onFailFields">
-        <div class="flex items-center gap-2 mb-1">
-          <svg class="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.17 14.83a4 4 0 005.66 0l3-3a4 4 0 10-5.66-5.66l-1.5 1.5M13.83 9.17a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1.5-1.5" /></svg>
-          <div>
-            <h3 class="text-sm font-semibold text-content">Self-Healing & Auto-Recovery</h3>
-            <p class="text-xs text-content-muted">Execute specialized recovery procedures, rollback strategies, or LLM auto-fixes upon failure.</p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-[1fr_auto] gap-4">
-          <div class="flex-1">
-            <label for="on_fail_type" class="block text-xs font-semibold text-content-muted mb-1">Recovery Action Type</label>
-            <select name="on_fail_type" id="on_fail_type"
-                    data-step-form-target="onFailType" data-action="step-form#onFailChanged"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-              <option value="">No action (Stop Workflow & Report Failure)</option>
-              <option value="reopen_previous" <%= "selected" if on_fail["type"] == "reopen_previous" %>>Re-Open Previous AI Step (Session-based Fix)</option>
-              <option value="skill" <%= "selected" if on_fail["type"] == "skill" %>>Run Diagnostic Skill (AI-agent corrective)</option>
-              <option value="script" <%= "selected" if on_fail["type"] == "script" %>>Run Recovery Script (Local code)</option>
-              <option value="command" <%= "selected" if on_fail["type"] == "command" %>>Run Shell Command (Rollback/Cleanup)</option>
-            </select>
-          </div>
-          
-          <div data-step-form-target="onFailMaxRounds" style="<%= 'display:none' unless on_fail["type"].present? %>">
-            <label for="on_fail_max_rounds" class="block text-xs font-semibold text-content-muted mb-1">Max Rounds</label>
-            <input type="number" name="on_fail_max_rounds" id="on_fail_max_rounds"
-                   value="<%= on_fail["max_rounds"] || 3 %>" min="1" placeholder="Rounds"
-                   class="w-24 px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-          </div>
-        </div>
-
-        <%# On Fail: Run AI Skill corrective %>
-        <div data-step-form-target="onFailSkillFields" style="<%= 'display:none' unless on_fail["type"] == "skill" %>" class="space-y-2 pt-2">
-          <label for="on_fail_skill_id" class="block text-xs font-semibold text-content-muted mb-1">Corrective Diagnostic Skill</label>
-          <select name="on_fail_skill_id" id="on_fail_skill_id"
-                  class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
-            <option value="">Select a diagnostic capability...</option>
-            <% Skill.for_project(@project).includes(:project).order(:name).each do |s| %>
-              <option value="<%= s.id %>" <%= "selected" if on_fail["skill_id"].to_s == s.id.to_s %>><%= s.display_name %></option>
-            <% end %>
-          </select>
-          <p class="text-[11px] text-content-muted leading-relaxed">Seneschal pre-loads the full trace output and the failed step name into this skill's prompt automatically.</p>
-        </div>
-
-        <%# On Fail: Re-Open Previous session %>
-        <div data-step-form-target="onFailReopenFields" style="<%= 'display:none' unless on_fail["type"] == "reopen_previous" %>" class="space-y-2 pt-2">
-          <label for="on_fail_instructions" class="block text-xs font-semibold text-content-muted mb-1">Additional Guidance for Resumed Session</label>
-          <textarea name="on_fail_instructions" id="on_fail_instructions" rows="3"
-                    placeholder="E.g., Try fixing the test suite import error. Refer back to package.json."
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["instructions"] %></textarea>
-          <p class="text-[11px] text-content-muted leading-relaxed">Resumes the previous AI-agent step's actual Claude chat session, feeding it this step's crash log and the extra guidance.</p>
-        </div>
-
-        <%# On Fail: Run Script/Command %>
-        <div data-step-form-target="onFailBodyFields" style="<%= 'display:none' unless on_fail["type"].in?(%w[script command]) %>" class="space-y-2 pt-2">
-          <label for="on_fail_body" class="block text-xs font-semibold text-content-muted mb-1">Recovery Procedure / Script Body</label>
-          <textarea name="on_fail_body" id="on_fail_body" rows="4"
-                    placeholder="E.g., git checkout main -- package-lock.json && npm install"
-                    class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm font-mono focus:outline-none focus:border-accent resize-y"><%= on_fail["body"] %></textarea>
-          <p class="text-[11px] text-content-muted leading-relaxed">Local process execution with environment access to <code class="bg-surface-input px-1 rounded font-mono text-[10px]">$PREVIOUS_FAILURE</code> and <code class="bg-surface-input px-1 rounded font-mono text-[10px]">$PREVIOUS_FAILURE_STEP</code>.</p>
-        </div>
-      </div>
-
-      <%# --- Save as Reusable Template Card checkbox --- %>
-      <div class="p-4 bg-surface-input/20 border border-edge rounded-xl hover:bg-surface-input/30 transition-colors">
-        <label class="flex items-start gap-3.5 cursor-pointer">
-          <div class="pt-0.5">
-            <input type="checkbox" name="save_as_template" value="1" class="accent-accent h-4.5 w-4.5 rounded cursor-pointer"
-                   data-step-form-target="saveTemplateCheck" data-action="step-form#toggleSaveTemplate">
-          </div>
-          <div class="flex-1 min-w-0">
-            <span class="block text-sm font-semibold text-content">Save as Reusable Template</span>
-            <span class="block text-xs text-content-muted mt-0.5 leading-relaxed">Persists this configured step as an application-wide template, making it immediately selectable when adding new steps across any workflow.</span>
-          </div>
-        </label>
-        
-        <div data-step-form-target="saveTemplateFields" style="display:none" class="mt-4 pl-8 border-t border-edge/50 pt-3">
-          <label for="template_name" class="block text-xs font-semibold text-content-muted mb-1.5">Template Name</label>
+          <label for="template_name" class="<%= label_classes %>">Template name</label>
           <input type="text" name="template_name" placeholder="e.g. Build assets and push to S3"
-                 class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent">
+                 class="<%= input_classes %>">
+        </div>
+        <div>
+          <label for="template_description" class="<%= label_classes %>">Description</label>
+          <input type="text" name="template_description" placeholder="When would somebody reach for this?"
+                 class="<%= input_classes %>">
         </div>
       </div>
-    </div>
+    <% end %>
   </div>
 
-  <!-- Action buttons -->
   <div class="flex gap-3 pt-5 border-t border-edge mt-6">
-    <%= f.submit "Save Step Configuration", class: "inline-flex items-center gap-2 px-5 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors shadow-md cursor-pointer select-none" %>
-    <%= link_to "Cancel", project_workflow_path(@project, @workflow), class: "inline-flex items-center gap-1.5 px-4 py-2 bg-transparent border border-edge text-content-muted rounded-lg text-sm font-semibold hover:bg-surface-input hover:text-content transition-colors select-none" %>
+    <%= f.submit "Save step", class: btn_classes(:primary) %>
+    <%= link_to "Cancel", project_workflow_path(@project, @workflow), data: { turbo_frame: "_top" },
+          class: btn_classes(:ghost) %>
   </div>
 <% end %>

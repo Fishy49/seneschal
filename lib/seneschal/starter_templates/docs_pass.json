@@ -1,0 +1,105 @@
+{
+  "seneschal_workflow_export": {
+    "version": 1,
+    "exported_at": "2026-07-27T00:00:00Z",
+    "source_project_name": "Seneschal starter templates",
+    "workflow": {
+      "name": "Documentation pass",
+      "description": "Reads the code, finds what the docs get wrong, and rewrites them. No CI, since nothing executable changes.",
+      "config": {},
+      "steps": [
+        {
+          "name": "Find the gaps",
+          "position": 1,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "medium",
+            "produces": [
+              "findings"
+            ],
+            "consumes": [
+              "task_title",
+              "task_body"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "audit-the-docs"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 1800,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Write the docs",
+          "position": 2,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "medium",
+            "consumes": [
+              "findings"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "write-the-docs"
+          },
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 1800,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Open PR",
+          "position": 3,
+          "step_type": "pr",
+          "body": null,
+          "config": {
+            "title": "docs: ${task_title}",
+            "body": "${task_body}",
+            "base": "main",
+            "draft": true,
+            "produces": [
+              "pr_number",
+              "branch_name"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 600,
+          "input_context": null,
+          "manual_approval": false
+        }
+      ]
+    },
+    "skills": [
+      {
+        "name": "audit-the-docs",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "audit-the-docs",
+        "description": "Compares documentation against the code and reports the real gaps.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: audit-the-docs\ndescription: Compares documentation against the code and reports the real gaps.\n---\n\nWork out what the documentation currently gets wrong.\n\nSubject: ${task_title}\n\n${task_body}\n\nRead the code and the existing docs side by side. Note what is missing, what\nis stale, and what is simply wrong. Prefer a few real gaps over a long list of\nnitpicks.\n\nWrite your findings into an output block named `findings`.\n"
+      },
+      {
+        "name": "write-the-docs",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "write-the-docs",
+        "description": "Rewrites documentation from an audit, for a reader who is new to the code.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: write-the-docs\ndescription: Rewrites documentation from an audit, for a reader who is new to the code.\n---\n\nUpdate the documentation based on these findings:\n\n${findings}\n\nWrite for somebody who has not seen this code before. Show the shortest thing\nthat works before the exhaustive reference. Do not document what the code does\nnot do.\n"
+      }
+    ],
+    "json_schemas": []
+  }
+}

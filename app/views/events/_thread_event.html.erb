@@ -1,0 +1,35 @@
+<%# One system line in a run's thread. Tone follows the moment: a brass
+    callout while a decision is actually pending, quiet dots for everything
+    else. Renders from broadcast jobs too, so no controller state.
+    Locals: event: %>
+<% if event.action == "run.awaiting_approval" && event.subject&.awaiting_approval? && (awaiting = event.subject.awaiting_run_step) %>
+  <li id="<%= dom_id(event) %>" class="py-1.5">
+    <div class="flex items-center gap-2.5 rounded-lg border border-brass/40 bg-brass/10 px-3 py-2">
+      <span class="text-brass"><%= seal_mark(size: 15) %></span>
+      <p class="flex-1 min-w-0 text-xs text-content">"<%= awaiting.step&.name %>" is waiting for a seal.</p>
+      <a href="#run_header" class="<%= btn_classes(:brass, size: :xs, extra: "shrink-0") %>">Review</a>
+    </div>
+  </li>
+<% else %>
+  <%
+    dot, text =
+      case event.action
+      when "run.completed" then ["bg-success", "Run completed"]
+      when "run.failed" then ["bg-danger", "Run failed"]
+      when "run.awaiting_approval" then ["bg-brass", "Paused for a human decision"]
+      when "run.waiting_for_tokens" then ["bg-brass", "Paused until the model's rate limit reset"]
+      when "run.started" then ["bg-edge-strong", "#{thread_actor(event.user)} started this run"]
+      when "run.stopped" then ["bg-warning", "#{thread_actor(event.user)} stopped the run"]
+      when "run.resumed"
+        step = event.metadata["step"]
+        ["bg-edge-strong", "#{thread_actor(event.user)} resumed#{step.present? ? " from \"#{step}\"" : ""}"]
+      else ["bg-edge-strong", "#{thread_actor(event.user)} #{event_phrase(event)}"]
+      end
+  %>
+  <li id="<%= dom_id(event) %>" class="flex items-center gap-2 py-1 text-xs text-content-muted">
+    <span class="w-1.5 h-1.5 rounded-full shrink-0 <%= dot %>"></span>
+    <span class="min-w-0 truncate"><%= text %></span>
+    <time class="ml-auto shrink-0 font-mono text-[0.6875rem] text-content-faint"
+          title="<%= event.created_at %>"><%= time_ago_short(event.created_at) %></time>
+  </li>
+<% end %>

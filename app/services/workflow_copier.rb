@@ -14,8 +14,11 @@ class WorkflowCopier
       wf = @target.workflows.create!(
         name: unique_name(@source.name),
         description: @source.description,
-        trigger_type: @source.trigger_type,
-        trigger_config: @source.trigger_config
+        # Where a workflow came from is worth keeping: good pipelines spread by
+        # being copied, and the copy should say who it learned from.
+        config: (@source.config || {}).merge(
+          "copied_from" => "#{@source.project.name}/#{@source.name}"
+        )
       )
 
       @source.steps.order(:position).each do |step|

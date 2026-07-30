@@ -16,10 +16,10 @@ class SetupControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "PATCH update_allowed_tools saves setting" do
-    patch update_allowed_tools_setup_path, params: { default_allowed_tools: "Bash,Read,Edit" }
-    assert_redirected_to setup_path
-    assert_equal "Bash,Read,Edit", Setting["default_allowed_tools"]
+  test "GET index no longer carries the settings forms" do
+    get setup_path
+    assert_select "input#default_allowed_tools", count: 0
+    assert_select "input#webhook_url", count: 0
   end
 
   test "works without setup complete" do

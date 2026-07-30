@@ -1,0 +1,37 @@
+<%# Raw SKILL.md editing. Repo-synced skills are read-only here because the
+    next sync would overwrite anything typed. Locals: skill: %>
+<% path = skill.skill_md_path %>
+<div class="mb-4 border border-edge rounded-lg p-4 bg-surface-muted/40">
+  <div class="flex items-center justify-between mb-2">
+    <h4 class="text-sm font-semibold text-content">SKILL.md</h4>
+    <% if path.present? %>
+      <span class="text-xs text-content-muted font-mono truncate"><%= path %></span>
+    <% end %>
+  </div>
+
+  <% if skill.source_kind == "skill_repo" %>
+    <p class="text-sm text-content-muted">
+      Synced from <strong><%= skill.skill_repo&.name %></strong> - edit it in that repository.
+      Local edits would be overwritten on the next sync.
+    </p>
+  <% elsif path.blank? || !File.exist?(path) %>
+    <p class="text-sm text-content-muted">
+      No file on disk yet.
+      <% if skill.project && !skill.project.repo_ready? %>
+        Clone <%= skill.project.name %> first.
+      <% end %>
+    </p>
+  <% else %>
+    <p class="text-xs text-content-muted mb-2">
+      The whole file, frontmatter included. Saving writes it back to disk. Keep
+      <code class="bg-surface-input px-1 rounded">name: <%= skill.name %></code> as it is - renaming means
+      moving the folder too, so do that on disk.
+    </p>
+    <div data-controller="code-editor">
+      <div class="codejar-wrap">
+        <code class="language-markdown codejar-editor" data-code-editor-target="editor"></code>
+      </div>
+      <input type="hidden" name="skill_md" data-code-editor-target="input" value="<%= File.read(path) %>">
+    </div>
+  <% end %>
+</div>

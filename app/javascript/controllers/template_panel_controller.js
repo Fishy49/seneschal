@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["backdrop", "panel", "search", "list", "empty"]
-  static values = { templates: Object }
+  static values = { newStepUrl: String }
 
   open() {
     this.backdropTarget.style.display = ""
@@ -41,14 +41,16 @@ export default class extends Controller {
     this.emptyTarget.style.display = anyVisible ? "none" : ""
   }
 
+  // The server applies the template and re-renders the inspector, so every
+  // captured config key survives without being re-mapped in JavaScript.
   select(event) {
     const templateId = event.currentTarget.dataset.templateId
+    const url = new URL(this.newStepUrlValue, window.location.origin)
+    url.searchParams.set("template_id", templateId)
 
-    const form = this.element.querySelector("[data-controller~='step-form']")
-    if (form) {
-      const ctrl = this.application.getControllerForElementAndIdentifier(form, "step-form")
-      if (ctrl) ctrl.loadTemplate(templateId)
-    }
+    const frame = document.getElementById("step_inspector")
+    if (frame) frame.src = url.toString()
+    else window.location = url.toString()
 
     this.close()
   }

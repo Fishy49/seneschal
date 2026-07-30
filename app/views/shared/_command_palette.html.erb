@@ -1,0 +1,61 @@
+<%# The Cmd/Ctrl+K launch bar. Rendered once per page from the layout; hidden
+    until the controller opens it. The controller itself lives on <body> so
+    Launch buttons elsewhere on the page can target it. %>
+<div>
+  <div data-command-palette-target="overlay" hidden
+       class="fixed inset-0 z-50 bg-scrim flex items-start justify-center pt-[12vh] px-4"
+       data-action="click->command-palette#backdropClick">
+    <div class="w-full max-w-2xl bg-surface-card border border-edge rounded-lg shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-edge">
+        <span class="text-sm font-semibold">Search, jump, or launch</span>
+        <span class="text-xs text-content-muted">Esc to close &middot; &#8593;&#8595; to pick &middot; <%= "⌘" %>/Ctrl+Enter to launch</span>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <label for="quick_launch_description" class="<%= label_classes %>">What should Claude do?</label>
+          <textarea id="quick_launch_description" rows="4"
+                    data-command-palette-target="description"
+                    data-action="keydown->command-palette#descriptionKeydown input->command-palette#updateComposerLink input->command-palette#queryChanged"
+                    placeholder="Add rate limiting to the public API endpoints"
+                    class="<%= input_classes("resize-y") %>"></textarea>
+        </div>
+
+        <ul data-command-palette-target="results" hidden
+            class="list-none border border-edge rounded-lg divide-y divide-edge overflow-hidden max-h-64 overflow-y-auto"></ul>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="quick_launch_project" class="<%= label_classes %>">Project</label>
+            <select id="quick_launch_project"
+                    data-command-palette-target="project"
+                    data-action="change->command-palette#projectChanged"
+                    class="<%= input_classes %>"></select>
+          </div>
+          <div>
+            <label for="quick_launch_workflow" class="<%= label_classes %>">Workflow</label>
+            <select id="quick_launch_workflow"
+                    data-command-palette-target="workflow"
+                    data-action="change->command-palette#workflowChanged"
+                    class="<%= input_classes %>"></select>
+          </div>
+        </div>
+
+        <p data-command-palette-target="summary" hidden class="text-xs text-content-muted"></p>
+
+        <p data-command-palette-target="error" hidden
+           class="bg-danger/15 text-danger border border-danger/25 px-3 py-2 rounded-lg text-sm"></p>
+
+        <div class="flex items-center gap-2">
+          <button type="button" data-action="command-palette#launch"
+                  data-command-palette-target="submit"
+                  class="<%= btn_classes(:primary) %>">Launch</button>
+          <button type="button" data-action="command-palette#close"
+                  class="<%= btn_classes(:ghost) %>">Cancel</button>
+          <a data-command-palette-target="composer" href="<%= new_pipeline_task_path %>"
+             class="ml-auto text-sm text-content-muted hover:text-content transition-colors">Full composer</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

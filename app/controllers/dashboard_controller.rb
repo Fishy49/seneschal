@@ -1,10 +1,31 @@
 class DashboardController < ApplicationController
+  ACTIVE_LIMIT = 10
+  RECENT_LIMIT = 8
+  FINISHED = ["completed", "failed", "stopped"].freeze
+
   def index
-    @active_runs = Run.active.includes(:pipeline_task, workflow: :project, run_steps: :step).recent.limit(10)
-    @recent_runs = Run.where.not(status: ["pending", "running"])
-                      .includes(:pipeline_task, workflow: :project)
-                      .recent.limit(10)
+    @awaiting_runs = Run.awaiting_approval.includes(:started_by, :pipeline_task, workflow: :project).recent
+    @awaiting_viewers = @awaiting_runs.to_h { |run| [run.id, RunPresence.new(run.id).viewers] }
+    # Parked runs get their own banner above, so keep them out of the active
+    # list rather than listing the same run twice.
+    @active_runs = Run.active.where.not(status: "awaiting_approval")
+                      .includes(:started_by, :pipeline_task, workflow: :project, run_steps: :step)
+                      .recent.limit(ACTIVE_LIMIT)
+    @recent_runs = Run.where(status: FINISHED)
+                      .includes(:started_by, :pipeline_task, :run_steps, workflow: :project)
+                      .recent.limit(RECENT_LIMIT)
     @projects = Project.order(:name)
-    @actionable_tasks = PipelineTask.actionable.includes(:project, :workflow).recent.limit(10)
+    @recent_events = Event.includes(:user, :subject).recent.limit(5)
+    # The checklist retires the moment somebody has launched something of
+    # their own; it has nothing left to teach them.
+    @show_onboarding = Run.where(started_by: current_user).none?
+    @has_credentials = current_user.user_credentials.exists?
+
+    # The Inbox proper: this person's unread rows, split the way the page
+    # groups them. Failure rows survive until the run is visited or swept.
+    unread = current_user.notifications.unread.includes(:context, event: [:user, :subject]).recent
+    @failed_notifications = unread.select { |n| n.reason == "failed" }.first(10)
+    @mention_notifications = unread.select { |n| n.reason.in?(["mention", "reply"]) }.first(15)
+    @shipped_this_week = Run.where(status: "completed").where(finished_at: 1.week.ago..).count
   end
 end

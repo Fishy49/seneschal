@@ -147,9 +147,7 @@ class DataImporter
   def import_workflow(project, wf_attrs)
     workflow = project.workflows.create!(
       name: wf_attrs[:name],
-      description: wf_attrs[:description],
-      trigger_type: wf_attrs[:trigger_type] || "manual",
-      trigger_config: wf_attrs[:trigger_config]
+      description: wf_attrs[:description]
     )
     @stats[:workflows] += 1
 

@@ -1,4 +1,14 @@
-<h1 class="text-2xl font-semibold mb-4">New Project</h1>
-<div class="bg-surface-card border border-edge rounded-lg p-5">
-  <%= render "form", project: @project %>
-</div>
+<% if @onboarding %>
+  <div class="max-w-2xl">
+    <%= render "shared/components/page_header", title: "Create your first project",
+          subtitle: "A project is a git repository Seneschal can work in. Point it at one and it will clone it for you." %>
+    <%= render layout: "shared/components/card" do %>
+      <%= render "onboarding_form", project: @project %>
+    <% end %>
+  </div>
+<% else %>
+  <%= render "shared/components/page_header", title: "New project" %>
+  <%= render layout: "shared/components/card" do %>
+    <%= render "form", project: @project %>
+  <% end %>
+<% end %>

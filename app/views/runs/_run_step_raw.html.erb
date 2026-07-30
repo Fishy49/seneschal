@@ -1,0 +1,77 @@
+<%# Everything the curated timeline moves one level down: what went in, what
+    the agent did while it worked, and the unedited output.
+    Locals: run_step:, run:, nested:, streaming: %>
+<% input_vars = run_step.step.consumes.filter_map { |k| [k, run.context[k]] if run.context[k].present? } %>
+<% if nested && run_step.resolved_input_context.present? %>
+  <% input_vars += [["failure_context", run_step.resolved_input_context]] %>
+<% end %>
+<% all_input = input_vars %>
+<% all_input += [["input_context", run_step.resolved_input_context]] if run_step.resolved_input_context.present? %>
+
+<% if run_step.step.step_type.in?(["skill", "prompt"]) %>
+  <div class="mb-1"><%= render "runs/step_context_modal", run_step: run_step %></div>
+<% end %>
+
+<% if all_input.any? %>
+  <details class="mt-1" data-preserve-key="input">
+    <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">input <span class="text-content-muted">(<%= all_input.size %> var<%= "s" if all_input.size != 1 %>)</span></summary>
+    <div class="mt-1 space-y-0.5">
+      <% all_input.each do |key, value| %>
+        <details class="ml-2" data-preserve-key="in-<%= key %>">
+          <summary class="text-xs font-semibold text-info cursor-pointer select-none hover:text-info/80"><%= key %></summary>
+          <div class="output-block mt-1 mb-1 text-xs"><%= value %></div>
+        </details>
+      <% end %>
+    </div>
+  </details>
+<% end %>
+
+<%= render "runs/todo_list", run_step: run_step %>
+
+<% query_logs = run_step.context_query_logs.recent_first %>
+<% if query_logs.any? %>
+  <details class="mt-1" data-preserve-key="queries">
+    <summary class="text-[0.8125rem] text-info cursor-pointer select-none hover:text-info/80">
+      context queries <span class="text-content-muted">(<%= query_logs.size %>, <%= number_to_human_size(query_logs.sum(:returned_bytes)) %> total)</span>
+    </summary>
+    <div class="mt-1 ml-2 space-y-0.5 text-xs font-mono">
+      <% query_logs.each do |q| %>
+        <div class="flex items-baseline gap-2 <%= "text-danger" if q.error.present? %>">
+          <code class="text-info"><%= q.variable %></code>
+          <code class="text-content-muted"><%= q.expression %></code>
+          <span class="text-content-muted">&rarr; <%= q.error.present? ? "error" : number_to_human_size(q.returned_bytes) %></span>
+          <% if q.error.present? %>
+            <span class="text-danger truncate"><%= q.error %></span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </details>
+<% end %>
+
+<% if run_step.stream_log.present? || streaming %>
+  <% cost_summary = stream_log_cost_summary(run_step.stream_log) %>
+  <details class="mt-1" data-preserve-key="activity" <%= "open" if streaming %>>
+    <summary class="text-[0.8125rem] text-accent cursor-pointer select-none hover:text-accent-hover">
+      activity log<% if cost_summary.present? %> <span class="text-content-muted">(<%= cost_summary %>)</span><% end %>
+    </summary>
+    <%= render "runs/stream_log", run_step: run_step %>
+  </details>
+<% end %>
+
+<%= render "runs/step_assets", run_step: run_step %>
+
+<% if run_step.output.present? %>
+  <details class="mt-0.5" data-preserve-key="raw-output">
+    <summary class="text-[0.8125rem] text-content-muted cursor-pointer select-none hover:text-content">raw output</summary>
+    <div class="output-block mt-2"><%= run_step.output %></div>
+  </details>
+<% end %>
+
+<% if run_step.error_output.present? %>
+  <% stderr_is_error = run_step.status == "failed" %>
+  <details class="mt-0.5" data-preserve-key="stderr">
+    <summary class="text-[0.8125rem] cursor-pointer select-none <%= stderr_is_error ? "text-danger" : "text-content-muted hover:text-content" %>"><%= stderr_is_error ? "error" : "stderr" %></summary>
+    <div class="output-block mt-2 <%= "border-danger" if stderr_is_error %>"><%= run_step.error_output %></div>
+  </details>
+<% end %>

@@ -24,6 +24,7 @@ Rails.application.routes.draw do
   # Account
   get   "account", to: "account#edit"
   patch "account", to: "account#update"
+  resources :user_credentials, only: [:create, :destroy], path: "account/connections"
 
   # User management (admin only)
   resources :users, only: [:index, :new, :create, :destroy] do
@@ -37,7 +38,9 @@ Rails.application.routes.draw do
   post  "setup/check_claude",       to: "setup#check_claude",       as: :check_claude_setup
   post  "setup/check_gh",           to: "setup#check_gh",           as: :check_gh_setup
   post  "setup/check_sdk_runner",   to: "setup#check_sdk_runner",   as: :check_sdk_runner_setup
-  patch "setup/allowed_tools",      to: "setup#update_allowed_tools", as: :update_allowed_tools_setup
+
+  get   "admin/settings", to: "admin_settings#show", as: :admin_settings
+  patch "admin/settings", to: "admin_settings#update"
 
   resources :projects do
     member do
@@ -53,7 +56,10 @@ Rails.application.routes.draw do
       post :suggestions
     end
     resource :workflow_import, only: [:new, :create], controller: "workflow_imports"
-    resources :workflows do
+    resources :workflows, except: [:index] do
+      collection do
+        post :create_from_template
+      end
       member do
         post :trigger
         get :export
@@ -84,12 +90,17 @@ Rails.application.routes.draw do
   end
   resources :json_schemas
   resources :project_groups
-  resources :step_templates, path: "templates", only: [:index, :destroy]
+  resources :step_templates, path: "templates", only: [:index, :show, :edit, :update, :destroy]
 
   # Data management (admin only)
   get  "data",        to: "data#index",  as: :data_management
   get  "data/export", to: "data#export", as: :data_export
   post "data/import", to: "data#import", as: :data_import
+
+  # Backing endpoints for the Cmd/Ctrl+K launch bar
+  post "quick_launch",         to: "quick_launch#create"
+  get  "quick_launch/options", to: "quick_launch#options", as: :quick_launch_options
+  get  "quick_launch/search",  to: "quick_launch#search",  as: :quick_launch_search
 
   post "tasks/format_body",     to: "pipeline_tasks#format_body",     as: :format_task_body
   get  "tasks/remote_branches", to: "pipeline_tasks#remote_branches", as: :remote_task_branches
@@ -101,6 +112,17 @@ Rails.application.routes.draw do
       patch :unarchive
     end
   end
+
+  # Public, unauthenticated, redacted run summary
+  get "shared/:token", to: "shared_runs#show", as: :shared_run
+
+  resources :share_links, only: [:create, :destroy]
+
+  get "activity", to: "activity#index", as: :activity
+
+  post "notifications/read_all", to: "notifications#read_all", as: :read_all_notifications
+
+  resources :comments, only: [:create, :destroy]
 
   resources :preview_assets, only: [:show]
 

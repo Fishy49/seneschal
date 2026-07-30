@@ -1,9 +1,9 @@
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-  <h2 class="text-xl font-semibold mb-2">Set Up Two-Factor Authentication</h2>
+<%= render layout: "shared/components/card", locals: { title: "Set Up Two-Factor Authentication", class: "mb-4" } do %>
   <p class="text-sm text-content-muted mb-6">Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc), then enter the verification code to confirm.</p>
 
   <div class="flex justify-center mb-6">
-    <div class="bg-white rounded-xl p-4 inline-block">
+    <%# The QR backdrop stays white in both themes so scanners can read it. %>
+    <div class="bg-white rounded-lg p-4 inline-block">
       <%= @qr_svg.html_safe %>
     </div>
   </div>
@@ -14,15 +14,14 @@
 
   <%= form_with url: confirm_two_factor_path, class: "max-w-xs mx-auto space-y-4" do |f| %>
     <div>
-      <label for="code" class="block text-sm font-medium text-content-muted mb-1.5">Verification Code</label>
+      <label for="code" class="<%= label_classes %>">Verification Code</label>
       <input type="text" name="code" id="code" autofocus required
              inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
-             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm text-center tracking-[0.3em] font-mono text-lg focus:outline-none focus:border-accent" />
+             class="w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-center tracking-[0.3em] font-mono text-lg focus:outline-none focus:border-accent" />
     </div>
 
-    <button type="submit"
-            class="w-full px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors">
+    <button type="submit" class="<%= btn_classes(:primary, extra: "w-full") %>">
       Enable 2FA
     </button>
   <% end %>
-</div>
+<% end %>

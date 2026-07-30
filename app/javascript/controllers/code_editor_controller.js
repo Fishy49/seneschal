@@ -5,7 +5,11 @@ export default class extends Controller {
   static targets = ["editor", "input"]
 
   connect() {
+    // Leaving innerHTML alone when hljs is missing degrades to a plain editable
+    // field: no colors, but the hidden input still syncs and the form submits.
     const highlight = (el) => {
+      if (!window.hljs) return
+
       const result = window.hljs.highlight(el.textContent, { language: "markdown" })
       el.innerHTML = result.value
     }

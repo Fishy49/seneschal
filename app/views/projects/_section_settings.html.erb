@@ -1,0 +1,7 @@
+<div class="max-w-2xl space-y-4">
+  <%= render layout: "shared/components/card", locals: { title: "Project settings" } do %>
+    <%= render "projects/form", project: project %>
+  <% end %>
+
+  <%= render "projects/danger_zone", project: project %>
+</div>

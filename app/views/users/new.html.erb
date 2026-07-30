@@ -1,8 +1,6 @@
 <div class="max-w-md">
-  <h1 class="text-2xl font-bold mb-6">New User</h1>
-  <p class="text-sm text-content-muted mb-6">
-    Create a user account. They'll receive an invite link to set their password.
-  </p>
+  <%= render "shared/components/page_header", title: "New User",
+        subtitle: "Create a user account. They'll receive an invite link to set their password." %>
 
   <%= form_with model: @user, url: users_path, class: "space-y-4" do |f| %>
     <% if @user.errors.any? %>
@@ -14,9 +12,8 @@
     <% end %>
 
     <div>
-      <%= f.label :email, class: "block text-sm font-medium text-content-muted mb-1.5" %>
-      <%= f.email_field :email, autofocus: true, required: true,
-            class: "w-full px-3 py-2 bg-surface-input border border-edge rounded-lg text-content text-sm focus:outline-none focus:border-accent" %>
+      <%= f.label :email, class: label_classes %>
+      <%= f.email_field :email, autofocus: true, required: true, class: input_classes %>
     </div>
 
     <div class="flex items-center gap-2">
@@ -24,11 +21,10 @@
       <%= f.label :admin, "Admin", class: "text-sm text-content-muted" %>
     </div>
 
-    <button type="submit"
-            class="px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold cursor-pointer hover:bg-accent-hover transition-colors">
+    <button type="submit" class="<%= btn_classes(:primary) %>">
       Create User
     </button>
 
-    <%= link_to "Cancel", users_path, class: "ml-2 text-sm text-content-muted hover:text-content" %>
+    <%= link_to "Cancel", users_path, class: btn_classes(:quiet, extra: "ml-1") %>
   <% end %>
 </div>

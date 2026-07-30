@@ -1,15 +1,13 @@
 <div class="max-w-2xl">
-  <div class="mb-4">
-    <p class="text-sm text-content-muted"><%= link_to "← Skill Repos", skill_repos_path %></p>
-    <h1 class="text-2xl font-semibold mt-1">Add Skill Repo</h1>
-    <p class="text-sm text-content-muted mt-1">
-      Point at any git repository whose layout is one directory per skill, each
-      containing a <code>SKILL.md</code> with YAML frontmatter (agentskills.io format).
-      Seneschal will clone it, index the skills, and re-sync every 6 hours.
-    </p>
-  </div>
+  <p class="text-sm text-content-muted mb-1"><%= link_to "← Skill Repos", skill_repos_path %></p>
+  <% new_subtitle = capture do %>
+    Point at any git repository whose layout is one directory per skill, each
+    containing a <code>SKILL.md</code> with YAML frontmatter (agentskills.io format).
+    Seneschal will clone it, index the skills, and re-sync every 6 hours.
+  <% end %>
+  <%= render "shared/components/page_header", title: "Add Skill Repo", subtitle: new_subtitle %>
 
-  <div class="bg-surface-card border border-edge rounded-lg p-5">
+  <%= render layout: "shared/components/card" do %>
     <%= render "form", skill_repo: @skill_repo %>
-  </div>
+  <% end %>
 </div>

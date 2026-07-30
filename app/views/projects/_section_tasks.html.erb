@@ -1,0 +1,49 @@
+<%= render layout: "shared/components/card",
+      locals: { title: "Tasks", action: { label: "New task", path: new_pipeline_task_path(project_id: project.id) } } do %>
+  <div class="flex items-center gap-1 mb-3">
+    <%= link_to "All", project_path(project, section: "tasks"),
+          class: nav_tab_classes(params[:status].blank?) %>
+    <% PipelineTask::STATUSES.each do |status| %>
+      <%= link_to status.capitalize, project_path(project, section: "tasks", status: status),
+            class: nav_tab_classes(params[:status] == status) %>
+    <% end %>
+  </div>
+
+  <% if @tasks.any? %>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="<%= th_classes %>">Title</th>
+            <th class="<%= th_classes %>">Status</th>
+            <th class="<%= th_classes %>">Workflow</th>
+            <th class="<%= th_classes %>">Updated</th>
+            <th class="<%= th_classes %>"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @tasks.each do |task| %>
+            <tr>
+              <td class="<%= td_classes %>"><%= link_to task.title, pipeline_task_path(task) %></td>
+              <td class="<%= td_classes %>"><%= status_badge(task.status) %></td>
+              <td class="<%= td_classes("text-content-muted") %>"><%= task.workflow&.name || "none" %></td>
+              <td class="<%= td_classes("text-content-muted font-mono") %>"><%= time_ago_short(task.updated_at) %></td>
+              <td class="<%= td_classes("text-right") %>">
+                <% if task.executable? %>
+                  <%= button_to "Run", execute_pipeline_task_path(task),
+                        class: btn_classes(:ghost, size: :sm) %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% elsif params[:status].present? %>
+    <%= render "shared/components/empty_state", message: "No #{params[:status]} tasks.",
+          cta_label: "Show all tasks", cta_path: project_path(project, section: "tasks") %>
+  <% else %>
+    <%= render "shared/components/empty_state", message: "No tasks yet.",
+          cta_label: "Create the first task", cta_path: new_pipeline_task_path(project_id: project.id) %>
+  <% end %>
+<% end %>

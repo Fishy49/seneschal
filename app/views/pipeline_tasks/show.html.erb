@@ -1,117 +1,116 @@
 <%= render "shared/project_bar", project: @task.project, task: @task %>
 
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <h1 class="text-2xl font-semibold">
-      <%= @task.title %> <%= status_badge(@task.status) %> <%= type_badge(@task.kind) %>
-      <% if @task.archived? %>
-        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-surface-input text-content-muted">archived</span>
-      <% end %>
-    </h1>
-  </div>
-  <div class="flex items-center gap-2">
-    <%= link_to "Edit", edit_pipeline_task_path(@task), class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <% if @task.status.in?(%w[draft completed failed]) && @task.workflow.present? %>
-      <%= button_to "Mark Ready", mark_ready_pipeline_task_path(@task), method: :patch,
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-accent-hover transition-colors",
-            data: { turbo_confirm: @task.status != "draft" ? "Reset '#{@task.title}' to ready for re-execution?" : nil } %>
-    <% end %>
-    <% if @task.executable? %>
-      <%= button_to "Execute", execute_pipeline_task_path(@task),
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-success text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-success/80 transition-colors",
-            data: { turbo_confirm: "Execute '#{@task.title}' with #{@task.workflow.name}?" } %>
-    <% end %>
-    <% if @task.archived? %>
-      <%= button_to "Unarchive", unarchive_pipeline_task_path(@task), method: :patch,
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors" %>
-    <% else %>
-      <%= button_to "Archive", archive_pipeline_task_path(@task), method: :patch,
-            class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent border border-edge text-content-muted rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-surface-input hover:text-content transition-colors",
-            data: { turbo_confirm: "Archive task '#{@task.title}'?" } %>
-    <% end %>
-    <%= button_to "Delete", pipeline_task_path(@task), method: :delete,
-          class: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-danger text-white rounded-lg text-[0.8125rem] font-medium cursor-pointer hover:bg-danger/80 transition-colors",
-          data: { turbo_confirm: "Delete task '#{@task.title}'?" } %>
-  </div>
-</div>
+<% header_title = capture do %>
+  <%= @task.title %> <%= status_badge(@task.status) %> <%= type_badge(@task.kind) %>
+  <% if @task.archived? %>
+    <%= render "shared/components/chip", text: "archived" %>
+  <% end %>
+<% end %>
+<%= render layout: "shared/components/page_header", locals: { title: header_title } do %>
+  <%= link_to "Edit", edit_pipeline_task_path(@task), class: btn_classes(:ghost, size: :sm) %>
+  <% if @task.executable? %>
+    <%= button_to (@task.runs.any? ? "Re-run" : "Execute"), execute_pipeline_task_path(@task),
+          class: btn_classes(:primary) %>
+  <% end %>
+  <% if @task.archived? %>
+    <%= button_to "Unarchive", unarchive_pipeline_task_path(@task), method: :patch,
+          class: btn_classes(:ghost, size: :sm) %>
+  <% else %>
+    <%= button_to "Archive", archive_pipeline_task_path(@task), method: :patch,
+          class: btn_classes(:ghost, size: :sm) %>
+  <% end %>
+  <%= button_to "Delete", pipeline_task_path(@task), method: :delete,
+        class: btn_classes(:danger, size: :sm),
+        data: { turbo_confirm: "Delete task '#{@task.title}'?" } %>
+<% end %>
 
-<div class="grid grid-cols-2 gap-4">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
   <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" data-controller="markdown">
-      <h2 class="text-lg font-semibold mb-3">Spec</h2>
-      <div class="code-preview" data-markdown-target="output"></div>
-      <template data-markdown-target="source"><%= @task.body %></template>
-    </div>
+    <%= render layout: "shared/components/card", locals: { title: "Spec", class: "mb-4" } do %>
+      <div data-controller="markdown">
+        <div class="code-preview" data-markdown-target="output"></div>
+        <template data-markdown-target="source"><%= @task.body %></template>
+      </div>
+    <% end %>
+
+    <%= render layout: "shared/components/card", locals: { title: "Discussion", class: "mb-4" } do %>
+      <%= render "comments/thread", commentable: @task %>
+    <% end %>
   </div>
 
   <div>
-    <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-      <h2 class="text-lg font-semibold mb-3">Details</h2>
-      <table class="w-full border-collapse">
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Project</th><td class="px-3 py-2 border-b border-edge"><%= link_to @task.project.name, project_path(@task.project) %></td></tr>
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Workflow</th><td class="px-3 py-2 border-b border-edge"><%= @task.workflow ? link_to(@task.workflow.name, project_workflow_path(@task.project, @task.workflow)) : "Not assigned" %></td></tr>
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Kind</th><td class="px-3 py-2 border-b border-edge"><%= type_badge(@task.kind) %></td></tr>
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th><td class="px-3 py-2 border-b border-edge"><%= status_badge(@task.status) %></td></tr>
-        <tr>
-          <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Trigger</th>
-          <td class="px-3 py-2 border-b border-edge text-sm">
-            <% if @task.cron? %>
-              <div><span class="font-medium">Cron:</span> <span class="font-mono"><%= @task.cron_expression %></span></div>
-              <% if @task.last_fired_at %>
-                <div class="text-xs text-content-muted">Last fired <%= time_ago_short(@task.last_fired_at) %></div>
-              <% end %>
-              <% if (next_at = @task.fugit_cron&.next_time(Time.current)&.to_t) %>
-                <div class="text-xs text-content-muted">Next fire <%= next_at.strftime("%Y-%m-%d %H:%M %Z") %></div>
-              <% end %>
-            <% elsif @task.github_watch? %>
-              <div><span class="font-medium">Branch watch:</span> <span class="font-mono"><%= @task.watched_branch %></span></div>
-              <div class="text-xs text-content-muted break-all"><%= @task.watched_repo_url %></div>
-              <% if @task.last_seen_sha.present? %>
-                <div class="text-xs text-content-muted">Last seen <span class="font-mono"><%= @task.last_seen_sha.first(7) %></span></div>
-              <% else %>
-                <div class="text-xs text-content-muted">Arming on next poll...</div>
-              <% end %>
-            <% else %>
-              <span class="text-content-muted">Manual</span>
-            <% end %>
-          </td>
-        </tr>
-        <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Created</th><td class="px-3 py-2 border-b border-edge text-sm"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></td></tr>
-        <% if (stats = @task.usage_stats) && stats[:cost_usd] > 0 %>
-          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Cost</th><td class="px-3 py-2 border-b border-edge text-sm font-medium"><%= format_cost(stats[:cost_usd]) %></td></tr>
-          <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>
-          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Tokens</th><td class="px-3 py-2 border-b border-edge text-sm"><%= format_tokens(total) %> <span class="text-xs text-content-muted">(in: <%= format_tokens(stats[:input_tokens]) %>, out: <%= format_tokens(stats[:output_tokens]) %>, cache read: <%= format_tokens(stats[:cache_read_tokens]) %>, cache write: <%= format_tokens(stats[:cache_creation_tokens]) %>)</span></td></tr>
-          <tr><th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Total Turns</th><td class="px-3 py-2 border-b border-edge text-sm"><%= stats[:num_turns] %></td></tr>
-        <% end %>
-      </table>
-    </div>
-
-    <% if @runs.any? %>
-      <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4">
-        <h2 class="text-lg font-semibold mb-3">Runs</h2>
+    <%= render layout: "shared/components/card", locals: { title: "Details", class: "mb-4" } do %>
+      <div class="overflow-x-auto">
         <table class="w-full border-collapse">
-          <thead>
-            <tr>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Run</th>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Status</th>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Cost</th>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">Duration</th>
-              <th class="text-left px-3 py-2 border-b border-edge text-xs font-semibold uppercase tracking-wide text-content-muted">When</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @runs.each do |run| %>
-              <tr>
-                <td class="px-3 py-2 border-b border-edge"><%= link_to "##{run.id}", run_path(run) %></td>
-                <td class="px-3 py-2 border-b border-edge"><%= status_badge(run.status) %></td>
-                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_cost(run.usage_stats&.dig(:cost_usd)) || "\u2014" %></td>
-                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= format_duration(run.duration) %></td>
-                <td class="px-3 py-2 border-b border-edge text-sm text-content-muted"><%= time_ago_short(run.finished_at || run.created_at) %></td>
-              </tr>
-            <% end %>
-          </tbody>
+          <tr><th class="<%= th_classes %>">Project</th><td class="<%= td_classes %>"><%= link_to @task.project.name, project_path(@task.project) %></td></tr>
+          <tr><th class="<%= th_classes %>">Workflow</th><td class="<%= td_classes %>"><%= @task.workflow ? link_to(@task.workflow.name, project_workflow_path(@task.project, @task.workflow)) : "Not assigned" %></td></tr>
+          <tr><th class="<%= th_classes %>">Kind</th><td class="<%= td_classes %>"><%= type_badge(@task.kind) %></td></tr>
+          <tr><th class="<%= th_classes %>">Status</th><td class="<%= td_classes %>"><%= status_badge(@task.status) %></td></tr>
+          <tr>
+            <th class="<%= th_classes %>">Trigger</th>
+            <td class="<%= td_classes %>">
+              <% if @task.cron? %>
+                <div><span class="font-medium">Cron:</span> <span class="font-mono"><%= @task.cron_expression %></span></div>
+                <% if @task.last_fired_at %>
+                  <div class="text-xs text-content-muted">Last fired <span class="font-mono"><%= time_ago_short(@task.last_fired_at) %></span></div>
+                <% end %>
+                <% if (next_at = @task.fugit_cron&.next_time(Time.current)&.to_t) %>
+                  <div class="text-xs text-content-muted">Next fire <span class="font-mono"><%= next_at.strftime("%Y-%m-%d %H:%M %Z") %></span></div>
+                <% end %>
+              <% elsif @task.github_watch? %>
+                <div><span class="font-medium">Branch watch:</span> <span class="font-mono"><%= @task.watched_branch %></span></div>
+                <div class="text-xs text-content-muted break-all"><%= @task.watched_repo_url %></div>
+                <% if @task.last_seen_sha.present? %>
+                  <div class="text-xs text-content-muted">Last seen <span class="font-mono"><%= @task.last_seen_sha.first(7) %></span></div>
+                <% else %>
+                  <div class="text-xs text-content-muted">Arming on next poll...</div>
+                <% end %>
+              <% else %>
+                <span class="text-content-muted">Manual</span>
+              <% end %>
+            </td>
+          </tr>
+          <tr><th class="<%= th_classes %>">Created</th><td class="<%= td_classes %>"><span class="font-mono"><%= @task.created_at.strftime("%Y-%m-%d %H:%M") %></span><% if @task.created_by %> <span class="text-content-muted">by <%= @task.created_by.email %></span><% end %></td></tr>
+          <% if (stats = @task.usage_stats) && stats[:cost_usd] > 0 %>
+            <tr><th class="<%= th_classes %>">Total Cost</th><td class="<%= td_classes("font-medium font-mono") %>"><%= format_cost(stats[:cost_usd]) %></td></tr>
+            <% total = stats[:input_tokens] + stats[:output_tokens] + stats[:cache_read_tokens] + stats[:cache_creation_tokens] %>
+            <tr><th class="<%= th_classes %>">Total Tokens</th><td class="<%= td_classes("font-mono tabular-nums") %>"><%= format_tokens(total) %> <span class="text-xs text-content-muted">(in: <%= format_tokens(stats[:input_tokens]) %>, out: <%= format_tokens(stats[:output_tokens]) %>, cache read: <%= format_tokens(stats[:cache_read_tokens]) %>, cache write: <%= format_tokens(stats[:cache_creation_tokens]) %>)</span></td></tr>
+            <tr><th class="<%= th_classes %>">Total Turns</th><td class="<%= td_classes("font-mono") %>"><%= stats[:num_turns] %></td></tr>
+          <% end %>
         </table>
       </div>
+    <% end %>
+
+    <% if @runs.any? %>
+      <%= render layout: "shared/components/card", locals: { title: "Runs", class: "mb-4" } do %>
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr>
+                <th class="<%= th_classes %>">Run</th>
+                <th class="<%= th_classes %>">Status</th>
+                <th class="<%= th_classes %>">Cost</th>
+                <th class="<%= th_classes %>">Duration</th>
+                <th class="<%= th_classes %>">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @runs.each do |run| %>
+                <tr>
+                  <td class="<%= td_classes %>">
+                    <%= link_to "run #{run.ordinal}", run_path(run), class: "font-mono" %>
+                    <span class="ml-1 text-xs text-content-muted font-mono">#<%= run.id %></span>
+                  </td>
+                  <td class="<%= td_classes %>"><%= status_badge(run.status) %></td>
+                  <td class="<%= td_classes("text-content-muted font-mono tabular-nums") %>"><%= format_cost(run.usage_stats&.dig(:cost_usd)) || "-" %></td>
+                  <td class="<%= td_classes("text-content-muted font-mono") %>"><%= format_duration(run.duration) %></td>
+                  <td class="<%= td_classes("text-content-muted font-mono") %>"><%= time_ago_short(run.finished_at || run.created_at) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
     <% end %>
   </div>
 </div>

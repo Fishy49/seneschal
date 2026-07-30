@@ -1,0 +1,4 @@
+<%# The poster gets the comment straight from the response; everyone else gets
+    it from the after_create_commit broadcast. Both append the same li id, and
+    Turbo drops an existing id before appending, so the echo cannot double up. %>
+<%= turbo_stream.append @comment.dom_target, partial: "comments/comment", locals: { comment: @comment } %>

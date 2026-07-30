@@ -12,7 +12,11 @@ class RunsController < ApplicationController
     @projects = Project.order(:name)
   end
 
-  def show; end
+  # Reading the room settles its debts: everything the Inbox held about this
+  # run is seen now.
+  def show
+    Notification.mark_read(current_user, @run) if current_user
+  end
 
   # Trajectory replay: a richer, drill-down view of a single Run's full
   # stream_log across all its RunSteps. Static (no live polling) so it
@@ -41,8 +45,11 @@ class RunsController < ApplicationController
 
   def stop
     if @run.active?
-      @run.update!(status: "stopped", finished_at: Time.current, error_message: "Stopped by user")
+      @run.update!(status: "stopped", finished_at: Time.current,
+                   stopped_by: current_user,
+                   error_message: "Stopped by #{current_user.email}")
       @run.pipeline_task&.update!(status: "failed")
+      Event.record("run.stopped", subject: @run, user: current_user)
     end
     redirect_to run_path(@run), notice: "Run stopped."
   end
@@ -66,6 +73,8 @@ class RunsController < ApplicationController
       "previous_failure_step" => resumable_step.name
     ).compact)
 
+    Event.record("run.resumed", subject: @run, user: current_user,
+                                metadata: { "step" => resumable_step.name })
     ExecuteRunJob.perform_later(@run, resumable_step.id, resume: true)
     redirect_to run_path(@run), notice: "Resuming from '#{resumable_step.name}'."
   end
@@ -92,25 +101,32 @@ class RunsController < ApplicationController
   end
 
   def approve
-    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
+    return redirect_to run_path(@run), alert: already_decided_alert unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
     return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
+    awaiting.approval_events.create!(user: current_user, action: "approved",
+                                     comment: params[:comment].to_s.strip.presence)
+    # The clear stays: ExecuteRunJob keys re-injection off rejection_context.
+    # The human-readable record is the approval event created above.
     awaiting.update!(status: "passed", rejection_context: nil)
+    Event.record("run.approved", subject: @run, user: current_user, metadata: { "step" => awaiting.step&.name })
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, after_approval: true)
     redirect_to run_path(@run), notice: "Step approved. Continuing run."
   end
 
   def reject
-    return redirect_to run_path(@run), alert: "Run is not awaiting approval." unless @run.awaiting_approval?
+    return redirect_to run_path(@run), alert: already_decided_alert unless @run.awaiting_approval?
 
     awaiting = @run.awaiting_run_step
     return redirect_to run_path(@run), alert: "No step awaiting approval." unless awaiting
 
     context = params.expect(:rejection_context).to_s.strip
+    awaiting.approval_events.create!(user: current_user, action: "rejected", comment: context.presence)
     awaiting.update!(rejection_context: context.presence)
+    Event.record("run.rejected", subject: @run, user: current_user, metadata: { "step" => awaiting.step&.name })
     @run.update!(status: "running")
     ExecuteRunJob.perform_later(@run, awaiting.step_id, resume: true)
     redirect_to run_path(@run), notice: "Step rejected. Re-running with feedback."
@@ -131,16 +147,27 @@ class RunsController < ApplicationController
       status: "pending",
       context: failure_context,
       input: @run.input.merge("resumed_from_run" => @run.id.to_s),
-      pipeline_task: @run.pipeline_task
+      pipeline_task: @run.pipeline_task,
+      started_by: current_user
     )
 
     @run.pipeline_task&.update!(status: "running")
+    Event.record("run.started", subject: new_run, user: current_user)
 
     ExecuteRunJob.perform_later(new_run, step.id)
     redirect_to run_path(new_run), notice: "Retrying from step '#{step.name}'."
   end
 
   private
+
+  # Two people can be looking at the same parked run. Name whoever decided
+  # first instead of a bare "not awaiting approval".
+  def already_decided_alert
+    event = @run.latest_approval_event
+    return "Run is not awaiting approval." unless event
+
+    "Already #{event.action} by #{event.actor_label}."
+  end
 
   def build_follow_up_steps(instructions, skill_ids)
     ActiveRecord::Base.transaction do

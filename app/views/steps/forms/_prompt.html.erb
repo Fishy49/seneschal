@@ -1,0 +1,7 @@
+<%# Prompt step: one prompt, no reusable SKILL.md. Locals: f:, step: %>
+<div>
+  <%= f.label :body, "Prompt", class: label_classes %>
+  <%= f.text_area :body, rows: 10,
+        placeholder: "What should the model do? Variables like ${task_title} are substituted before it runs.",
+        class: input_classes("font-mono resize-y") %>
+</div>

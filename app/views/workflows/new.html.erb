@@ -1,5 +1,16 @@
 <%= render "shared/project_bar", project: @project %>
-<h1 class="text-2xl font-semibold mb-4">New Workflow</h1>
-<div class="bg-surface-card border border-edge rounded-lg p-5">
+<%= render "shared/components/page_header", title: "New workflow",
+      subtitle: "Start from something that already works, or build one from nothing." %>
+
+<h2 class="text-lg font-semibold mb-3">Start from a template</h2>
+<%= render "workflows/starter_gallery", project: @project %>
+
+<h2 class="text-lg font-semibold mt-8 mb-3">Start blank</h2>
+<%= render layout: "shared/components/card", locals: { class: "max-w-2xl" } do %>
   <%= render "form", workflow: @workflow %>
-</div>
+<% end %>
+
+<p class="text-sm text-content-muted mt-4">
+  Got a workflow from somewhere else?
+  <%= link_to "Import a file", new_project_workflow_import_path(@project), class: "text-accent hover:underline" %>.
+</p>

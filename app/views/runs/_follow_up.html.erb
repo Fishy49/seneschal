@@ -1,0 +1,44 @@
+<%# Append more work to a finished run. Locals: run: %>
+<% project_skills = Skill.for_project(run.workflow.project).includes(:project).order(:name) %>
+<details class="mt-4" data-controller="follow-up-form">
+  <summary class="<%= btn_classes(:ghost, size: :sm, extra: "list-none [&::-webkit-details-marker]:hidden") %>">
+    Follow up
+  </summary>
+  <%= render layout: "shared/components/card", locals: { class: "mt-3" } do %>
+    <p class="text-sm text-content-muted mb-3">
+      Describe what to fix or change. It runs as a new step appended to this run, with the same context
+      (branch, pull request, and so on). You can queue skills to run afterwards.
+    </p>
+    <%= form_with url: follow_up_run_path(run), method: :post, class: "space-y-4" do |f| %>
+      <div>
+        <label for="follow_up_instructions" class="<%= label_classes %>">Instructions</label>
+        <%= f.text_area :instructions, id: "follow_up_instructions", rows: 5,
+              placeholder: "e.g. RunService and StepService still call the database directly. Move them onto the repository, keeping the existing public method signatures.",
+              class: input_classes("font-mono resize-y") %>
+      </div>
+
+      <div>
+        <label class="<%= label_classes %>">Then run these skills, in order</label>
+        <div data-follow-up-form-target="skillList" class="space-y-2"></div>
+        <template data-follow-up-form-target="template">
+          <div class="flex items-center gap-2">
+            <select name="skill_ids[]" class="<%= input_classes("flex-1") %>">
+              <option value="">Select a skill...</option>
+              <% project_skills.each do |skill| %>
+                <option value="<%= skill.id %>"><%= skill.display_name %></option>
+              <% end %>
+            </select>
+            <button type="button" data-action="follow-up-form#removeSkill"
+                    class="<%= btn_classes(:ghost, size: :sm) %>">Remove</button>
+          </div>
+        </template>
+        <button type="button" data-action="follow-up-form#addSkill"
+                class="<%= btn_classes(:ghost, size: :sm, extra: "mt-2") %>">
+          + Add skill
+        </button>
+      </div>
+
+      <%= f.submit "Start follow up", class: btn_classes(:primary) %>
+    <% end %>
+  <% end %>
+</details>

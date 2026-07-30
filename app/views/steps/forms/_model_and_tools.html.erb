@@ -1,0 +1,50 @@
+<%# Model settings shared by skill and prompt steps. Locals: step: %>
+<% cfg = step.config || {} %>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div>
+    <label for="skill_model" class="<%= label_classes %>">Model</label>
+    <select name="skill_model" id="skill_model"
+            class="<%= input_classes %>">
+      <option value="">Default</option>
+      <% StepsHelper::MODEL_OPTIONS.each do |label, value| %>
+        <option value="<%= value %>" <%= "selected" if cfg["model"] == value %>><%= label %></option>
+      <% end %>
+    </select>
+  </div>
+  <div>
+    <label for="skill_effort" class="<%= label_classes %>">Thinking effort</label>
+    <select name="skill_effort" id="skill_effort"
+            class="<%= input_classes %>">
+      <% StepsHelper::EFFORT_OPTIONS.each do |label, value| %>
+        <option value="<%= value %>" <%= "selected" if cfg["effort"] == value || (cfg["effort"].blank? && value == "medium") %>><%= label %></option>
+      <% end %>
+    </select>
+  </div>
+  <div>
+    <label for="skill_max_turns" class="<%= label_classes %>">Turn limit</label>
+    <input type="number" name="skill_max_turns" id="skill_max_turns"
+           value="<%= cfg["max_turns"] %>" min="1" placeholder="No limit"
+           class="<%= input_classes("font-mono tabular-nums") %>">
+  </div>
+</div>
+
+<div>
+  <label for="skill_allowed_tools" class="<%= label_classes %>">Allowed tools</label>
+  <input type="text" name="skill_allowed_tools" id="skill_allowed_tools"
+         value="<%= cfg["allowed_tools"] %>" placeholder="<%= StepExecutor::DEFAULT_ALLOWED_TOOLS %>"
+         class="<%= input_classes("font-mono") %>">
+  <p class="<%= hint_classes %>">
+    Comma separated; anything else is refused. Patterns work, for example
+    <code class="bg-surface-input px-1 rounded">Bash(git *)</code>.
+    Blank inherits the server's default allowed tools.
+  </p>
+</div>
+
+<label class="flex items-start gap-3 cursor-pointer">
+  <input type="checkbox" name="skill_preview_assets" value="1" <%= "checked" if cfg["preview_assets"] %>
+         class="accent-accent h-4 w-4 rounded cursor-pointer mt-0.5">
+  <span>
+    <span class="block text-sm font-medium text-content">Collect images and other files it produces</span>
+    <span class="block text-xs text-content-muted mt-0.5">Charts, screenshots, audio and video show up on the run page instead of only on disk.</span>
+  </span>
+</label>

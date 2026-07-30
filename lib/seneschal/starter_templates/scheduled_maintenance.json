@@ -1,0 +1,92 @@
+{
+  "seneschal_workflow_export": {
+    "version": 1,
+    "exported_at": "2026-07-27T00:00:00Z",
+    "source_project_name": "Seneschal starter templates",
+    "workflow": {
+      "name": "Dependency update",
+      "description": "Updates dependencies, runs the suite, and opens a pull request. Built to be paired with a task set to run on a schedule.",
+      "config": {},
+      "steps": [
+        {
+          "name": "Update dependencies",
+          "position": 1,
+          "step_type": "skill",
+          "body": null,
+          "config": {
+            "effort": "medium",
+            "consumes": [
+              "task_body"
+            ]
+          },
+          "skill_ref": {
+            "scope": "shared",
+            "name": "update-dependencies"
+          },
+          "json_schema_ref": null,
+          "max_retries": 1,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Open PR",
+          "position": 2,
+          "step_type": "pr",
+          "body": null,
+          "config": {
+            "title": "chore: dependency update",
+            "body": "Routine dependency update.",
+            "base": "main",
+            "draft": true,
+            "produces": [
+              "pr_number",
+              "branch_name"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 600,
+          "input_context": null,
+          "manual_approval": false
+        },
+        {
+          "name": "Wait for CI",
+          "position": 3,
+          "step_type": "ci_check",
+          "body": null,
+          "config": {
+            "mode": "pr",
+            "pr": "${pr_number}",
+            "poll_interval": 60,
+            "max_log_chars": 10000,
+            "log_from": "end",
+            "consumes": [
+              "pr_number"
+            ]
+          },
+          "skill_ref": null,
+          "json_schema_ref": null,
+          "max_retries": 0,
+          "timeout": 3600,
+          "input_context": null,
+          "manual_approval": false
+        }
+      ]
+    },
+    "skills": [
+      {
+        "name": "update-dependencies",
+        "scope": "shared",
+        "source_kind": "global",
+        "relative_path": "update-dependencies",
+        "description": "Updates dependencies conservatively and keeps the test suite green.",
+        "default_json_schema_name": null,
+        "default_output_variable": null,
+        "skill_md_content": "---\nname: update-dependencies\ndescription: Updates dependencies conservatively and keeps the test suite green.\n---\n\nBring dependencies up to date.\n\n${task_body}\n\nUpdate what is safe to update. Read the changelog for anything crossing a\nmajor version and leave those alone unless the notes say the change does not\naffect this project - say which ones you skipped and why.\n\nRun the test suite afterwards. If something breaks, fix it or revert that one\ndependency; do not leave the suite red.\n"
+      }
+    ],
+    "json_schemas": []
+  }
+}

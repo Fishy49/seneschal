@@ -1,0 +1,11 @@
+<%# Shell step: runs in the run's checkout. Locals: f:, step: %>
+<div>
+  <%= f.label :body, "Command", class: label_classes %>
+  <%= f.text_area :body, rows: 8,
+        placeholder: "e.g. npm run build",
+        class: input_classes("font-mono resize-y") %>
+  <p class="<%= hint_classes %>">
+    Runs in the working copy for this run. Variables like <code class="bg-surface-input px-1 rounded">${task_title}</code>
+    are substituted first. Write outputs with <code class="bg-surface-input px-1 rounded">::set-output</code>.
+  </p>
+</div>

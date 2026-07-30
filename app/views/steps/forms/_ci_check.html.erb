@@ -1,0 +1,74 @@
+<%# Wait for CI: watch GitHub checks until they settle. Locals: f:, step: %>
+<% ci = step.config || {} %>
+<div class="space-y-4">
+  <p class="text-sm text-content-muted">Pauses the run until GitHub reports back, then hands any failure logs to the next step.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label for="ci_mode" class="<%= label_classes %>">Watch</label>
+      <select name="ci_mode" id="ci_mode" data-step-form-target="ciMode" data-action="step-form#ciModeChanged"
+              class="<%= input_classes %>">
+        <option value="pr" <%= "selected" unless ci["mode"] == "workflow" %>>Every check on a pull request</option>
+        <option value="workflow" <%= "selected" if ci["mode"] == "workflow" %>>One workflow file</option>
+      </select>
+    </div>
+    <div>
+      <label for="ci_poll_interval" class="<%= label_classes %>">Check every</label>
+      <div class="flex items-center gap-2">
+        <input type="number" name="ci_poll_interval" id="ci_poll_interval"
+               value="<%= ci["poll_interval"] || 30 %>" min="10"
+               class="<%= input_classes("font-mono tabular-nums") %>">
+        <span class="text-sm text-content-muted">seconds</span>
+      </div>
+    </div>
+  </div>
+
+  <div data-step-form-target="ciPrFields" style="<%= "display:none" if ci["mode"] == "workflow" %>">
+    <label for="ci_pr" class="<%= label_classes %>">Pull request</label>
+    <input type="text" name="ci_pr" id="ci_pr"
+           value="<%= ci["pr"] || "${pr_number}" %>" placeholder="${pr_number}"
+           class="<%= input_classes("font-mono") %>">
+    <p class="<%= hint_classes %>">An earlier Open PR step publishes <code class="bg-surface-input px-1 rounded">${pr_number}</code>.</p>
+  </div>
+
+  <div data-step-form-target="ciWorkflowFields" style="<%= "display:none" unless ci["mode"] == "workflow" %>" class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label for="ci_workflow" class="<%= label_classes %>">Workflow file</label>
+        <input type="text" name="ci_workflow" id="ci_workflow"
+               value="<%= ci["workflow"] %>" placeholder="e.g. test.yml"
+               class="<%= input_classes %>">
+      </div>
+      <div>
+        <label for="ci_ref" class="<%= label_classes %>">Branch</label>
+        <input type="text" name="ci_ref" id="ci_ref"
+               value="<%= ci["ref"] || "${branch_name}" %>" placeholder="${branch_name}"
+               class="<%= input_classes("font-mono") %>">
+        <p class="<%= hint_classes %>">An Open PR step publishes <code class="bg-surface-input px-1 rounded">${branch_name}</code>.</p>
+      </div>
+    </div>
+
+    <label class="flex items-center gap-2.5 cursor-pointer text-sm text-content">
+      <input type="checkbox" name="ci_trigger" value="1" <%= "checked" if ci["trigger"] %> class="accent-accent h-4 w-4 rounded cursor-pointer">
+      Start the workflow run, instead of only watching for one
+    </label>
+  </div>
+
+  <div data-step-form-target="ciLogFields" style="<%= "display:none" if ci["mode"] == "workflow" %>" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label for="ci_max_log_chars" class="<%= label_classes %>">Failure log limit</label>
+      <input type="number" name="ci_max_log_chars" id="ci_max_log_chars"
+             value="<%= ci["max_log_chars"] || 10_000 %>" min="1000" step="1000"
+             class="<%= input_classes("font-mono tabular-nums") %>">
+      <p class="<%= hint_classes %>">Characters of log kept for the next step to read.</p>
+    </div>
+    <div>
+      <label for="ci_log_from" class="<%= label_classes %>">Keep the log's</label>
+      <select name="ci_log_from" id="ci_log_from"
+              class="<%= input_classes %>">
+        <option value="end" <%= "selected" unless ci["log_from"] == "beginning" %>>End, where the error usually is</option>
+        <option value="beginning" <%= "selected" if ci["log_from"] == "beginning" %>>Beginning</option>
+      </select>
+    </div>
+  </div>
+</div>

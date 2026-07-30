@@ -241,4 +241,67 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to skill_path(skill)
     assert_match(/not valid JSON/i, flash[:alert])
   end
+
+  # SKILL.md editing writes to disk, so these build their own temp project.
+  class SkillMdEditingTest < ActionDispatch::IntegrationTest
+    setup do
+      sign_in users(:admin)
+      @dir = Dir.mktmpdir("seneschal-skill-edit")
+      @project = Project.create!(name: "Edit Project", repo_url: "git@example.com:acme/x.git", local_path: @dir)
+      FileUtils.mkdir_p(File.join(@dir, ".seneschal", "skills", "reviewer"))
+      File.write(File.join(@dir, ".seneschal", "skills", "reviewer", "SKILL.md"),
+                 "---\nname: reviewer\n---\n\nOriginal.\n")
+      @skill = Skill.create!(name: "reviewer", project: @project,
+                             source_kind: "project_seneschal", relative_path: "reviewer")
+      @skill.refresh_cached_metadata!
+    end
+
+    teardown { FileUtils.remove_entry(@dir) if @dir && File.directory?(@dir) }
+
+    test "the edit page offers the SKILL.md editor" do
+      get edit_skill_path(@skill)
+      assert_select "input[name=skill_md]"
+      assert_select "h4", text: "SKILL.md"
+    end
+
+    test "PATCH update writes the file and reports success" do
+      patch skill_path(@skill), params: {
+        skill: { scope: "project:#{@project.id}" },
+        skill_md: "---\nname: reviewer\n---\n\nRewritten.\n"
+      }
+      assert_redirected_to skill_path(@skill)
+      assert_includes Skill.find(@skill.id).body, "Rewritten."
+    end
+
+    test "PATCH update rejects a rename and leaves the file alone" do
+      patch skill_path(@skill), params: {
+        skill: { scope: "project:#{@project.id}" },
+        skill_md: "---\nname: renamed\n---\n\nRewritten.\n"
+      }
+      assert_response :unprocessable_content
+      assert_includes Skill.find(@skill.id).body, "Original."
+    end
+
+    test "a repo-synced skill shows the read-only notice instead of an editor" do
+      repo = SkillRepo.create!(name: "acme-skills", repo_url: "git@example.com:acme/s.git",
+                               local_path: @dir, priority: 1)
+      synced = Skill.create!(name: "synced", skill_repo: repo, source_kind: "skill_repo",
+                             relative_path: "reviewer")
+
+      get edit_skill_path(synced)
+      assert_select "input[name=skill_md]", count: 0
+      assert_select "p", text: /Synced from/
+    end
+
+    test "a repo-synced skill refuses a write even if one is posted" do
+      repo = SkillRepo.create!(name: "acme-skills", repo_url: "git@example.com:acme/s.git",
+                               local_path: @dir, priority: 1)
+      synced = Skill.create!(name: "synced", skill_repo: repo, source_kind: "skill_repo",
+                             relative_path: "reviewer")
+
+      patch skill_path(synced), params: { skill: { scope: "" }, skill_md: "hacked" }
+      assert_response :unprocessable_content
+      assert_includes File.read(File.join(@dir, ".seneschal", "skills", "reviewer", "SKILL.md")), "Original."
+    end
+  end
 end
