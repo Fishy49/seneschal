@@ -1,12 +1,8 @@
 <%# Broadcast contract: ExecuteRunJob replaces #run_info wholesale, so the
-    element id, partial path and `run:` local stay put. The error leads when
-    there is one - it is the reason anyone is reading this card. %>
-<div class="bg-surface-card border border-edge rounded-lg p-5 mb-4" id="run_info">
-  <div class="flex items-center justify-between gap-2 mb-3">
-    <h2 class="text-lg font-semibold">Run <span class="text-content-muted font-normal font-mono">#<%= run.id %></span></h2>
-    <%= status_badge(run.status) %>
-  </div>
-
+    element id, partial path and `run:` local stay put. The header owns the
+    run's identity, status and totals now; this card keeps only what has no
+    other home - the error, provenance, and the precise timestamps. %>
+<div class="bg-surface-card border border-edge rounded-lg p-4 mb-4" id="run_info">
   <% if run.error_message.present? %>
     <div class="mb-3 px-3 py-2.5 bg-danger/10 border border-danger/30 rounded-lg">
       <p class="text-[0.6875rem] font-semibold uppercase tracking-wide text-danger mb-1">Error</p>
@@ -14,12 +10,7 @@
     </div>
   <% end %>
 
-  <%
-    stats = run.usage_stats
-    tokens = stats && (stats[:input_tokens] + stats[:output_tokens] +
-                       stats[:cache_read_tokens] + stats[:cache_creation_tokens])
-  %>
-  <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+  <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
     <% if run.input["resumed_from_run"].present? %>
       <dt class="text-content-muted">Resumed from</dt>
       <dd><%= link_to "Run ##{run.input['resumed_from_run']}", run_path(run.input["resumed_from_run"]) %></dd>
@@ -32,15 +23,5 @@
     <dd class="font-mono tabular-nums"><%= run.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
     <dt class="text-content-muted">Finished</dt>
     <dd class="font-mono tabular-nums"><%= run.finished_at&.strftime("%Y-%m-%d %H:%M:%S") || "-" %></dd>
-    <dt class="text-content-muted">Duration</dt>
-    <dd class="font-mono tabular-nums"><%= format_duration(run.duration) %></dd>
-    <% if stats && stats[:cost_usd].to_f.positive? %>
-      <dt class="text-content-muted">Cost</dt>
-      <dd class="font-mono tabular-nums"><%= format_cost(stats[:cost_usd]) %></dd>
-    <% end %>
-    <% if tokens&.positive? %>
-      <dt class="text-content-muted">Tokens</dt>
-      <dd class="font-mono tabular-nums"><%= format_tokens(tokens) %></dd>
-    <% end %>
   </dl>
 </div>

@@ -1,10 +1,4 @@
 <%= turbo_stream_from @run %>
-<%= render "shared/project_bar",
-     project: @run.workflow.project,
-     workflow: @run.workflow,
-     task: @run.pipeline_task,
-     run: @run %>
-
 <%= render "runs/run_chrome", run: @run, mode: :overview %>
 
 <%# data-controller="discussion" sits up here so a step row in the left column
@@ -25,8 +19,8 @@
 
     <%# Context and input are reference material once a run is under way, so
         they sit closed under the steps instead of crowding the rail. %>
-    <details class="mb-4">
-      <summary class="bg-surface-card border border-edge rounded-lg px-5 py-3 text-lg font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
+    <details class="mb-3">
+      <summary class="bg-surface-card border border-edge rounded-lg px-4 py-2 text-sm font-medium text-content-muted cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
         Context
       </summary>
       <div class="mt-2">
@@ -35,8 +29,8 @@
     </details>
 
     <% if @run.input.present? && @run.input.any? %>
-      <details class="mb-4">
-        <summary class="bg-surface-card border border-edge rounded-lg px-5 py-3 text-lg font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
+      <details class="mb-3">
+        <summary class="bg-surface-card border border-edge rounded-lg px-4 py-2 text-sm font-medium text-content-muted cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
           Input
         </summary>
         <div class="bg-surface-card border border-edge rounded-lg p-5 mt-2">

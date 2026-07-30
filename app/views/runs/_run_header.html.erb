@@ -1,39 +1,53 @@
-<%# Identity and actions for a run. ExecuteRunJob broadcasts a replace of
-    #run_header with this partial, so the element id, the partial path and the
-    `run:` local are a contract - anything live must live in here, and
-    anything with a Stimulus subscription must not (it would be torn down on
-    every step update). %>
+<%# Identity and actions for a run, said once: breadcrumb, title, status,
+    live stats and actions share a single row. ExecuteRunJob broadcasts a
+    replace of #run_header with this partial, so the element id, the partial
+    path and the `run:` local are a contract - anything live must live in
+    here, and anything with a Stimulus subscription must not (it would be
+    torn down on every step update). %>
 <div id="run_header">
-  <div class="flex items-start justify-between gap-4">
-    <div class="min-w-0">
-      <h1 class="text-2xl font-semibold flex items-center gap-2 flex-wrap">
-        <%= run_display_name(run) %>
-        <%= status_badge(run.status) %>
-        <% if run.workflow.project.skip_permissions? %>
-          <span class="bg-danger/15 text-danger border border-danger/25 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide"
-                title="This run executed without permission prompts.">&#9888; Danger mode</span>
-        <% end %>
-      </h1>
-      <p class="text-xs text-content-muted mt-1">
-        <%
-          stats = run.usage_stats
-          tokens = stats && (stats[:input_tokens] + stats[:output_tokens] +
-                             stats[:cache_read_tokens] + stats[:cache_creation_tokens])
-          meta = ["Started by #{run.started_by_label}"]
-          meta << time_ago_short(run.started_at || run.created_at)
-          meta << format_cost(stats[:cost_usd]) if stats && stats[:cost_usd].to_f.positive?
-          meta << "#{format_tokens(tokens)} tokens" if tokens&.positive?
-          meta << "stopped by #{run.stopped_by.email}" if run.stopped_by
-        %>
-        <%= meta.compact.join(" · ") %>
-        &middot;
-        <%= link_to run.workflow.project.name, project_path(run.workflow.project), class: "hover:text-content transition-colors" %>
-        &middot;
-        <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-content transition-colors" %>
-      </p>
-    </div>
+  <div class="flex items-center gap-x-2.5 gap-y-2 flex-wrap min-w-0">
+    <nav class="flex items-center gap-2.5 text-[0.8125rem] text-content-muted min-w-0" aria-label="Breadcrumb">
+      <%= link_to run.workflow.project.name, project_path(run.workflow.project), class: "hover:text-accent transition-colors shrink-0" %>
+      <span class="text-content-faint">/</span>
+      <%= link_to run.workflow.name, project_workflow_path(run.workflow.project, run.workflow), class: "hover:text-accent transition-colors truncate" %>
+      <span class="text-content-faint">/</span>
+    </nav>
+    <h1 class="text-lg font-semibold leading-tight flex items-baseline gap-1.5 min-w-0">
+      <% if run.pipeline_task %>
+        <%= link_to run.pipeline_task.title, pipeline_task_path(run.pipeline_task), class: "text-content hover:text-accent transition-colors truncate" %>
+        <span class="shrink-0 text-content-muted font-normal">&middot; run <%= run.ordinal %></span>
+      <% else %>
+        <span class="truncate">Manual run <span class="font-mono">#<%= run.id %></span></span>
+      <% end %>
+    </h1>
+    <%= status_badge(run.status) %>
+    <% if run.workflow.project.skip_permissions? %>
+      <span class="bg-danger/15 text-danger border border-danger/25 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide"
+            title="This run executed without permission prompts.">&#9888; Danger mode</span>
+    <% end %>
 
-    <div class="flex items-center gap-2 shrink-0">
+    <span class="ml-auto"></span>
+    <%
+      stats = run.usage_stats
+      tokens = stats && (stats[:input_tokens] + stats[:output_tokens] +
+                         stats[:cache_read_tokens] + stats[:cache_creation_tokens])
+      strip = []
+      if run.active? && (current = run.run_steps.where(status: ["running", "streaming", "retrying", "awaiting_approval", "waiting_for_tokens"]).order(:position).first)
+        total = run.workflow.steps.count
+        strip << "step #{current.position} of #{total}" if current.position.to_i.positive? && total.positive?
+      end
+      strip << format_cost(stats[:cost_usd]) if stats && stats[:cost_usd].to_f.positive?
+      strip << "#{format_tokens(tokens)} tok" if tokens&.positive?
+      if run.active? && run.started_at
+        strip << format_duration(Time.current - run.started_at)
+      elsif run.duration
+        strip << format_duration(run.duration)
+      end
+    %>
+    <% if strip.any? %>
+      <span class="font-mono tabular-nums text-xs text-content-muted whitespace-nowrap"><%= strip.join(" · ") %></span>
+    <% end %>
+    <span class="flex items-center gap-2 shrink-0">
       <% if run.active? %>
         <%= button_to "Stop", stop_run_path(run),
               class: btn_classes(:danger, size: :sm),
@@ -49,8 +63,12 @@
       <% end %>
       <%= link_to "Share", run_path(run, anchor: "share"),
             class: btn_classes(:ghost, size: :sm) %>
-    </div>
+    </span>
   </div>
+  <p class="text-xs text-content-muted mt-1">
+    Started by <%= run.started_by_label %> &middot; <%= time_ago_short(run.started_at || run.created_at) %><% if run.stopped_by %> &middot; stopped by <%= run.stopped_by.email %><% end %>
+    &middot; <span class="font-mono">Run #<%= run.id %></span>
+  </p>
 
   <% if run.awaiting_approval? %>
     <div class="mt-4">

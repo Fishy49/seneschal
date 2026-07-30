@@ -1,9 +1,3 @@
-<%= render "shared/project_bar",
-     project: @run.workflow.project,
-     workflow: @run.workflow,
-     task: @run.pipeline_task,
-     run: @run %>
-
 <%= render "runs/run_chrome", run: @run, mode: :transcript %>
 
 <%# Top-line metrics + filter chips + per-step trajectory all live under

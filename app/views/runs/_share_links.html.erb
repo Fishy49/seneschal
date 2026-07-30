@@ -2,8 +2,8 @@
     something to spend a whole card on. The header's Share link jumps to
     #share, which is why the id lives on the details element. %>
 <% links = run.share_links.recent %>
-<details class="mb-4 scroll-mt-4" id="share">
-  <summary class="bg-surface-card border border-edge rounded-lg px-5 py-3 text-lg font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
+<details class="mb-3 scroll-mt-4" id="share">
+  <summary class="bg-surface-card border border-edge rounded-lg px-4 py-2 text-sm font-medium text-content-muted cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-accent transition-colors">
     Share<% if links.any? %> <span class="text-xs font-medium text-content-muted align-middle">(<%= links.size %>)</span><% end %>
   </summary>
   <div class="bg-surface-card border border-edge rounded-lg p-5 mt-2">

@@ -390,10 +390,11 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_select "#run_step_#{run_steps(:running_step).id} details[data-preserve-key='raw'][open]"
   end
 
-  test "the run info card carries the raw id" do
+  test "the run info card carries the precise timestamps" do
     run = runs(:completed_run)
     get run_path(run)
-    assert_select "#run_info h2", text: /##{run.id}/
+    assert_select "#run_info dt", text: "Started"
+    assert_select "#run_info dd", text: /#{run.started_at.strftime("%Y-%m-%d")}/
   end
 
   # ExecuteRunJob broadcasts `replace target: "run_step_<id>", partial:

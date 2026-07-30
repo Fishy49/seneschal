@@ -9,11 +9,22 @@
      label = rs.position.to_i.positive? ? "Step #{rs.position} · #{rs.step.name}" : rs.step.name
      [label, "RunStep:#{rs.id}"]
    end %>
+<% items = run.thread_items %>
+<% participants = items.grep(Comment).map(&:user).compact.uniq.first(4) %>
 <div class="bg-surface-card border border-edge rounded-lg p-5 mb-4 scroll-mt-4" id="discussion">
-  <h2 class="text-lg font-semibold mb-3">Thread</h2>
+  <div class="flex items-center justify-between gap-2 mb-3">
+    <h2 class="text-lg font-semibold">Thread</h2>
+    <% if participants.any? %>
+      <div class="flex -space-x-1.5">
+        <% participants.each do |user| %>
+          <%= avatar_for(user, size: :sm) %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
 
   <div class="max-h-[55vh] overflow-y-auto" data-controller="autoscroll">
-    <ul class="list-none peer" id="run_discussion"><% run.thread_items.each do |item| %><%= render_thread_item(item) %><% end %></ul>
+    <ul class="list-none peer" id="run_discussion"><% items.each do |item| %><%= render_thread_item(item) %><% end %></ul>
     <p class="hidden peer-empty:block text-sm text-content-muted py-1">
       Nothing yet. The run's story - progress, decisions, comments - lands here.
     </p>

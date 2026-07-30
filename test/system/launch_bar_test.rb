@@ -33,7 +33,7 @@ class LaunchBarTest < ApplicationSystemTestCase
     select "Deploy Pipeline", from: "Workflow"
     find("[data-command-palette-target='submit']").click
 
-    assert_selector "h1", text: "Try the launch bar · run 1"
+    assert_selector "h1", text: "Try the launch bar · run 1", normalize_ws: true
     assert_equal "Try the launch bar", PipelineTask.last.title
   end
 

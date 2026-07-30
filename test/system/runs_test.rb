@@ -31,7 +31,7 @@ class RunsTest < ApplicationSystemTestCase
   test "the run header summarises cost and tokens" do
     visit run_path(runs(:completed_run))
     assert_text "$0.05"
-    assert_text "24.0k tokens"
+    assert_text "24.0k tok"
   end
 
   test "the full metrics breakdown lives on the transcript" do
