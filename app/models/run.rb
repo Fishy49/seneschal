@@ -41,6 +41,16 @@ class Run < ApplicationRecord
            .chronological.includes(:user, :commentable)
   end
 
+  # Everyone with a stake in this run: whoever started it, everyone who
+  # spoke in its thread, everyone who sealed or rejected a step. Notification
+  # fanout subtracts the actor itself.
+  def participants
+    users = [started_by]
+    users.concat(discussion_comments.map(&:user))
+    users.concat(ApprovalEvent.where(run_step_id: run_step_ids).includes(:user).map(&:user))
+    users.compact.uniq
+  end
+
   # The run's whole story in one list: comments, run-level events, and seal
   # decisions, oldest first. Approve/reject Events stay out (THREAD_HIDDEN);
   # their ApprovalEvent rows tell it better, comment text included.

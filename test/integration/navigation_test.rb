@@ -8,7 +8,7 @@ class NavigationTest < ActionDispatch::IntegrationTest
     get root_path
 
     assert_select "nav" do
-      assert_select "a[href=?]", root_path, text: "Home"
+      assert_select "a[href=?]", root_path, text: /Inbox/
       assert_select "a[href=?]", runs_path
       assert_select "a[href=?]", projects_path, text: "Projects"
       assert_select "a[href=?]", skills_path, text: "Library"

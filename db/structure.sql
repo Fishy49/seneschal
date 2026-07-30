@@ -173,7 +173,20 @@ FOREIGN KEY ("created_by_id")
  ON DELETE SET NULL);
 CREATE INDEX "index_workflows_on_project_id" ON "workflows" ("project_id") /*application='Seneschal'*/;
 CREATE INDEX "index_workflows_on_created_by_id" ON "workflows" ("created_by_id") /*application='Seneschal'*/;
+CREATE TABLE IF NOT EXISTS "notifications" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer NOT NULL, "event_id" integer NOT NULL, "context_type" varchar, "context_id" integer, "reason" varchar NOT NULL, "read_at" datetime(6), "created_at" datetime(6) NOT NULL, "updated_at" datetime(6) NOT NULL, CONSTRAINT "fk_rails_b080fb4855"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+, CONSTRAINT "fk_rails_78f4b5a537"
+FOREIGN KEY ("event_id")
+  REFERENCES "events" ("id")
+);
+CREATE INDEX "index_notifications_on_user_id" ON "notifications" ("user_id") /*application='Seneschal'*/;
+CREATE INDEX "index_notifications_on_event_id" ON "notifications" ("event_id") /*application='Seneschal'*/;
+CREATE INDEX "index_notifications_on_context" ON "notifications" ("context_type", "context_id") /*application='Seneschal'*/;
+CREATE INDEX "index_notifications_on_user_id_and_read_at" ON "notifications" ("user_id", "read_at") /*application='Seneschal'*/;
+CREATE UNIQUE INDEX "index_notifications_on_event_id_and_user_id" ON "notifications" ("event_id", "user_id") /*application='Seneschal'*/;
 INSERT INTO "schema_migrations" (version) VALUES
+('20260730170000'),
 ('20260729091900'),
 ('20260727011843'),
 ('20260727011001'),

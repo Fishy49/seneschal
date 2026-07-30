@@ -12,7 +12,11 @@ class RunsController < ApplicationController
     @projects = Project.order(:name)
   end
 
-  def show; end
+  # Reading the room settles its debts: everything the Inbox held about this
+  # run is seen now.
+  def show
+    Notification.mark_read(current_user, @run) if current_user
+  end
 
   # Trajectory replay: a richer, drill-down view of a single Run's full
   # stream_log across all its RunSteps. Static (no live polling) so it

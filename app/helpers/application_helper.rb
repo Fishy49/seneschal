@@ -92,6 +92,12 @@ module ApplicationHelper
     Run.awaiting_approval.count
   end
 
+  # The Inbox badge: seals the whole team still owes plus this person's own
+  # unread rows. Honest by construction - reading things shrinks it.
+  def inbox_attention_count
+    awaiting_approval_count + (current_user ? current_user.notifications.unread.count : 0)
+  end
+
   def usage_stats_bar(stats)
     return nil unless stats
 

@@ -7,7 +7,7 @@ class AuthenticationTest < ApplicationSystemTestCase
     fill_in "Password", with: "password"
     click_on "Sign In"
 
-    assert_selector "h1", text: "Home"
+    assert_selector "h1", text: "Inbox"
     assert_current_path root_path
   end
 
@@ -45,7 +45,7 @@ class AuthenticationTest < ApplicationSystemTestCase
     fill_in "Confirm Password", with: "mynewpassword"
     click_on "Set Password & Sign In"
 
-    assert_selector "h1", text: "Home"
+    assert_selector "h1", text: "Inbox"
     assert_current_path root_path
   end
 

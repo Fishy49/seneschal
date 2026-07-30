@@ -45,19 +45,19 @@
           <span class="text-brass"><%= seal_mark(size: 22) %></span>
           <span class="font-display font-bold text-lg tracking-tight">Seneschal</span>
         </div>
-        <%= link_to root_path, class: nav_link_classes(:home) do %>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
-          <span>Home</span>
-        <% end %>
-        <%= link_to runs_path, class: "#{nav_link_classes(:runs)} justify-between" do %>
+        <%= link_to root_path, class: "#{nav_link_classes(:home)} justify-between" do %>
           <span class="flex items-center gap-2.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            <span>Runs</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg>
+            <span>Inbox</span>
           </span>
-          <% if (needs_you = awaiting_approval_count).positive? %>
+          <% if (needs_you = inbox_attention_count).positive? %>
             <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-brass text-on-brass text-[0.6875rem] font-semibold font-mono"
-                  title="<%= pluralize(needs_you, "run") %> awaiting approval"><%= needs_you %></span>
+                  title="<%= pluralize(needs_you, "thing") %> waiting on you"><%= needs_you %></span>
           <% end %>
+        <% end %>
+        <%= link_to runs_path, class: nav_link_classes(:runs) do %>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+          <span>Runs</span>
         <% end %>
         <div data-controller="sidebar-toggle">
           <div class="flex items-center justify-between">

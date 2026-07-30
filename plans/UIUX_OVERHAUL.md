@@ -167,6 +167,11 @@ Today Cmd+K is a launch-only form (no search, no results, no keyboard nav).
    inside ExecuteRunJob, which stays off-limits).
 3. **The inbox** - notifications table, mention fanout, read tracking, new
    home screen, honest badges, activity fold-in.
+   **STATUS: shipped on this branch.** Notes: fanout covers run.failed and
+   comment.created (mention outranks reply via the unique-index dedupe);
+   awaiting-approval stays a live query, not notification rows. The
+   Activity page survives as its own nav item rather than folding in - the
+   recent-activity card already covers the inbox's "everything" glance.
 4. **The board & the palette** - tasks kanban, command palette v2, branded
    share page, workflow editor cleanup (inspector density, starter gallery
    dedupe).

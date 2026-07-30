@@ -119,6 +119,8 @@ Rails.application.routes.draw do
 
   get "activity", to: "activity#index", as: :activity
 
+  post "notifications/read_all", to: "notifications#read_all", as: :read_all_notifications
+
   resources :comments, only: [:create, :destroy]
 
   resources :preview_assets, only: [:show]

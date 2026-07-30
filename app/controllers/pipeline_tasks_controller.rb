@@ -18,6 +18,7 @@ class PipelineTasksController < ApplicationController
 
   def show
     @runs = @task.runs.includes(:workflow).recent.limit(10)
+    Notification.mark_read(current_user, @task) if current_user
   end
 
   # `description` and `project_id` let the launch palette hand off to the full

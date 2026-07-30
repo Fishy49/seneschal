@@ -23,6 +23,12 @@ class Comment < ApplicationRecord
     end
   end
 
+  # Where this comment's conversation lives: the run, or the task for task
+  # comments. Notification fanout keys audience and read-tracking off it.
+  def thread_context
+    run || (commentable if commentable.is_a?(PipelineTask))
+  end
+
   # "@rick" matches rick@example.com and rick.cagle@hey.com: a token matches a
   # user when it equals the whole local part of their email, or that local
   # part's first dot / underscore / hyphen delimited segment. Nothing fuzzier,

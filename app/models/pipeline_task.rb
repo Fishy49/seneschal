@@ -37,6 +37,11 @@ class PipelineTask < ApplicationRecord
   scope :scheduled_cron, -> { active.where(trigger_type: "cron") }
   scope :branch_watching, -> { active.where(trigger_type: "github_watch") }
 
+  # Whoever filed the task plus everyone who spoke in its thread.
+  def participants
+    ([created_by] + comments.includes(:user).map(&:user)).compact.uniq
+  end
+
   def archived? = archived_at.present?
   def manual? = trigger_type == "manual"
   def cron? = trigger_type == "cron"

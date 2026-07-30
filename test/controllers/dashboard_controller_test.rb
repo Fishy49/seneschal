@@ -8,20 +8,20 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test "GET index renders dashboard" do
     get root_path
     assert_response :success
-    assert_select "h1", "Home"
+    assert_select "h1", "Inbox"
   end
 
-  test "sidebar badges the number of runs awaiting approval" do
+  test "sidebar badges the inbox with what waits on you" do
     get root_path
     assert_response :success
-    assert_select "a[href=?] span[title*=?]", runs_path, "awaiting approval", text: "1"
+    assert_select "a[href=?] span[title*=?]", root_path, "waiting on you", text: "1"
   end
 
   test "sidebar has no badge when nothing is parked" do
     Run.awaiting_approval.find_each { |r| r.update!(status: "completed") }
     get root_path
     assert_response :success
-    assert_select "a[href=?] span[title*=?]", runs_path, "awaiting approval", false
+    assert_select "a[href=?] span[title*=?]", root_path, "waiting on you", false
   end
 
   test "loads highlight.js and its theme from local assets" do
@@ -68,7 +68,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
   test "Home leads with a launch button" do
     get root_path
-    assert_select "h1", "Home"
+    assert_select "h1", "Inbox"
     assert_select "button[data-action=?]", "command-palette#open"
   end
 
@@ -79,7 +79,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     assert_select "#dashboard_awaiting" do
       assert_select "a[href=?]", run_path(run)
     end
-    assert_match(/Needs you/, response.body)
+    assert_match(/Waiting on your seal/, response.body)
   end
 
   test "awaiting runs are not duplicated into active runs" do
@@ -93,7 +93,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
     Run.awaiting_approval.find_each { |r| r.update!(status: "completed") }
     get root_path
     assert_response :success
-    assert_no_match(/Needs you/, response.body)
+    assert_no_match(/Waiting on your seal/, response.body)
   end
 
   test "shows projects" do
@@ -146,5 +146,33 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
 
     get root_path
     assert_select "h2", text: "Getting started", count: 0
+  end
+  test "the inbox lists unread failures and mentions and marks them read on visit" do
+    run = runs(:completed_run)
+    run.update!(started_by: users(:admin), error_message: "Step 'Run Build' failed with exit code 1")
+    Event.record("run.failed", subject: run, user: users(:other))
+    run.comments.create!(user: users(:other), body: "@admin can you look?")
+
+    get root_path
+    assert_response :success
+    assert_select "h2", text: "Failed"
+    assert_select "h2", text: /Mentions/
+    assert_match(/can you look\?/, response.body)
+
+    # Visiting the run settles both rows; the inbox empties.
+    get run_path(run)
+    get root_path
+    assert_select "h2", text: "Failed", count: 0
+    assert_select "h2", text: /Mentions/, count: 0
+  end
+
+  test "mark all read sweeps the inbox" do
+    run = runs(:completed_run)
+    run.update!(started_by: users(:admin))
+    run.comments.create!(user: users(:other), body: "@admin ping")
+    assert_equal 1, users(:admin).notifications.unread.count
+
+    post read_all_notifications_path
+    assert_equal 0, users(:admin).notifications.unread.count
   end
 end

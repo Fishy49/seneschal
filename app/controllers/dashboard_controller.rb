@@ -20,5 +20,12 @@ class DashboardController < ApplicationController
     # their own; it has nothing left to teach them.
     @show_onboarding = Run.where(started_by: current_user).none?
     @has_credentials = current_user.user_credentials.exists?
+
+    # The Inbox proper: this person's unread rows, split the way the page
+    # groups them. Failure rows survive until the run is visited or swept.
+    unread = current_user.notifications.unread.includes(:context, event: [:user, :subject]).recent
+    @failed_notifications = unread.select { |n| n.reason == "failed" }.first(10)
+    @mention_notifications = unread.select { |n| n.reason.in?(["mention", "reply"]) }.first(15)
+    @shipped_this_week = Run.where(status: "completed").where(finished_at: 1.week.ago..).count
   end
 end

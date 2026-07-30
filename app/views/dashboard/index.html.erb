@@ -1,13 +1,33 @@
-<%= render layout: "shared/components/page_header", locals: { title: "Home" } do %>
+<% attention = @awaiting_runs.size + @failed_notifications.size + @mention_notifications.size %>
+<%= render layout: "shared/components/page_header", locals: { title: "Inbox" } do %>
+  <% if @failed_notifications.any? || @mention_notifications.any? %>
+    <%= button_to "Mark all read", read_all_notifications_path,
+          class: btn_classes(:quiet, size: :sm) %>
+  <% end %>
   <button type="button" data-action="command-palette#open"
           class="<%= btn_classes(:primary) %>">
     Launch
   </button>
 <% end %>
 
+<p class="font-mono tabular-nums text-xs text-content-muted -mt-2 mb-4">
+  <%= attention %> need you &middot; <%= @active_runs.size %> running &middot; <%= @shipped_this_week %> shipped this week
+</p>
+
 <div data-controller="dashboard-refresh">
   <div id="dashboard_awaiting" data-dashboard-refresh-target="region">
     <%= render "dashboard/awaiting_runs", runs: @awaiting_runs, viewers: @awaiting_viewers %>
+  </div>
+
+  <div id="dashboard_inbox" data-dashboard-refresh-target="region">
+    <%= render "dashboard/inbox_notifications",
+          failed: @failed_notifications, mentions: @mention_notifications %>
+    <% if attention.zero? && !@show_onboarding %>
+      <div class="bg-surface-card border border-edge rounded-lg px-5 py-4 mb-4 flex items-center gap-2.5">
+        <span class="text-brass"><%= seal_mark(size: 16) %></span>
+        <p class="text-sm text-content-muted">Nothing needs you. The agents have the watch.</p>
+      </div>
+    <% end %>
   </div>
 
   <% if @show_onboarding %>

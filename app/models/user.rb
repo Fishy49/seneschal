@@ -6,6 +6,7 @@ class User < ApplicationRecord
   DENSITIES = ["cozy", "compact"].freeze
 
   has_many :user_credentials, dependent: :destroy
+  has_many :notifications, dependent: :delete_all
 
   has_secure_password
 
