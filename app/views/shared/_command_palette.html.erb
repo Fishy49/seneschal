@@ -7,8 +7,8 @@
        data-action="click->command-palette#backdropClick">
     <div class="w-full max-w-2xl bg-surface-card border border-edge rounded-lg shadow-2xl overflow-hidden">
       <div class="flex items-center justify-between px-5 py-3 border-b border-edge">
-        <span class="text-sm font-semibold">Launch a run</span>
-        <span class="text-xs text-content-muted">Esc to close &middot; <%= "⌘" %>/Ctrl+Enter to launch</span>
+        <span class="text-sm font-semibold">Search, jump, or launch</span>
+        <span class="text-xs text-content-muted">Esc to close &middot; &#8593;&#8595; to pick &middot; <%= "⌘" %>/Ctrl+Enter to launch</span>
       </div>
 
       <div class="p-5 space-y-4">
@@ -16,10 +16,13 @@
           <label for="quick_launch_description" class="<%= label_classes %>">What should Claude do?</label>
           <textarea id="quick_launch_description" rows="4"
                     data-command-palette-target="description"
-                    data-action="keydown->command-palette#descriptionKeydown input->command-palette#updateComposerLink"
+                    data-action="keydown->command-palette#descriptionKeydown input->command-palette#updateComposerLink input->command-palette#queryChanged"
                     placeholder="Add rate limiting to the public API endpoints"
                     class="<%= input_classes("resize-y") %>"></textarea>
         </div>
+
+        <ul data-command-palette-target="results" hidden
+            class="list-none border border-edge rounded-lg divide-y divide-edge overflow-hidden max-h-64 overflow-y-auto"></ul>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

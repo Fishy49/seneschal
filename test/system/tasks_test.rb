@@ -80,12 +80,13 @@ class TasksTest < ApplicationSystemTestCase
     assert_field "Title", with: "Add rate limiting"
   end
 
-  test "filter tasks by status" do
+  test "the board groups tasks into status columns" do
     visit pipeline_tasks_path
-    select "Ready", from: "status"
-    click_on "Search"
 
-    assert_text "Add user authentication"
+    assert_text "Draft"
+    assert_text "Waiting on you"
+    within("[data-column='ready']") { assert_text "Add user authentication" }
+    within("[data-column='draft']") { assert_text "Refactor database layer" }
   end
 
   test "task shows runs" do

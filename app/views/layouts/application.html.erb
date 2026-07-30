@@ -38,7 +38,8 @@
       page is inside its scope. %>
   <body data-controller="<%= "command-palette" if current_user %>"
         data-command-palette-options-url-value="<%= quick_launch_options_path %>"
-        data-command-palette-launch-url-value="<%= quick_launch_path %>">
+        data-command-palette-launch-url-value="<%= quick_launch_path %>"
+        data-command-palette-search-url-value="<%= quick_launch_search_path %>">
     <div class="grid grid-cols-[224px_1fr] min-h-screen">
       <nav class="bg-surface-card border-r border-edge p-6 px-4 flex flex-col gap-2 sticky top-0 h-screen overflow-y-auto">
         <div class="flex items-center gap-2.5 px-2 mb-4 text-content">
@@ -54,6 +55,10 @@
             <span class="inline-flex items-center justify-center min-w-5 px-1.5 py-0.5 rounded-full bg-brass text-on-brass text-[0.6875rem] font-semibold font-mono"
                   title="<%= pluralize(needs_you, "thing") %> waiting on you"><%= needs_you %></span>
           <% end %>
+        <% end %>
+        <%= link_to pipeline_tasks_path, class: nav_link_classes(:board) do %>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="shrink-0"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="5" height="13" rx="1"/></svg>
+          <span>Board</span>
         <% end %>
         <%= link_to runs_path, class: nav_link_classes(:runs) do %>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="6 3 20 12 6 21 6 3"/></svg>

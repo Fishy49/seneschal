@@ -175,6 +175,14 @@ Today Cmd+K is a launch-only form (no search, no results, no keyboard nav).
 4. **The board & the palette** - tasks kanban, command palette v2, branded
    share page, workflow editor cleanup (inspector density, starter gallery
    dedupe).
+   **STATUS: shipped on this branch** (share page branding landed in phase
+   1). Board columns: Draft / Ready / Running / Waiting on you / Finished -
+   a running task whose run parks on a seal moves columns; Finished holds
+   completed and failed with chips so nothing vanishes. Palette: the one
+   box searches (pages, projects, workflows, tasks, skills, #id runs) with
+   arrow-key navigation while Cmd/Ctrl+Enter still launches. Deferred:
+   drag-and-drop between columns, workflow editor density pass, starter
+   gallery dedupe.
 
 ## Standing constraints
 

@@ -134,4 +134,30 @@ class QuickLaunchControllerTest < ActionDispatch::IntegrationTest
     assert_equal "never run", workflow["stats"]
     assert_equal "read-only", workflow["access"]
   end
+  test "search finds projects, workflows, tasks, and pages" do
+    get quick_launch_search_path, params: { q: "Deploy" }, as: :json
+    assert_response :success
+    labels = response.parsed_body["results"].pluck("label")
+    assert_includes labels, "Deploy Pipeline"
+
+    get quick_launch_search_path, params: { q: "Add user" }, as: :json
+    assert_includes response.parsed_body["results"].pluck("label"), "Add user authentication"
+
+    get quick_launch_search_path, params: { q: "boar" }, as: :json
+    board = response.parsed_body["results"].find { |r| r["type"] == "page" }
+    assert_equal "Board", board["label"]
+  end
+
+  test "search resolves a run id" do
+    run = runs(:completed_run)
+    get quick_launch_search_path, params: { q: "##{run.id}" }, as: :json
+    result = response.parsed_body["results"].find { |r| r["type"] == "run" }
+    assert result
+    assert_equal "/runs/#{run.id}", result["url"]
+  end
+
+  test "search returns nothing for short queries" do
+    get quick_launch_search_path, params: { q: "a" }, as: :json
+    assert_empty response.parsed_body["results"]
+  end
 end

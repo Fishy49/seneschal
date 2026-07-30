@@ -3,6 +3,11 @@ class QuickLaunchController < ApplicationController
   # launched, and one action that writes a task and starts its run in a single
   # request.
 
+  PAGES = [
+    ["Inbox", :root_path], ["Board", :pipeline_tasks_path], ["Runs", :runs_path],
+    ["Library", :skills_path], ["Activity", :activity_path], ["Account", :account_path]
+  ].freeze
+
   def options
     payload = Project.includes(workflows: [:steps, :runs]).order(:name).map do |project|
       {
@@ -14,6 +19,18 @@ class QuickLaunchController < ApplicationController
     end
 
     render json: { projects: payload }
+  end
+
+  # Jump-to search behind the palette: pages, projects, workflows, tasks,
+  # skills, and "#42"-style run ids, capped small because it renders as a
+  # keyboard-navigable list, not a results page.
+  def search
+    q = params[:q].to_s.strip
+    return render json: { results: [] } if q.length < 2
+
+    like = "%#{ActiveRecord::Base.sanitize_sql_like(q)}%"
+    results = page_results(q) + record_results(like) + run_result(q) + skill_results(like)
+    render json: { results: results.first(10) }
   end
 
   def create
@@ -41,6 +58,43 @@ class QuickLaunchController < ApplicationController
   end
 
   private
+
+  def page_results(query)
+    PAGES.filter_map do |label, helper|
+      next unless label.downcase.include?(query.downcase)
+
+      { type: "page", label: label, sublabel: "Go to", url: send(helper) }
+    end
+  end
+
+  def record_results(like)
+    results = Project.where("name LIKE ?", like).order(:name).limit(4).map do |project|
+      { type: "project", label: project.name, sublabel: "Project", url: project_path(project) }
+    end
+    Workflow.includes(:project).where("name LIKE ?", like).order(:name).limit(4).each do |workflow|
+      results << { type: "workflow", label: workflow.name, sublabel: workflow.project.name,
+                   url: project_workflow_path(workflow.project, workflow) }
+    end
+    PipelineTask.active.includes(:project).where("title LIKE ?", like).recent.limit(5).each do |task|
+      results << { type: "task", label: task.title, sublabel: "#{task.project.name} · #{task.status}",
+                   url: pipeline_task_path(task) }
+    end
+    results
+  end
+
+  def run_result(query)
+    match = query.match(/\A#?(\d+)\z/)
+    run = match && Run.find_by(id: match[1])
+    return [] unless run
+
+    [{ type: "run", label: helpers.run_display_name(run), sublabel: "Run ##{run.id}", url: run_path(run) }]
+  end
+
+  def skill_results(like)
+    Skill.where("name LIKE ?", like).order(:name).limit(4).map do |skill|
+      { type: "skill", label: skill.name, sublabel: "Skill", url: skill_path(skill) }
+    end
+  end
 
   # Stats and access are pre-formatted here so the palette can show the same
   # confidence glance as the composer without duplicating the wording in JS.

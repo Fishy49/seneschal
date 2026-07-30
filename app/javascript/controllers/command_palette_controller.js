@@ -9,14 +9,19 @@ function escapeHtml(value) {
   return node.innerHTML
 }
 
-// Cmd/Ctrl+K from anywhere: describe the work, confirm project + workflow,
-// launch. Project and workflow default to whatever was used last.
+// Cmd/Ctrl+K from anywhere: one box that searches, jumps, or launches. The
+// text doubles as a jump-to query (arrow keys pick a result, Enter goes) and
+// as the description for a new run (Cmd/Ctrl+Enter launches). Project and
+// workflow default to whatever was used last.
 export default class extends Controller {
-  static targets = ["overlay", "description", "project", "workflow", "error", "submit", "summary", "composer"]
-  static values = { optionsUrl: String, launchUrl: String }
+  static targets = ["overlay", "description", "project", "workflow", "error", "submit", "summary", "composer", "results"]
+  static values = { optionsUrl: String, launchUrl: String, searchUrl: String }
 
   connect() {
     this.projects = null
+    this.results = []
+    this.selectedIndex = -1
+    this.searchTimer = null
     this.onKeydown = (event) => this.handleKeydown(event)
     document.addEventListener("keydown", this.onKeydown)
   }
@@ -68,6 +73,7 @@ export default class extends Controller {
 
   close() {
     this.overlayTarget.hidden = true
+    this.clearResults()
   }
 
   backdropClick(event) {
@@ -78,6 +84,101 @@ export default class extends Controller {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault()
       this.launch()
+      return
+    }
+
+    if (!this.results.length) return
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      this.moveSelection(1)
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault()
+      this.moveSelection(-1)
+    } else if (event.key === "Enter" && this.selectedIndex >= 0) {
+      event.preventDefault()
+      this.visit(this.results[this.selectedIndex].url)
+    }
+  }
+
+  // Typing searches; below two characters the list folds away. Plain Enter
+  // keeps inserting newlines until a result is actually highlighted.
+  queryChanged() {
+    clearTimeout(this.searchTimer)
+    const query = this.descriptionTarget.value.trim()
+    if (!this.hasSearchUrlValue || query.length < 2) {
+      this.clearResults()
+      return
+    }
+
+    this.searchTimer = setTimeout(async () => {
+      try {
+        const url = new URL(this.searchUrlValue, window.location.origin)
+        url.searchParams.set("q", query)
+        const response = await fetch(url, { headers: { Accept: "application/json" } })
+        if (!response.ok) return
+        this.renderResults((await response.json()).results || [])
+      } catch {
+        // Search is a convenience; a failed fetch just means no list.
+      }
+    }, 180)
+  }
+
+  renderResults(results) {
+    this.results = results
+    this.selectedIndex = -1
+    if (!results.length) {
+      this.resultsTarget.hidden = true
+      this.resultsTarget.innerHTML = ""
+      return
+    }
+
+    this.resultsTarget.innerHTML = results
+      .map((result, index) => `
+        <li><button type="button" data-index="${index}"
+              class="w-full flex items-center gap-2.5 px-3 py-2 bg-transparent border-none cursor-pointer text-left text-sm text-content hover:bg-surface-input transition-colors"
+              data-action="command-palette#resultClicked">
+          <span class="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-faint w-16 shrink-0">${escapeHtml(result.type)}</span>
+          <span class="truncate">${escapeHtml(result.label)}</span>
+          <span class="ml-auto shrink-0 text-xs text-content-muted">${escapeHtml(result.sublabel || "")}</span>
+        </button></li>`)
+      .join("")
+    this.resultsTarget.hidden = false
+  }
+
+  moveSelection(step) {
+    const count = this.results.length
+    if (!count) return
+
+    if (this.selectedIndex === -1) {
+      this.selectedIndex = step > 0 ? 0 : count - 1
+    } else {
+      this.selectedIndex = (this.selectedIndex + step + count) % count
+    }
+
+    this.resultsTarget.querySelectorAll("button").forEach((button, index) => {
+      button.classList.toggle("bg-surface-input", index === this.selectedIndex)
+      button.setAttribute("aria-selected", String(index === this.selectedIndex))
+    })
+  }
+
+  resultClicked(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    if (this.results[index]) this.visit(this.results[index].url)
+  }
+
+  visit(url) {
+    this.close()
+    if (window.Turbo) window.Turbo.visit(url)
+    else window.location = url
+  }
+
+  clearResults() {
+    this.results = []
+    this.selectedIndex = -1
+    if (this.hasResultsTarget) {
+      this.resultsTarget.hidden = true
+      this.resultsTarget.innerHTML = ""
     }
   }
 

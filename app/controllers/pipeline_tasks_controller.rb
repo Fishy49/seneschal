@@ -14,6 +14,8 @@ class PipelineTasksController < ApplicationController
     @tasks = @tasks.where("title LIKE ?", "%#{params[:q]}%") if params[:q].present?
 
     @projects = Project.order(:name)
+
+    build_board(@tasks.to_a)
   end
 
   def show
@@ -135,6 +137,32 @@ class PipelineTasksController < ApplicationController
   end
 
   private
+
+  # The board's five columns. "Running" splits on the active run's status:
+  # a run parked on a seal moves its card into "Waiting on you". One query
+  # per concern, then plain Ruby - the board never N+1s.
+  def build_board(tasks)
+    running = tasks.select { |t| t.status == "running" }
+    @board_runs = Run.active.where(pipeline_task_id: running.map(&:id))
+                     .includes(run_steps: :step).index_by(&:pipeline_task_id)
+    waiting, running = running.partition { |t| @board_runs[t.id]&.awaiting_approval? }
+
+    @columns = [
+      ["Draft", tasks.select { |t| t.status == "draft" }],
+      ["Ready", tasks.select { |t| t.status == "ready" }],
+      ["Running", running],
+      ["Waiting on you", waiting],
+      ["Finished", tasks.select { |t| t.status.in?(["completed", "failed"]) }]
+    ]
+
+    task_ids = tasks.map(&:id)
+    @comment_counts = Comment.where(commentable_type: "PipelineTask", commentable_id: task_ids)
+                             .group(:commentable_id).count
+    @run_ids_by_task = Run.where(pipeline_task_id: task_ids)
+                          .pluck(:pipeline_task_id, :id)
+                          .group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
+    @unread_contexts = current_user.notifications.unread.pluck(:context_type, :context_id).to_set
+  end
 
   def set_task
     @task = PipelineTask.find(params.expect(:id))

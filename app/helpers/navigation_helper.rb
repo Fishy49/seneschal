@@ -6,7 +6,7 @@ module NavigationHelper
     "runs" => :runs,
     "shared_runs" => :runs,
     "projects" => :projects,
-    "pipeline_tasks" => :projects,
+    "pipeline_tasks" => :board,
     "workflows" => :projects,
     "steps" => :projects,
     "code_maps" => :projects,

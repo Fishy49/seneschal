@@ -16,6 +16,19 @@ class LaunchBarTest < ApplicationSystemTestCase
     assert_no_selector "[data-command-palette-target='description']", visible: true
   end
 
+  test "typing searches and arrow-enter jumps" do
+    visit root_path
+    find("body").send_keys([:control, "k"])
+
+    box = find("[data-command-palette-target='description']")
+    box.fill_in with: "Deploy Pip"
+    assert_selector "[data-command-palette-target='results'] button", text: /Deploy Pipeline/
+
+    box.send_keys(:arrow_down)
+    box.send_keys(:enter)
+    assert_current_path project_workflow_path(projects(:seneschal), workflows(:deploy))
+  end
+
   test "the sidebar Launch button opens the launch bar" do
     visit root_path
     assert_no_selector "[data-command-palette-target='description']", visible: true
